@@ -1,7 +1,11 @@
-import InvitePage from "./pages/InvitePage";
+import CalendarPage from "./pages/CalendarPage";
 
 function App() {
-  return <InvitePage />;
+  return (
+    <div className="w-full min-h-screen">
+      <CalendarPage />
+    </div>
+  );
 }
 
 export default App;
