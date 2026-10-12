@@ -10,7 +10,6 @@ import trendingUpIcon from "../../assets/icons/trending-up.svg";
 import usersIcon from "../../assets/icons/users.svg";
 import filterIcon from "../../assets/icons/filter.svg";
 
-// 1. activeMenu 속성 추가
 export interface SidebarProps {
   activeMenu?: string;
   todayTaskCount?: number;

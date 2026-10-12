@@ -27,7 +27,6 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
 
   return (
     <div className="flex items-center justify-between pb-5 select-none">
-      {/* 날짜 조작 및 탐색 */}
       <div className="flex items-center gap-3">
         <h2 className="text-lg font-bold text-gray-900">
           {year}년 {month}월
@@ -50,9 +49,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
         </div>
       </div>
 
-      {/* 우측 컨트롤 필터 */}
       <div className="flex items-center gap-3">
-        {/* 내 일정만 보기 토글 */}
         <button
           type="button"
           onClick={onToggleOnlyMyEvents}
@@ -70,7 +67,6 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
           내 일정만
         </button>
 
-        {/* 월간 / 주간 스위처 */}
         <div className="flex rounded-xl bg-gray-100 p-1">
           {(["월간", "주간"] as const).map((mode) => (
             <button
@@ -88,7 +84,6 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
           ))}
         </div>
 
-        {/* 일정 추가 버튼 */}
         <button
           type="button"
           onClick={onOpenAddModal}

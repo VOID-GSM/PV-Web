@@ -24,12 +24,10 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
   const [date, setDate] = useState("2026-10-15");
   const [time, setTime] = useState("");
 
-  // 경고 메시지 및 에러 상태
   const [errors, setErrors] = useState<FormErrors>({});
 
   if (!isOpen) return null;
 
-  // 모달 닫을 때 상태 초기화
   const handleClose = () => {
     setTitle("");
     setBoard("");
@@ -40,7 +38,6 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
     onClose();
   };
 
-  // 일정 추가 버튼 클릭 시 검증
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -56,13 +53,11 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
       newErrors.date = "날짜를 선택해 주세요.";
     }
 
-    // 에러가 하나라도 있으면 추가 중단 및 경고 표시
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
 
-    // 유효성 검사 통과 시 일정 추가
     onAddEvent({
       id: Date.now().toString(),
       title: title.trim(),
@@ -79,7 +74,6 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs select-none">
       <div className="w-full max-w-lg rounded-3xl bg-white p-8 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-        {/* Header */}
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-xl font-bold text-gray-900">일정 추가</h2>
@@ -109,7 +103,6 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-5">
-          {/* 일정 유형 */}
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-2">
               일정 유형
@@ -147,7 +140,6 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
             </div>
           </div>
 
-          {/* 제목 입력 */}
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1.5">
               제목
@@ -169,12 +161,24 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
             />
             {errors.title && (
               <p className="mt-1.5 text-[11px] font-semibold text-red-500 flex items-center gap-1">
-                <span>⚠️</span> {errors.title}
+                <svg
+                  className="h-3.5 w-3.5 shrink-0 text-red-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+                {errors.title}
               </p>
             )}
           </div>
 
-          {/* 보드 입력 */}
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1.5">
               보드
@@ -196,12 +200,24 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
             />
             {errors.board && (
               <p className="mt-1.5 text-[11px] font-semibold text-red-500 flex items-center gap-1">
-                <span>⚠️</span> {errors.board}
+                <svg
+                  className="h-3.5 w-3.5 shrink-0 text-red-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+                {errors.board}
               </p>
             )}
           </div>
 
-          {/* 날짜 및 시간 */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1.5">
@@ -223,7 +239,20 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
               />
               {errors.date && (
                 <p className="mt-1.5 text-[11px] font-semibold text-red-500 flex items-center gap-1">
-                  <span>⚠️</span> {errors.date}
+                  <svg
+                    className="h-3.5 w-3.5 shrink-0 text-red-500"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                    />
+                  </svg>
+                  {errors.date}
                 </p>
               )}
             </div>
@@ -241,7 +270,6 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
             </div>
           </div>
 
-          {/* Actions */}
           <div className="mt-8 flex justify-end gap-2 pt-2">
             <button
               type="button"

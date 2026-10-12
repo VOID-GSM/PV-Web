@@ -13,7 +13,6 @@ import type {
   ViewMode,
 } from "../types/calendar";
 
-// Props 옵셔널(?) 처리
 export interface CalendarPageProps {
   events?: CalendarEvent[];
   activeMenu?: string;
