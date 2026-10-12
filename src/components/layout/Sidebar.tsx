@@ -21,12 +21,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   return (
     <aside className="flex h-screen w-60 flex-col border-r border-gray-100 bg-white px-4 py-5 select-none shrink-0">
-      {/* Logo & VOID Title */}
-      <div className="mb-6 px-2 flex items-center gap-2.5">
-        <img src={logo} alt="" className="h-6 w-auto object-contain" />
-        <span className="text-xl font-black tracking-wider text-gray-900 font-sans">
-          VOID
-        </span>
+      {/* Logo */}
+      <div className="mb-6 px-2 flex items-center">
+        <img src={logo} alt="VOID" className="h-5 object-contain" />
       </div>
 
       {/* Navigation Menu */}
@@ -39,7 +36,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="space-y-1">
             <button
               type="button"
-              className="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+              className="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition"
             >
               <span className="flex items-center gap-2.5">
                 <img src={homeIcon} alt="" className="h-4 w-4 opacity-70" />
@@ -52,7 +49,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               type="button"
-              className="flex w-full items-center gap-2.5 rounded-xl bg-black px-2.5 py-2.5 text-xs font-semibold text-white shadow-xs cursor-pointer"
+              className="flex w-full items-center gap-2.5 rounded-xl bg-black px-2.5 py-2.5 text-xs font-semibold text-white shadow-xs"
             >
               <img
                 src={calendarIcon}
@@ -64,7 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               type="button"
-              className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+              className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition"
             >
               <img src={bookIcon} alt="" className="h-4 w-4 opacity-70" />
               활동
@@ -80,7 +77,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="space-y-1">
             <button
               type="button"
-              className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+              className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition"
             >
               <img src={bookIcon} alt="" className="h-4 w-4 opacity-70" />
               정리글 아카이브
@@ -88,7 +85,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               type="button"
-              className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+              className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition"
             >
               <img src={micIcon} alt="" className="h-4 w-4 opacity-70" />
               면접 질문 뱅크
@@ -96,7 +93,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               type="button"
-              className="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+              className="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition"
             >
               <span className="flex items-center gap-2.5">
                 <img src={fileTextIcon} alt="" className="h-4 w-4 opacity-70" />
@@ -117,7 +114,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="space-y-1">
             <button
               type="button"
-              className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+              className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition"
             >
               <img src={clipboardIcon} alt="" className="h-4 w-4 opacity-70" />
               업무일지
@@ -125,7 +122,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
               type="button"
-              className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+              className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition"
             >
               <img src={trendingUpIcon} alt="" className="h-4 w-4 opacity-70" />
               주간 리포트
@@ -141,7 +138,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="space-y-1">
             <button
               type="button"
-              className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+              className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition"
             >
               <img src={usersIcon} alt="" className="h-4 w-4 opacity-70" />
               팀원 관리
@@ -164,7 +161,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           <button
             type="button"
-            className="p-1 text-gray-400 hover:text-gray-600 cursor-pointer"
+            className="p-1 text-gray-400 hover:text-gray-600"
           >
             <img src={filterIcon} alt="설정" className="h-4 w-4 opacity-50" />
           </button>
