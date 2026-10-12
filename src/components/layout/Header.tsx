@@ -10,28 +10,25 @@ import micIcon from "../../assets/icons/mic.svg";
 import usersIcon from "../../assets/icons/users.svg";
 
 interface HeaderProps {
-  title?: string;
-  subtitle?: string;
   onOpenAddModal?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({
-  title = "통합 캘린더",
-  subtitle = "모든 보드의 마감·회의·활동을 한 화면에서",
-  onOpenAddModal,
-}) => {
+export const Header: React.FC<HeaderProps> = ({ onOpenAddModal }) => {
+  // 1. 새로 만들기 드롭다운 상태
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const createDropdownRef = useRef<HTMLDivElement>(null);
 
+  // 2. 알림 센터 드롭다운 상태 및 데이터
   const [isNotiOpen, setIsNotiOpen] = useState(false);
   const [activeNotiTab, setActiveNotiTab] = useState<
     "전체" | "안 읽음" | "멘션"
   >("전체");
-  const [notifications] = useState<any[]>([]);
+  const [notifications] = useState<any[]>([]); // 기본값 없음 상태
   const notiDropdownRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
+  // 외부 영역 클릭 시 드롭다운들 닫기
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -58,10 +55,11 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="flex h-16 w-full items-center justify-between border-b border-gray-100 bg-white px-8 shrink-0 relative z-30">
-      {/* Dynamic Title & Subtitle */}
       <div>
-        <h1 className="text-base font-bold text-gray-900">{title}</h1>
-        {subtitle && <p className="text-[11px] text-gray-400">{subtitle}</p>}
+        <h1 className="text-base font-bold text-gray-900">통합 캘린더</h1>
+        <p className="text-[11px] text-gray-400">
+          모든 보드의 마감·회의·활동을 한 화면에서
+        </p>
       </div>
 
       <div className="flex items-center gap-3">
@@ -90,13 +88,16 @@ export const Header: React.FC<HeaderProps> = ({
             className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gray-100 transition hover:bg-gray-200 cursor-pointer"
           >
             <img src={bellIcon} alt="알림" className="h-4 w-4 opacity-70" />
+            {/* 안 읽은 알림이 있을 때만 빨간 점 표시 */}
             {unreadCount > 0 && (
               <span className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-red-500" />
             )}
           </button>
 
+          {/* 알림 센터 드롭다운 */}
           {isNotiOpen && (
             <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-gray-100 bg-white shadow-2xl z-50 text-xs select-none animate-in fade-in zoom-in-95 duration-100">
+              {/* 상단 헤더 */}
               <div className="flex items-center justify-between border-b border-gray-100 p-4">
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-gray-900 text-sm">알림</span>
@@ -114,6 +115,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               </div>
 
+              {/* 탭 헤더 */}
               <div className="flex border-b border-gray-100 px-4 pt-2 text-xs font-semibold text-gray-400">
                 {(["전체", "안 읽음", "멘션"] as const).map((tab) => (
                   <button
@@ -131,6 +133,7 @@ export const Header: React.FC<HeaderProps> = ({
                 ))}
               </div>
 
+              {/* 알림 본문 (기본값 없음) */}
               <div className="flex flex-col items-center justify-center py-12 text-gray-400">
                 <img
                   src={bellIcon}
@@ -140,6 +143,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <p className="text-xs">새로운 알림이 없습니다.</p>
               </div>
 
+              {/* 하단 푸터 */}
               <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50/50 px-4 py-2.5 rounded-b-2xl text-[11px] text-gray-400">
                 <span>디스코드와도 함께 받고 있습니다</span>
                 <button
@@ -167,6 +171,7 @@ export const Header: React.FC<HeaderProps> = ({
             <span>새로 만들기</span>
           </button>
 
+          {/* 새로 만들기 팝오버 드롭다운 메뉴 */}
           {isDropdownOpen && (
             <div className="absolute right-0 mt-2 w-60 rounded-2xl border border-gray-100 bg-white p-2 shadow-2xl z-50 text-xs select-none animate-in fade-in zoom-in-95 duration-100">
               <div className="px-3 py-1.5 text-[11px] font-medium text-gray-400">
