@@ -9,6 +9,15 @@ import clipboardIcon from "../../assets/icons/clipboard.svg";
 import micIcon from "../../assets/icons/mic.svg";
 import usersIcon from "../../assets/icons/users.svg";
 
+// 알림 아이템 타입 정의 (any 타입 명시 금지 ESLint 대응)
+interface NotificationItem {
+  id: string;
+  title: string;
+  message?: string;
+  isRead: boolean;
+  createdAt?: string;
+}
+
 interface HeaderProps {
   title?: string;
   subtitle?: string;
@@ -27,7 +36,9 @@ export const Header: React.FC<HeaderProps> = ({
   const [activeNotiTab, setActiveNotiTab] = useState<
     "전체" | "안 읽음" | "멘션"
   >("전체");
-  const [notifications] = useState<any[]>([]);
+
+  // any[] 대신 NotificationItem[] 타입 명시
+  const [notifications] = useState<NotificationItem[]>([]);
   const notiDropdownRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
