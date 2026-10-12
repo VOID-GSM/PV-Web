@@ -1,5 +1,4 @@
 export type EventType = "마감" | "회의" | "활동" | "개인 일정";
-export type ViewMode = "월간" | "주간" | "타임라인";
 
 export interface CalendarEvent {
   id: string;
@@ -9,9 +8,15 @@ export interface CalendarEvent {
   date: string; // YYYY-MM-DD
   time?: string;
   endDate?: string;
+  isAllDay?: boolean;
   assignees?: string[];
+  creator?: string;
+  createdDate?: string;
+  milestone?: string;
   description?: string;
-  isMyEvent?: boolean;
+  dDayAlerts?: string[];
+  hasConflict?: boolean;
+  conflictText?: string;
 }
 
 export interface BoardFilter {
