@@ -24,7 +24,6 @@ export const Header: React.FC<HeaderProps> = ({
     "전체" | "안 읽음" | "멘션"
   >("전체");
 
-  // 실제 사용을 위해 알림 데이터 초기화
   const notifications: [] = [];
 
   return (
@@ -35,7 +34,6 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       <div className="flex items-center gap-3">
-        {/* 알림 버튼 및 드롭다운 */}
         <div className="relative">
           <button
             type="button"
@@ -51,7 +49,6 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </button>
 
-          {/* 알림 팝업 모달 */}
           {isNoticeOpen && (
             <div className="absolute right-0 mt-3 w-96 rounded-3xl border border-gray-100 bg-white p-5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
               <div className="flex items-center justify-between pb-3">
@@ -69,7 +66,6 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               </div>
 
-              {/* 탭 헤더 */}
               <div className="flex border-b border-gray-100 pb-1 pt-2 gap-4 text-xs font-semibold text-gray-400">
                 {(["전체", "안 읽음", "멘션"] as const).map((tab) => (
                   <button
@@ -87,18 +83,10 @@ export const Header: React.FC<HeaderProps> = ({
                 ))}
               </div>
 
-              {/* 알림 목록 (초기화 상태) */}
               <div className="py-8 text-center text-xs text-gray-400">
-                {notifications.length === 0 ? (
-                  <p>새로운 알림이 없습니다.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {/* 알림 데이터가 등록될 경우 렌더링 영역 */}
-                  </div>
-                )}
+                <p>새로운 알림이 없습니다.</p>
               </div>
 
-              {/* 푸터 */}
               <div className="border-t border-gray-100 pt-3 flex items-center justify-between text-[11px] text-gray-400">
                 <span>디스코드에서도 함께 받고 있습니다</span>
                 <button
@@ -112,7 +100,6 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
 
-        {/* 새로 만들기 드롭다운 */}
         <div className="relative">
           <button
             type="button"
@@ -128,7 +115,6 @@ export const Header: React.FC<HeaderProps> = ({
 
           {isCreateOpen && (
             <div className="absolute right-0 mt-3 w-64 rounded-3xl border border-gray-100 bg-white p-3 shadow-2xl z-50 space-y-3 animate-in fade-in zoom-in-95 duration-150 text-xs">
-              {/* 새로 만들기 섹션 */}
               <div>
                 <p className="px-3 py-1 text-[10px] font-semibold text-gray-400">
                   새로 만들기
@@ -179,7 +165,6 @@ export const Header: React.FC<HeaderProps> = ({
 
               <hr className="border-gray-100" />
 
-              {/* 내 기록 섹션 */}
               <div>
                 <p className="px-3 py-1 text-[10px] font-semibold text-gray-400">
                   내 기록

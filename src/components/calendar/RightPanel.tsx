@@ -52,7 +52,6 @@ export const RightPanel: React.FC<RightPanelProps> = ({
 
   return (
     <div className="flex w-80 flex-col space-y-5 shrink-0 select-none overflow-y-auto">
-      {/* 1. 보드 필터 */}
       <div className="rounded-3xl bg-white p-5 shadow-xs">
         <h3 className="text-xs font-bold text-gray-900 mb-3">보드 필터</h3>
         <div className="space-y-2.5">
@@ -79,7 +78,6 @@ export const RightPanel: React.FC<RightPanelProps> = ({
         </div>
       </div>
 
-      {/* 2. D-day 알림 단계 */}
       <div className="rounded-3xl bg-white p-5 shadow-xs">
         <h3 className="text-xs font-bold text-gray-900">D-day 알림 단계</h3>
         <p className="text-[11px] text-gray-400 mt-0.5 mb-3">
@@ -104,7 +102,6 @@ export const RightPanel: React.FC<RightPanelProps> = ({
         </div>
       </div>
 
-      {/* 3. 마감 역산 마일스톤 */}
       <div className="flex-1 rounded-3xl bg-white p-5 shadow-xs flex flex-col justify-between">
         <div>
           <h3 className="text-xs font-bold text-gray-900">
@@ -114,7 +111,6 @@ export const RightPanel: React.FC<RightPanelProps> = ({
             주요 마감일을 기준으로 자동 제안된 마일스톤 목록입니다.
           </p>
 
-          {/* 입력 폼 */}
           <form onSubmit={handleAdd} className="mt-4 space-y-2">
             <input
               type="text"
@@ -144,7 +140,6 @@ export const RightPanel: React.FC<RightPanelProps> = ({
               </button>
             </div>
 
-            {/* 입력 오류 알림 문구 */}
             {milestoneError && (
               <p className="text-[11px] font-semibold text-red-500 flex items-center gap-1 mt-1">
                 <svg
@@ -165,7 +160,6 @@ export const RightPanel: React.FC<RightPanelProps> = ({
             )}
           </form>
 
-          {/* 목록 표시 */}
           <div className="mt-4 space-y-2 max-h-40 overflow-y-auto">
             {milestones.length === 0 ? (
               <p className="text-xs text-gray-400 py-3 text-center">
@@ -196,7 +190,6 @@ export const RightPanel: React.FC<RightPanelProps> = ({
           </div>
         </div>
 
-        {/* 하단 버튼 */}
         <div className="mt-5 flex gap-2">
           <button
             type="button"

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import CalendarPage from "./pages/CalendarPage";
+import { MainPage } from "./pages/MainPage";
 import { Sidebar } from "./components/layout/Sidebar";
 import { Header } from "./components/layout/Header";
 import { AddEventModal } from "./components/calendar/AddEventModal";
@@ -19,7 +20,16 @@ export default function App() {
 
   return (
     <>
-      {/* 1. 통합 캘린더 */}
+      {/* 1. 오늘 할 일 (메인 대시보드) */}
+      {currentMenu === "오늘 할 일" && (
+        <MainPage
+          events={events}
+          onNavigate={(menu: string) => setCurrentMenu(menu)}
+          onOpenAddModal={() => setIsAddModalOpen(true)}
+        />
+      )}
+
+      {/* 2. 통합 캘린더 */}
       {currentMenu === "통합 캘린더" && (
         <CalendarPage
           events={events}
@@ -30,8 +40,8 @@ export default function App() {
         />
       )}
 
-      {/* 2. 통합 캘린더 외 기타 메뉴 (오늘 할 일 및 기타 - 빈 흰 화면) */}
-      {currentMenu !== "통합 캘린더" && (
+      {/* 3. 기타 메뉴 (빈 화면) */}
+      {currentMenu !== "오늘 할 일" && currentMenu !== "통합 캘린더" && (
         <div className="flex h-screen w-full overflow-hidden bg-[#f7f7f8]">
           <Sidebar
             activeMenu={currentMenu}

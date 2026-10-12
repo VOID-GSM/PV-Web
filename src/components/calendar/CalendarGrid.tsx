@@ -19,7 +19,6 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
-  // 날짜 포맷 (YYYY-MM-DD)
   const formatDateStr = (d: Date) => {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -27,7 +26,6 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     return `${y}-${m}-${day}`;
   };
 
-  // 월간 데이터 계산
   const firstDayOfMonth = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
@@ -37,7 +35,6 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     monthDays.push(new Date(year, month, d));
   }
 
-  // 주간 데이터 계산 (현재 날짜가 속한 주의 일요일~토요일)
   const startOfWeek = new Date(currentDate);
   startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
 
@@ -73,7 +70,6 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden select-none">
-      {/* 요어 헤더 */}
       <div className="grid grid-cols-7 border-b border-gray-100 text-center text-xs font-semibold text-gray-400 py-2">
         {daysOfWeek.map((day, idx) => (
           <div key={day} className={idx === 0 ? "text-red-400" : ""}>
@@ -82,7 +78,6 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
         ))}
       </div>
 
-      {/* 그리드 바디 */}
       <div
         className={`grid flex-1 grid-cols-7 gap-px bg-gray-100 ${
           viewMode === "주간" ? "grid-rows-1" : "grid-rows-5"
