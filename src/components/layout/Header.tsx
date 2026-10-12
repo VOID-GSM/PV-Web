@@ -14,17 +14,34 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ onOpenAddModal }) => {
+  // 1. 새로 만들기 드롭다운 상태
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const createDropdownRef = useRef<HTMLDivElement>(null);
 
-  // 드롭다운 외부 클릭 시 닫히는 이벤트
+  // 2. 알림 센터 드롭다운 상태 및 데이터
+  const [isNotiOpen, setIsNotiOpen] = useState(false);
+  const [activeNotiTab, setActiveNotiTab] = useState<
+    "전체" | "안 읽음" | "멘션"
+  >("전체");
+  const [notifications] = useState<any[]>([]); // 기본값 없음 상태
+  const notiDropdownRef = useRef<HTMLDivElement>(null);
+
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+  // 외부 영역 클릭 시 드롭다운들 닫기
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
+        createDropdownRef.current &&
+        !createDropdownRef.current.contains(event.target as Node)
       ) {
         setIsDropdownOpen(false);
+      }
+      if (
+        notiDropdownRef.current &&
+        !notiDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsNotiOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -60,20 +77,94 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal }) => {
           />
         </div>
 
-        {/* Bell Notification Button */}
-        <button
-          type="button"
-          className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gray-100 transition hover:bg-gray-200"
-        >
-          <img src={bellIcon} alt="알림" className="h-4 w-4 opacity-70" />
-          <span className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-red-500" />
-        </button>
-
-        {/* Create Button & Dropdown Menu */}
-        <div className="relative" ref={dropdownRef}>
+        {/* Bell Button & Notification Popover */}
+        <div className="relative" ref={notiDropdownRef}>
           <button
             type="button"
-            onClick={() => setIsDropdownOpen((prev) => !prev)}
+            onClick={() => {
+              setIsNotiOpen((prev) => !prev);
+              setIsDropdownOpen(false);
+            }}
+            className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gray-100 transition hover:bg-gray-200 cursor-pointer"
+          >
+            <img src={bellIcon} alt="알림" className="h-4 w-4 opacity-70" />
+            {/* 안 읽은 알림이 있을 때만 빨간 점 표시 */}
+            {unreadCount > 0 && (
+              <span className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-red-500" />
+            )}
+          </button>
+
+          {/* 알림 센터 드롭다운 */}
+          {isNotiOpen && (
+            <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-gray-100 bg-white shadow-2xl z-50 text-xs select-none animate-in fade-in zoom-in-95 duration-100">
+              {/* 상단 헤더 */}
+              <div className="flex items-center justify-between border-b border-gray-100 p-4">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-gray-900 text-sm">알림</span>
+                  {unreadCount > 0 && (
+                    <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                      안 읽음 {unreadCount}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="text-[11px] font-semibold text-gray-400 hover:text-gray-700 transition cursor-pointer"
+                >
+                  모두 읽음
+                </button>
+              </div>
+
+              {/* 탭 헤더 */}
+              <div className="flex border-b border-gray-100 px-4 pt-2 text-xs font-semibold text-gray-400">
+                {(["전체", "안 읽음", "멘션"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setActiveNotiTab(tab)}
+                    className={`pb-2.5 mr-4 transition cursor-pointer ${
+                      activeNotiTab === tab
+                        ? "border-b-2 border-black font-bold text-gray-900"
+                        : "hover:text-gray-600"
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+
+              {/* 알림 본문 (기본값 없음) */}
+              <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                <img
+                  src={bellIcon}
+                  alt=""
+                  className="h-7 w-7 opacity-20 mb-2"
+                />
+                <p className="text-xs">새로운 알림이 없습니다.</p>
+              </div>
+
+              {/* 하단 푸터 */}
+              <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50/50 px-4 py-2.5 rounded-b-2xl text-[11px] text-gray-400">
+                <span>디스코드와도 함께 받고 있습니다</span>
+                <button
+                  type="button"
+                  className="font-medium text-gray-500 hover:text-black transition cursor-pointer"
+                >
+                  알림 설정
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Create Button & Dropdown Menu */}
+        <div className="relative" ref={createDropdownRef}>
+          <button
+            type="button"
+            onClick={() => {
+              setIsDropdownOpen((prev) => !prev);
+              setIsNotiOpen(false);
+            }}
             className="flex h-9 items-center gap-1.5 rounded-xl bg-black px-4 text-xs font-medium text-white hover:bg-gray-800 transition cursor-pointer"
           >
             <img src={plusIcon} alt="" className="h-3.5 w-3.5 filter invert" />
@@ -83,7 +174,6 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal }) => {
           {/* 새로 만들기 팝오버 드롭다운 메뉴 */}
           {isDropdownOpen && (
             <div className="absolute right-0 mt-2 w-60 rounded-2xl border border-gray-100 bg-white p-2 shadow-2xl z-50 text-xs select-none animate-in fade-in zoom-in-95 duration-100">
-              {/* 1. 새로 만들기 섹션 */}
               <div className="px-3 py-1.5 text-[11px] font-medium text-gray-400">
                 새로 만들기
               </div>
@@ -91,7 +181,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal }) => {
                 <button
                   type="button"
                   onClick={handleOpenAddModal}
-                  className="flex w-full items-center gap-3 rounded-xl bg-gray-100 px-3 py-2 font-semibold text-gray-900 transition hover:bg-gray-200"
+                  className="flex w-full items-center gap-3 rounded-xl bg-gray-100 px-3 py-2 font-semibold text-gray-900 transition hover:bg-gray-200 cursor-pointer"
                 >
                   <img
                     src={calendarIcon}
@@ -104,7 +194,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal }) => {
                 <button
                   type="button"
                   onClick={() => setIsDropdownOpen(false)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer"
                 >
                   <img src={bookIcon} alt="" className="h-4 w-4 opacity-70" />
                   <span>활동 개설</span>
@@ -113,7 +203,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal }) => {
                 <button
                   type="button"
                   onClick={() => setIsDropdownOpen(false)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer"
                 >
                   <img src={bellIcon} alt="" className="h-4 w-4 opacity-70" />
                   <span>공지 보내기</span>
@@ -122,7 +212,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal }) => {
                 <button
                   type="button"
                   onClick={() => setIsDropdownOpen(false)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer"
                 >
                   <img
                     src={clipboardIcon}
@@ -133,7 +223,6 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal }) => {
                 </button>
               </div>
 
-              {/* 2. 내 기록 섹션 */}
               <div className="mt-2 border-t border-gray-100 pt-2 px-3 pb-1 text-[11px] font-medium text-gray-400">
                 내 기록
               </div>
@@ -141,7 +230,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal }) => {
                 <button
                   type="button"
                   onClick={() => setIsDropdownOpen(false)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer"
                 >
                   <img
                     src={fileTextIcon}
@@ -154,7 +243,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal }) => {
                 <button
                   type="button"
                   onClick={() => setIsDropdownOpen(false)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer"
                 >
                   <img
                     src={clipboardIcon}
@@ -167,19 +256,18 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal }) => {
                 <button
                   type="button"
                   onClick={() => setIsDropdownOpen(false)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer"
                 >
                   <img src={micIcon} alt="" className="h-4 w-4 opacity-70" />
                   <span>면접 답변 남기기</span>
                 </button>
               </div>
 
-              {/* 3. 기타 관리 섹션 */}
               <div className="mt-2 border-t border-gray-100 pt-2 space-y-0.5">
                 <button
                   type="button"
                   onClick={() => setIsDropdownOpen(false)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer"
                 >
                   <img
                     src={fileTextIcon}
@@ -192,7 +280,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal }) => {
                 <button
                   type="button"
                   onClick={() => setIsDropdownOpen(false)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer"
                 >
                   <img src={usersIcon} alt="" className="h-4 w-4 opacity-70" />
                   <span>초대 링크 만들기</span>
@@ -201,7 +289,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal }) => {
                 <button
                   type="button"
                   onClick={() => setIsDropdownOpen(false)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer"
                 >
                   <img src={plusIcon} alt="" className="h-4 w-4 opacity-70" />
                   <span>노션에서 가져오기</span>
