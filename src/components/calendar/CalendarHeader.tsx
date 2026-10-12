@@ -10,8 +10,8 @@ interface CalendarHeaderProps {
   onlyMyEvents: boolean;
   onViewChange: (mode: ViewMode) => void;
   onToggleOnlyMyEvents: () => void;
-  onPrevMonth: () => void;
-  onNextMonth: () => void;
+  onPrev: () => void;
+  onNext: () => void;
   onOpenAddModal: () => void;
 }
 
@@ -21,8 +21,8 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
   onlyMyEvents,
   onViewChange,
   onToggleOnlyMyEvents,
-  onPrevMonth,
-  onNextMonth,
+  onPrev,
+  onNext,
   onOpenAddModal,
 }) => {
   const today = new Date();
@@ -31,20 +31,20 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
 
   return (
     <div className="flex items-center justify-between pb-4 select-none">
-      {/* Date controls */}
+      {/* 날짜 이동 컨트롤 */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={onPrevMonth}
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-100 transition"
+            onClick={onPrev}
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-100 transition cursor-pointer"
           >
             <img src={chevronLeftIcon} alt="이전" className="h-4 w-4" />
           </button>
           <button
             type="button"
-            onClick={onNextMonth}
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-100 transition"
+            onClick={onNext}
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-100 transition cursor-pointer"
           >
             <img src={chevronRightIcon} alt="다음" className="h-4 w-4" />
           </button>
@@ -59,16 +59,15 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
         </span>
       </div>
 
-      {/* View Switcher & Action */}
+      {/* 뷰 전환 & 버튼 */}
       <div className="flex items-center gap-3">
-        {/* 월간 / 주간 / 타임라인 클릭 반응형 버튼 */}
         <div className="flex rounded-xl bg-gray-100 p-1 text-xs font-medium text-gray-500">
           {(["월간", "주간", "타임라인"] as ViewMode[]).map((mode) => (
             <button
               key={mode}
               type="button"
               onClick={() => onViewChange(mode)}
-              className={`rounded-lg px-3 py-1 transition ${
+              className={`rounded-lg px-3 py-1 transition cursor-pointer ${
                 viewMode === mode
                   ? "bg-white font-bold text-gray-900 shadow-sm"
                   : "hover:text-gray-900"
@@ -79,7 +78,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
           ))}
         </div>
 
-        {/* 내 일정만 토글 스위치 */}
+        {/* 내 일정만 보기 토글 */}
         <div className="flex items-center gap-2 text-xs font-medium text-gray-700">
           <span>내 일정만</span>
           <button
@@ -100,7 +99,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
         <button
           type="button"
           onClick={onOpenAddModal}
-          className="flex h-8 items-center gap-1.5 rounded-xl bg-black px-3.5 text-xs font-medium text-white hover:bg-gray-800 transition"
+          className="flex h-8 items-center gap-1.5 rounded-xl bg-black px-3.5 text-xs font-medium text-white hover:bg-gray-800 transition cursor-pointer"
         >
           <img src={plusIcon} alt="" className="h-3.5 w-3.5 filter invert" />
           <span>일정 추가</span>
