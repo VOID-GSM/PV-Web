@@ -193,7 +193,7 @@ function InvitePage() {
                 </p>
               ) : (
                 <p className="mt-2 text-[10px] text-[#aaa]">
-                  기수 목록은 무한히 관리합니다
+                  기수 목록은 부장이 관리합니다
                 </p>
               )}
             </div>
@@ -222,7 +222,7 @@ function InvitePage() {
                 </p>
               ) : (
                 <p className="mt-2 text-[10px] text-[#aaa]">
-                  과제 · 스터디 추천에 아마 적합하게 사용됩니다
+                  과제 · 스터디 추천과 아바타 색상에 사용됩니다
                 </p>
               )}
             </div>
