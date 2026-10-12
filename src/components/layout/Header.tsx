@@ -9,6 +9,7 @@ import clipboardIcon from "../../assets/icons/clipboard.svg";
 import micIcon from "../../assets/icons/mic.svg";
 import usersIcon from "../../assets/icons/users.svg";
 
+// 알림 아이템 타입 정의 (ESLint 대응)
 interface NotificationItem {
   id: string;
   title: string;
@@ -35,6 +36,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [activeNotiTab, setActiveNotiTab] = useState<
     "전체" | "안 읽음" | "멘션"
   >("전체");
+
   const [notifications] = useState<NotificationItem[]>([]);
   const notiDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -66,6 +68,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="flex h-16 w-full items-center justify-between border-b border-gray-100 bg-white px-8 shrink-0 relative z-30">
+      {/* Dynamic Title & Subtitle */}
       <div>
         <h1 className="text-base font-bold text-gray-900">{title}</h1>
         {subtitle && <p className="text-[11px] text-gray-400">{subtitle}</p>}
@@ -180,7 +183,6 @@ export const Header: React.FC<HeaderProps> = ({
                 새로 만들기
               </div>
               <div className="space-y-0.5">
-                {/* 기존 고정 bg-gray-100 제거 -> hover:bg-gray-100만 적용 */}
                 <button
                   type="button"
                   onClick={handleOpenAddModal}

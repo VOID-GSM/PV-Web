@@ -35,38 +35,3 @@ export default function App() {
           events={events}
           activeMenu={currentMenu}
           onNavigate={(menu: string) => setCurrentMenu(menu)}
-          onOpenAddModal={() => setIsAddModalOpen(true)}
-          onAddEvent={handleAddEvent}
-        />
-      )}
-
-      {/* 3. 오늘 할 일 / 통합 캘린더 제외 기타 메뉴 (빈 흰 화면) */}
-      {currentMenu !== "오늘 할 일" && currentMenu !== "통합 캘린더" && (
-        <div className="flex h-screen w-full overflow-hidden bg-[#f7f7f8]">
-          <Sidebar
-            activeMenu={currentMenu}
-            todayTaskCount={todayTaskCount}
-            assignmentCount={0}
-            onNavigate={(menu: string) => setCurrentMenu(menu)}
-          />
-          <div className="flex flex-1 flex-col overflow-hidden">
-            <Header
-              title={currentMenu}
-              subtitle=""
-              onOpenAddModal={() => setIsAddModalOpen(true)}
-            />
-            {/* 본문 전체 순수 흰색 영역 */}
-            <main className="flex-1 bg-white" />
-          </div>
-        </div>
-      )}
-
-      {/* 새로 만들기 공통 모달 */}
-      <AddEventModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        onAddEvent={handleAddEvent}
-      />
-    </>
-  );
-}

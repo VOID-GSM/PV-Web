@@ -13,19 +13,17 @@ import type {
   ViewMode,
 } from "../types/calendar";
 
-// 1. Props 타입 인터페이스 정의
-interface CalendarPageProps {
-  events: CalendarEvent[];
-  activeMenu: string;
-  onNavigate: (menu: string) => void;
-  onOpenAddModal: () => void;
-  onAddEvent: (newEvent: CalendarEvent) => void;
+export interface CalendarPageProps {
+  events?: CalendarEvent[];
+  activeMenu?: string;
+  onNavigate?: (menu: string) => void;
+  onOpenAddModal?: () => void;
+  onAddEvent?: (newEvent: CalendarEvent) => void;
 }
 
-// 2. 컴포넌트 인자에 Props 받아오기
 export default function CalendarPage({
-  events,
-  activeMenu,
+  events = [],
+  activeMenu = "통합 캘린더",
   onNavigate,
   onOpenAddModal,
   onAddEvent,
@@ -33,15 +31,19 @@ export default function CalendarPage({
   const [viewMode, setViewMode] = useState<ViewMode>("월간");
   const [onlyMyEvents, setOnlyMyEvents] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
+    null,
+  );
 
   const [boardFilters, setBoardFilters] = useState<BoardFilter[]>([]);
   const [milestones, setMilestones] = useState<MilestoneItem[]>([]);
 
-  // 오늘 할 일 / 과제·역량맵 동적 계산
+  // 동적 일정/과제 수치 계산
   const todayStr = currentDate.toISOString().split("T")[0];
   const todayTaskCount = events.filter((e) => e.date === todayStr).length;
-  const assignmentCount = 0;
+  const assignmentCount = events.filter(
+    (e) => e.type === "마감" || e.type === "활동",
+  ).length;
 
   const handlePrevDate = () => {
     const newDate = new Date(currentDate);
@@ -64,7 +66,7 @@ export default function CalendarPage({
   };
 
   const handleApplyMilestonesToCalendar = () => {
-    if (milestones.length === 0) return;
+    if (milestones.length === 0 || !onAddEvent) return;
 
     milestones.forEach((m) => {
       onAddEvent({
@@ -103,7 +105,7 @@ export default function CalendarPage({
         />
 
         <main className="flex flex-1 gap-5 overflow-hidden p-6">
-          <div className="flex flex-1 flex-col overflow-hidden rounded-3xl bg-white p-6 shadow-sm">
+          <div className="flex flex-1 flex-col overflow-hidden rounded-3xl bg-white p-6 shadow-xs">
             <CalendarHeader
               currentDate={currentDate}
               viewMode={viewMode}
@@ -112,7 +114,7 @@ export default function CalendarPage({
               onToggleOnlyMyEvents={() => setOnlyMyEvents(!onlyMyEvents)}
               onPrev={handlePrevDate}
               onNext={handleNextDate}
-              onOpenAddModal={onOpenAddModal}
+              onOpenAddModal={onOpenAddModal ?? (() => {})}
             />
 
             <CalendarGrid
@@ -129,8 +131,8 @@ export default function CalendarPage({
             onToggleFilter={(id) => {
               setBoardFilters((prev) =>
                 prev.map((f) =>
-                  f.id === id ? { ...f, checked: !f.checked } : f
-                )
+                  f.id === id ? { ...f, checked: !f.checked } : f,
+                ),
               );
             }}
             onAddMilestone={(title, date) => {
@@ -148,7 +150,7 @@ export default function CalendarPage({
         <EventDetailModal
           event={selectedEvent}
           onClose={() => setSelectedEvent(null)}
-          onDelete={() => {}}
+          onDelete={() => setSelectedEvent(null)}
         />
       )}
     </div>

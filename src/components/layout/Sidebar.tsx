@@ -10,15 +10,15 @@ import trendingUpIcon from "../../assets/icons/trending-up.svg";
 import usersIcon from "../../assets/icons/users.svg";
 import filterIcon from "../../assets/icons/filter.svg";
 
-interface SidebarProps {
-  activeMenu: string; // 현재 활성화된 메뉴 이름 ("오늘 할 일", "통합 캘린더" 등)
+export interface SidebarProps {
+  activeMenu?: string;
   todayTaskCount?: number;
   assignmentCount?: number;
   onNavigate?: (menu: string) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
-  activeMenu,
+  activeMenu = "오늘 할 일",
   todayTaskCount = 0,
   assignmentCount = 0,
   onNavigate,

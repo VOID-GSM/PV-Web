@@ -20,7 +20,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   const daysOfWeek = ["일", "월", "화", "수", "목", "금", "토"];
   const today = new Date();
 
-  // 1. 일정 칩 렌더링
+  // 1. 일정 칩 렌더링 (유형별 아이콘 및 스타일 적용)
   const renderEventChip = (evt: CalendarEvent) => {
     switch (evt.type) {
       case "활동":
@@ -29,7 +29,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
             key={evt.id}
             type="button"
             onClick={() => onSelectEvent(evt)}
-            className="flex w-full items-center gap-1 rounded bg-[#e8f1ff] px-2 py-1 text-left text-[11px] font-medium text-[#2d62d3] transition hover:opacity-80"
+            className="flex w-full items-center gap-1 rounded bg-[#e8f1ff] px-2 py-1 text-left text-[11px] font-medium text-[#2d62d3] transition hover:opacity-80 cursor-pointer"
           >
             <img src={bookIcon} alt="" className="h-3 w-3" />
             <span className="truncate">{evt.title}</span>
@@ -41,7 +41,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
             key={evt.id}
             type="button"
             onClick={() => onSelectEvent(evt)}
-            className="flex w-full items-center gap-1 rounded border border-[#00a86b] bg-white px-2 py-1 text-left text-[11px] font-medium text-[#008f5a] transition hover:bg-gray-50"
+            className="flex w-full items-center gap-1 rounded border border-[#00a86b] bg-white px-2 py-1 text-left text-[11px] font-medium text-[#008f5a] transition hover:bg-gray-50 cursor-pointer"
           >
             <img src={usersIcon} alt="" className="h-3 w-3" />
             <span className="truncate">{evt.title}</span>
@@ -53,7 +53,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
             key={evt.id}
             type="button"
             onClick={() => onSelectEvent(evt)}
-            className="flex w-full items-center gap-1 rounded bg-[#2c6ecb] px-2 py-1 text-left text-[11px] font-medium text-white transition hover:opacity-90"
+            className="flex w-full items-center gap-1 rounded bg-[#2c6ecb] px-2 py-1 text-left text-[11px] font-medium text-white transition hover:opacity-90 cursor-pointer"
           >
             <img src={alertIcon} alt="" className="h-3 w-3 filter invert" />
             <span className="truncate">{evt.title}</span>
@@ -65,7 +65,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
             key={evt.id}
             type="button"
             onClick={() => onSelectEvent(evt)}
-            className="flex w-full items-center gap-1 rounded bg-gray-100 px-2 py-1 text-left text-[11px] font-medium text-gray-700 transition hover:bg-gray-200"
+            className="flex w-full items-center gap-1 rounded bg-gray-100 px-2 py-1 text-left text-[11px] font-medium text-gray-700 transition hover:bg-gray-200 cursor-pointer"
           >
             <span className="truncate">{evt.title}</span>
           </button>
@@ -73,7 +73,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     }
   };
 
-  // 2. 주간 뷰 (선택한 날짜가 속한 주 7일 정밀 계산)
+  // 2. 주간 뷰
   if (viewMode === "주간") {
     const currentDayOfWeek = currentDate.getDay();
     const startOfWeek = new Date(currentDate);
@@ -141,7 +141,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   if (viewMode === "타임라인") {
     return (
       <div className="flex flex-1 flex-col overflow-y-auto rounded-2xl border border-gray-100 bg-white p-5">
-        <h3 className="text-xs font-bold text-gray-900 mb-3">
+        <h3 className="mb-3 text-xs font-bold text-gray-900">
           간트형 타임라인 뷰
         </h3>
         {events.length === 0 ? (
@@ -152,7 +152,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
               <div
                 key={evt.id}
                 onClick={() => onSelectEvent(evt)}
-                className="flex items-center justify-between p-3 border border-gray-100 rounded-xl hover:border-gray-300 cursor-pointer transition"
+                className="flex cursor-pointer items-center justify-between rounded-xl border border-gray-100 p-3 transition hover:border-gray-300"
               >
                 <div>
                   <span className="text-[10px] font-bold text-blue-600">
@@ -169,7 +169,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     );
   }
 
-  // 4. 월간 뷰 (JavaScript Date 객체 연산 기반 35/42일 동적 셀 생성)
+  // 4. 월간 뷰 (기본값)
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
@@ -199,7 +199,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white">
+    <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white select-none">
       {/* 요일 헤더 */}
       <div className="grid grid-cols-7 border-b border-gray-100 bg-white text-center text-xs font-semibold text-gray-500">
         {daysOfWeek.map((day, idx) => (
@@ -222,7 +222,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
           return (
             <div
               key={cell.dateStr}
-              className={`flex flex-col border-b border-r border-gray-100 p-2 min-h-[85px] ${
+              className={`flex min-h-[85px] flex-col border-b border-r border-gray-100 p-2 ${
                 cell.isCurrentMonth ? "bg-white" : "bg-gray-50/40"
               }`}
             >
