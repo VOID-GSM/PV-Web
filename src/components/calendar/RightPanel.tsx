@@ -186,7 +186,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
                 onClick={() => setIsEditingMilestone(true)}
                 className="flex-1 rounded-xl border border-gray-200 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition"
               >
-                수정
+                추가
               </button>
               <button
                 type="button"

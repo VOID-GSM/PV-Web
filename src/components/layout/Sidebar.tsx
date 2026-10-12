@@ -11,13 +11,17 @@ import usersIcon from "../../assets/icons/users.svg";
 import filterIcon from "../../assets/icons/filter.svg";
 
 interface SidebarProps {
+  activeMenu: string; // 현재 활성화된 메뉴 이름 ("오늘 할 일", "통합 캘린더" 등)
   todayTaskCount?: number;
   assignmentCount?: number;
+  onNavigate?: (menu: string) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
+  activeMenu,
   todayTaskCount = 0,
   assignmentCount = 0,
+  onNavigate,
 }) => {
   return (
     <aside className="flex h-screen w-60 flex-col border-r border-gray-100 bg-white px-4 py-5 select-none shrink-0">
@@ -37,36 +41,74 @@ export const Sidebar: React.FC<SidebarProps> = ({
             워크스페이스
           </p>
           <div className="space-y-1">
+            {/* 오늘 할 일 */}
             <button
               type="button"
-              className="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+              onClick={() => onNavigate?.("오늘 할 일")}
+              className={`flex w-full items-center justify-between rounded-xl px-2.5 py-2.5 text-xs font-medium transition cursor-pointer ${
+                activeMenu === "오늘 할 일"
+                  ? "bg-black text-white font-semibold shadow-xs"
+                  : "text-gray-700 hover:bg-gray-100"
+              }`}
             >
               <span className="flex items-center gap-2.5">
-                <img src={homeIcon} alt="" className="h-4 w-4 opacity-70" />
+                <img
+                  src={homeIcon}
+                  alt=""
+                  className={`h-4 w-4 ${
+                    activeMenu === "오늘 할 일" ? "filter invert" : "opacity-70"
+                  }`}
+                />
                 오늘 할 일
               </span>
-              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600">
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                  activeMenu === "오늘 할 일"
+                    ? "bg-white/20 text-white"
+                    : "bg-gray-100 text-gray-600"
+                }`}
+              >
                 {todayTaskCount}
               </span>
             </button>
 
+            {/* 통합 캘린더 */}
             <button
               type="button"
-              className="flex w-full items-center gap-2.5 rounded-xl bg-black px-2.5 py-2.5 text-xs font-semibold text-white shadow-xs cursor-pointer"
+              onClick={() => onNavigate?.("통합 캘린더")}
+              className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-xs font-medium transition cursor-pointer ${
+                activeMenu === "통합 캘린더"
+                  ? "bg-black text-white font-semibold shadow-xs"
+                  : "text-gray-700 hover:bg-gray-100"
+              }`}
             >
               <img
                 src={calendarIcon}
                 alt=""
-                className="h-4 w-4 filter invert"
+                className={`h-4 w-4 ${
+                  activeMenu === "통합 캘린더" ? "filter invert" : "opacity-70"
+                }`}
               />
               통합 캘린더
             </button>
 
+            {/* 활동 */}
             <button
               type="button"
-              className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+              onClick={() => onNavigate?.("활동")}
+              className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-xs font-medium transition cursor-pointer ${
+                activeMenu === "활동"
+                  ? "bg-black text-white font-semibold shadow-xs"
+                  : "text-gray-700 hover:bg-gray-100"
+              }`}
             >
-              <img src={bookIcon} alt="" className="h-4 w-4 opacity-70" />
+              <img
+                src={bookIcon}
+                alt=""
+                className={`h-4 w-4 ${
+                  activeMenu === "활동" ? "filter invert" : "opacity-70"
+                }`}
+              />
               활동
             </button>
           </div>
@@ -80,29 +122,74 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="space-y-1">
             <button
               type="button"
-              className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+              onClick={() => onNavigate?.("정리글 아카이브")}
+              className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-xs font-medium transition cursor-pointer ${
+                activeMenu === "정리글 아카이브"
+                  ? "bg-black text-white font-semibold shadow-xs"
+                  : "text-gray-700 hover:bg-gray-100"
+              }`}
             >
-              <img src={bookIcon} alt="" className="h-4 w-4 opacity-70" />
+              <img
+                src={bookIcon}
+                alt=""
+                className={`h-4 w-4 ${
+                  activeMenu === "정리글 아카이브"
+                    ? "filter invert"
+                    : "opacity-70"
+                }`}
+              />
               정리글 아카이브
             </button>
 
             <button
               type="button"
-              className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+              onClick={() => onNavigate?.("면접 질문 뱅크")}
+              className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-xs font-medium transition cursor-pointer ${
+                activeMenu === "면접 질문 뱅크"
+                  ? "bg-black text-white font-semibold shadow-xs"
+                  : "text-gray-700 hover:bg-gray-100"
+              }`}
             >
-              <img src={micIcon} alt="" className="h-4 w-4 opacity-70" />
+              <img
+                src={micIcon}
+                alt=""
+                className={`h-4 w-4 ${
+                  activeMenu === "면접 질문 뱅크"
+                    ? "filter invert"
+                    : "opacity-70"
+                }`}
+              />
               면접 질문 뱅크
             </button>
 
             <button
               type="button"
-              className="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+              onClick={() => onNavigate?.("과제 · 역량맵")}
+              className={`flex w-full items-center justify-between rounded-xl px-2.5 py-2.5 text-xs font-medium transition cursor-pointer ${
+                activeMenu === "과제 · 역량맵"
+                  ? "bg-black text-white font-semibold shadow-xs"
+                  : "text-gray-700 hover:bg-gray-100"
+              }`}
             >
               <span className="flex items-center gap-2.5">
-                <img src={fileTextIcon} alt="" className="h-4 w-4 opacity-70" />
+                <img
+                  src={fileTextIcon}
+                  alt=""
+                  className={`h-4 w-4 ${
+                    activeMenu === "과제 · 역량맵"
+                      ? "filter invert"
+                      : "opacity-70"
+                  }`}
+                />
                 과제 · 역량맵
               </span>
-              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600">
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                  activeMenu === "과제 · 역량맵"
+                    ? "bg-white/20 text-white"
+                    : "bg-gray-100 text-gray-600"
+                }`}
+              >
                 {assignmentCount}
               </span>
             </button>
@@ -117,17 +204,39 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="space-y-1">
             <button
               type="button"
-              className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+              onClick={() => onNavigate?.("업무일지")}
+              className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-xs font-medium transition cursor-pointer ${
+                activeMenu === "업무일지"
+                  ? "bg-black text-white font-semibold shadow-xs"
+                  : "text-gray-700 hover:bg-gray-100"
+              }`}
             >
-              <img src={clipboardIcon} alt="" className="h-4 w-4 opacity-70" />
+              <img
+                src={clipboardIcon}
+                alt=""
+                className={`h-4 w-4 ${
+                  activeMenu === "업무일지" ? "filter invert" : "opacity-70"
+                }`}
+              />
               업무일지
             </button>
 
             <button
               type="button"
-              className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+              onClick={() => onNavigate?.("주간 리포트")}
+              className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-xs font-medium transition cursor-pointer ${
+                activeMenu === "주간 리포트"
+                  ? "bg-black text-white font-semibold shadow-xs"
+                  : "text-gray-700 hover:bg-gray-100"
+              }`}
             >
-              <img src={trendingUpIcon} alt="" className="h-4 w-4 opacity-70" />
+              <img
+                src={trendingUpIcon}
+                alt=""
+                className={`h-4 w-4 ${
+                  activeMenu === "주간 리포트" ? "filter invert" : "opacity-70"
+                }`}
+              />
               주간 리포트
             </button>
           </div>
@@ -141,9 +250,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="space-y-1">
             <button
               type="button"
-              className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+              onClick={() => onNavigate?.("팀원 관리")}
+              className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-xs font-medium transition cursor-pointer ${
+                activeMenu === "팀원 관리"
+                  ? "bg-black text-white font-semibold shadow-xs"
+                  : "text-gray-700 hover:bg-gray-100"
+              }`}
             >
-              <img src={usersIcon} alt="" className="h-4 w-4 opacity-70" />
+              <img
+                src={usersIcon}
+                alt=""
+                className={`h-4 w-4 ${
+                  activeMenu === "팀원 관리" ? "filter invert" : "opacity-70"
+                }`}
+              />
               팀원 관리
             </button>
           </div>

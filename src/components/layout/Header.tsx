@@ -9,6 +9,14 @@ import clipboardIcon from "../../assets/icons/clipboard.svg";
 import micIcon from "../../assets/icons/mic.svg";
 import usersIcon from "../../assets/icons/users.svg";
 
+interface NotificationItem {
+  id: string;
+  title: string;
+  message?: string;
+  isRead: boolean;
+  createdAt?: string;
+}
+
 interface HeaderProps {
   title?: string;
   subtitle?: string;
@@ -27,7 +35,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [activeNotiTab, setActiveNotiTab] = useState<
     "전체" | "안 읽음" | "멘션"
   >("전체");
-  const [notifications] = useState<any[]>([]);
+  const [notifications] = useState<NotificationItem[]>([]);
   const notiDropdownRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
@@ -58,7 +66,6 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="flex h-16 w-full items-center justify-between border-b border-gray-100 bg-white px-8 shrink-0 relative z-30">
-      {/* Dynamic Title & Subtitle */}
       <div>
         <h1 className="text-base font-bold text-gray-900">{title}</h1>
         {subtitle && <p className="text-[11px] text-gray-400">{subtitle}</p>}
@@ -173,15 +180,16 @@ export const Header: React.FC<HeaderProps> = ({
                 새로 만들기
               </div>
               <div className="space-y-0.5">
+                {/* 기존 고정 bg-gray-100 제거 -> hover:bg-gray-100만 적용 */}
                 <button
                   type="button"
                   onClick={handleOpenAddModal}
-                  className="flex w-full items-center gap-3 rounded-xl bg-gray-100 px-3 py-2 font-semibold text-gray-900 transition hover:bg-gray-200 cursor-pointer"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer"
                 >
                   <img
                     src={calendarIcon}
                     alt=""
-                    className="h-4 w-4 opacity-80"
+                    className="h-4 w-4 opacity-70"
                   />
                   <span>일정 추가</span>
                 </button>
@@ -189,7 +197,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsDropdownOpen(false)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer"
                 >
                   <img src={bookIcon} alt="" className="h-4 w-4 opacity-70" />
                   <span>활동 개설</span>
@@ -198,7 +206,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsDropdownOpen(false)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer"
                 >
                   <img src={bellIcon} alt="" className="h-4 w-4 opacity-70" />
                   <span>공지 보내기</span>
@@ -207,7 +215,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsDropdownOpen(false)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer"
                 >
                   <img
                     src={clipboardIcon}
@@ -225,7 +233,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsDropdownOpen(false)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer"
                 >
                   <img
                     src={fileTextIcon}
@@ -238,7 +246,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsDropdownOpen(false)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer"
                 >
                   <img
                     src={clipboardIcon}
@@ -251,7 +259,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsDropdownOpen(false)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer"
                 >
                   <img src={micIcon} alt="" className="h-4 w-4 opacity-70" />
                   <span>면접 답변 남기기</span>
@@ -262,7 +270,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsDropdownOpen(false)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer"
                 >
                   <img
                     src={fileTextIcon}
@@ -275,7 +283,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsDropdownOpen(false)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer"
                 >
                   <img src={usersIcon} alt="" className="h-4 w-4 opacity-70" />
                   <span>초대 링크 만들기</span>
@@ -284,7 +292,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsDropdownOpen(false)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer"
                 >
                   <img src={plusIcon} alt="" className="h-4 w-4 opacity-70" />
                   <span>노션에서 가져오기</span>
