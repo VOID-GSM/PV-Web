@@ -18,9 +18,59 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   onSelectEvent,
 }) => {
   const daysOfWeek = ["일", "월", "화", "수", "목", "금", "토"];
-  const today = new Date();
 
-  // 1. 일정 칩 렌더링
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+
+  const firstDayOfWeek = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+  const today = new Date();
+  const isThisMonth =
+    today.getFullYear() === year && today.getMonth() === month;
+
+  // 1. 월간 뷰 데이터 생성
+  const monthCells = [];
+
+  for (let i = firstDayOfWeek - 1; i >= 0; i--) {
+    const dayNum = daysInPrevMonth - i;
+    const prevM = month === 0 ? 12 : month;
+    const prevY = month === 0 ? year - 1 : year;
+    const dateStr = `${prevY}-${String(prevM).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+    monthCells.push({
+      dateStr,
+      dayLabel: `${prevM}/${dayNum}`,
+      isCurrentMonth: false,
+      isToday: false,
+    });
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    monthCells.push({
+      dateStr,
+      dayLabel: String(d),
+      isCurrentMonth: true,
+      isToday: isThisMonth && today.getDate() === d,
+    });
+  }
+
+  const totalCells = Math.ceil(monthCells.length / 7) * 7;
+  const remainingCells = totalCells - monthCells.length;
+  for (let i = 1; i <= remainingCells; i++) {
+    const nextM = month === 11 ? 1 : month + 2;
+    const nextY = month === 11 ? year + 1 : year;
+    const dateStr = `${nextY}-${String(nextM).padStart(2, "0")}-${String(i).padStart(2, "0")}`;
+    monthCells.push({
+      dateStr,
+      dayLabel: `${nextM}/${i}`,
+      isCurrentMonth: false,
+      isToday: false,
+    });
+  }
+
+  // 일정 칩 렌더링
   const renderEventChip = (evt: CalendarEvent) => {
     switch (evt.type) {
       case "활동":
@@ -73,60 +123,31 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     }
   };
 
-  // 2. 주간 뷰 (선택한 날짜가 속한 주 7일 정밀 계산)
+  // 뷰 모드별 분기 처리
   if (viewMode === "주간") {
-    const currentDayOfWeek = currentDate.getDay();
-    const startOfWeek = new Date(currentDate);
-    startOfWeek.setDate(currentDate.getDate() - currentDayOfWeek);
-
-    const weekCells = [];
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(startOfWeek);
-      d.setDate(startOfWeek.getDate() + i);
-
-      const y = d.getFullYear();
-      const m = d.getMonth() + 1;
-      const dateNum = d.getDate();
-      const dateStr = `${y}-${String(m).padStart(2, "0")}-${String(dateNum).padStart(2, "0")}`;
-
-      weekCells.push({
-        dateStr,
-        dayLabel: `${m}/${dateNum}`,
-        isToday: d.toDateString() === today.toDateString(),
-      });
-    }
-
+    // 현재 기준 1주(7일)만 출력
+    const weekCells = monthCells.slice(0, 7);
     return (
       <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white">
         <div className="grid grid-cols-7 border-b border-gray-100 bg-white text-center text-xs font-semibold text-gray-500">
           {daysOfWeek.map((day, idx) => (
-            <div
-              key={day}
-              className={`py-3 ${
-                idx === 0 ? "text-red-500" : idx === 6 ? "text-blue-500" : ""
-              }`}
-            >
+            <div key={day} className="py-3">
               {day}
             </div>
           ))}
         </div>
-
         <div className="grid flex-1 grid-cols-7 bg-white">
-          {weekCells.map((cell) => {
+          {weekCells.map((cell, idx) => {
             const dayEvents = events.filter((e) => e.date === cell.dateStr);
             return (
               <div
-                key={cell.dateStr}
-                className="flex flex-col border-r border-gray-100 p-2 min-h-[300px]"
+                key={idx}
+                className="border-r border-gray-100 p-2 min-h-[300px]"
               >
-                <span
-                  className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
-                    cell.isToday ? "bg-black text-white" : "text-gray-700"
-                  }`}
-                >
-                  {cell.dayLabel}
+                <span className="text-xs font-bold text-gray-700">
+                  {cell.dayLabel}일
                 </span>
-                <div className="mt-2 space-y-1 overflow-y-auto">
+                <div className="mt-2 space-y-1">
                   {dayEvents.map((evt) => renderEventChip(evt))}
                 </div>
               </div>
@@ -137,7 +158,6 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     );
   }
 
-  // 3. 타임라인 뷰
   if (viewMode === "타임라인") {
     return (
       <div className="flex flex-1 flex-col overflow-y-auto rounded-2xl border border-gray-100 bg-white p-5">
@@ -152,7 +172,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
               <div
                 key={evt.id}
                 onClick={() => onSelectEvent(evt)}
-                className="flex items-center justify-between p-3 border border-gray-100 rounded-xl hover:border-gray-300 cursor-pointer transition"
+                className="flex items-center justify-between p-3 border border-gray-100 rounded-xl hover:border-gray-300 cursor-pointer"
               >
                 <div>
                   <span className="text-[10px] font-bold text-blue-600">
@@ -169,38 +189,9 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     );
   }
 
-  // 4. 월간 뷰 (JavaScript Date 객체 연산 기반 35/42일 동적 셀 생성)
-  const year = currentDate.getFullYear();
-  const month = currentDate.getMonth();
-
-  const firstDateOfMonth = new Date(year, month, 1);
-  const firstDayOfWeek = firstDateOfMonth.getDay();
-  const gridStartDate = new Date(year, month, 1 - firstDayOfWeek);
-
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const totalDays = firstDayOfWeek + daysInMonth > 35 ? 42 : 35;
-
-  const monthCells = [];
-  for (let i = 0; i < totalDays; i++) {
-    const d = new Date(gridStartDate);
-    d.setDate(gridStartDate.getDate() + i);
-
-    const y = d.getFullYear();
-    const m = d.getMonth() + 1;
-    const dateNum = d.getDate();
-    const dateStr = `${y}-${String(m).padStart(2, "0")}-${String(dateNum).padStart(2, "0")}`;
-
-    monthCells.push({
-      dateStr,
-      dayLabel: d.getMonth() === month ? String(dateNum) : `${m}/${dateNum}`,
-      isCurrentMonth: d.getMonth() === month,
-      isToday: d.toDateString() === today.toDateString(),
-    });
-  }
-
+  // 기본 월간 뷰
   return (
     <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white">
-      {/* 요일 헤더 */}
       <div className="grid grid-cols-7 border-b border-gray-100 bg-white text-center text-xs font-semibold text-gray-500">
         {daysOfWeek.map((day, idx) => (
           <div
@@ -214,14 +205,13 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
         ))}
       </div>
 
-      {/* 월간 그리드 */}
       <div className="grid flex-1 grid-cols-7 grid-rows-5 bg-white">
-        {monthCells.map((cell) => {
+        {monthCells.map((cell, idx) => {
           const dayEvents = events.filter((e) => e.date === cell.dateStr);
 
           return (
             <div
-              key={cell.dateStr}
+              key={idx}
               className={`flex flex-col border-b border-r border-gray-100 p-2 min-h-[85px] ${
                 cell.isCurrentMonth ? "bg-white" : "bg-gray-50/40"
               }`}
