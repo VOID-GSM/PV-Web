@@ -33,9 +33,7 @@ export default function CalendarPage({
   const [viewMode, setViewMode] = useState<ViewMode>("월간");
   const [onlyMyEvents, setOnlyMyEvents] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
-    null,
-  );
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
 
   const [boardFilters, setBoardFilters] = useState<BoardFilter[]>([]);
   const [milestones, setMilestones] = useState<MilestoneItem[]>([]);
@@ -43,9 +41,7 @@ export default function CalendarPage({
   // 오늘 할 일 / 과제·역량맵 동적 계산
   const todayStr = currentDate.toISOString().split("T")[0];
   const todayTaskCount = events.filter((e) => e.date === todayStr).length;
-  const assignmentCount = events.filter(
-    (e) => e.type === "마감" || e.type === "활동",
-  ).length;
+  const assignmentCount = 0;
 
   const handlePrevDate = () => {
     const newDate = new Date(currentDate);
@@ -133,8 +129,8 @@ export default function CalendarPage({
             onToggleFilter={(id) => {
               setBoardFilters((prev) =>
                 prev.map((f) =>
-                  f.id === id ? { ...f, checked: !f.checked } : f,
-                ),
+                  f.id === id ? { ...f, checked: !f.checked } : f
+                )
               );
             }}
             onAddMilestone={(title, date) => {

@@ -16,27 +16,21 @@ export const MainPage: React.FC<MainPageProps> = ({
 }) => {
   const todayStr = new Date().toISOString().split("T")[0];
 
-  // 실제 데이터 연산 (초기 상태: 0개)
   const todayTasks = events.filter((e) => e.date === todayStr);
   const upcomingDeadlines = events.filter((e) => e.type === "마감");
   const activities = events.filter((e) => e.type === "활동");
-  const assignmentCount = events.filter(
-    (e) => e.type === "마감" || e.type === "활동",
-  ).length;
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-[#f7f7f8]">
-      {/* Sidebar - activeMenu="오늘 할 일", 실시간 수치 바인딩 */}
+      {/* 과제·역량맵 수치는 일반 일정 추가와 무관하므로 0 전달 */}
       <Sidebar
         activeMenu="오늘 할 일"
         todayTaskCount={todayTasks.length}
-        assignmentCount={assignmentCount}
+        assignmentCount={0}
         onNavigate={onNavigate}
       />
 
-      {/* Main Content Area */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Header */}
         <Header
           title="오늘 할 일"
           subtitle={new Date().toLocaleDateString("ko-KR", {
@@ -48,11 +42,8 @@ export const MainPage: React.FC<MainPageProps> = ({
           onOpenAddModal={onOpenAddModal}
         />
 
-        {/* Dashboard Content */}
         <main className="flex flex-1 gap-6 overflow-y-auto p-6">
-          {/* Left Main Section */}
           <div className="flex flex-1 flex-col space-y-6 min-w-0">
-            {/* Top Stat Cards (동적 수치) */}
             <div className="grid grid-cols-4 gap-4">
               <div className="flex flex-col justify-between rounded-2xl border border-gray-100 bg-white p-5 shadow-2xs">
                 <span className="text-xs font-medium text-gray-500">
@@ -100,7 +91,7 @@ export const MainPage: React.FC<MainPageProps> = ({
                 </span>
                 <div className="mt-4 flex items-baseline gap-2">
                   <span className="text-2xl font-extrabold text-gray-900">
-                    {assignmentCount}
+                    0
                   </span>
                   <span className="text-[11px] font-medium text-amber-600">
                     건
@@ -109,7 +100,6 @@ export const MainPage: React.FC<MainPageProps> = ({
               </div>
             </div>
 
-            {/* 오늘 할 일 영역 */}
             <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-2xs">
               <div className="flex items-center justify-between pb-4">
                 <div>
@@ -151,7 +141,6 @@ export const MainPage: React.FC<MainPageProps> = ({
               )}
             </div>
 
-            {/* 이번 주 활동 영역 */}
             <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-2xs">
               <div>
                 <h2 className="text-base font-bold text-gray-900">
@@ -188,9 +177,7 @@ export const MainPage: React.FC<MainPageProps> = ({
             </div>
           </div>
 
-          {/* Right Side Panel */}
           <div className="w-80 shrink-0 space-y-5">
-            {/* 다가오는 마감 카드 */}
             <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-2xs">
               <h3 className="text-xs font-bold text-gray-900">다가오는 마감</h3>
               {upcomingDeadlines.length === 0 ? (
