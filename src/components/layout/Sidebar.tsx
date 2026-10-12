@@ -1,4 +1,3 @@
-import React from "react";
 import logoWhite from "../../assets/images/logo-white.png";
 import homeIcon from "../../assets/icons/home.svg";
 import calendarIcon from "../../assets/icons/calendar.svg";
@@ -11,15 +10,7 @@ import barChartIcon from "../../assets/icons/bar-chart.svg";
 import usersIcon from "../../assets/icons/users.svg";
 import settingsIcon from "../../assets/icons/settings.svg";
 
-interface SidebarProps {
-  todayTaskCount: number;
-  assignmentCount: number;
-}
-
-export const Sidebar: React.FC<SidebarProps> = ({
-  todayTaskCount,
-  assignmentCount,
-}) => {
+export const Sidebar = () => {
   return (
     <aside className="flex h-screen w-60 flex-col bg-[#0d0d0d] px-4 py-5 text-white select-none shrink-0">
       {/* Logo */}
@@ -28,7 +19,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Nav Menu */}
-      <div className="flex-1 space-y-5 overflow-y-auto text-[13px]">
+      <div className="flex-1 space-y-6 overflow-y-auto text-[13px]">
         {/* 워크스페이스 */}
         <div>
           <p className="px-2 pb-2 text-[10px] font-semibold tracking-wider text-[#555]">
@@ -43,8 +34,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <img src={homeIcon} alt="" className="h-4 w-4 opacity-70" />
                 오늘 할 일
               </span>
-              <span className="rounded-full bg-[#222] px-2 py-0.5 text-[10px] text-[#aaa] font-semibold">
-                {todayTaskCount}
+              <span className="rounded-full bg-[#222] px-1.5 py-0.5 text-[10px] text-[#aaa]">
+                0
               </span>
             </button>
 
@@ -52,11 +43,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               type="button"
               className="flex w-full items-center gap-2.5 rounded-lg bg-[#1a1a1a] px-2.5 py-2 font-medium text-white"
             >
-              <img
-                src={calendarIcon}
-                alt=""
-                className="h-4 w-4 filter invert"
-              />
+              <img src={calendarIcon} alt="" className="h-4 w-4 filter invert" />
               통합 캘린더
             </button>
 
@@ -99,9 +86,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="flex items-center gap-2.5">
                 <img src={fileTextIcon} alt="" className="h-4 w-4 opacity-70" />
                 과제 · 역량맵
-              </span>
-              <span className="rounded-full bg-[#222] px-2 py-0.5 text-[10px] text-[#aaa] font-semibold">
-                {assignmentCount}
               </span>
             </button>
           </div>
@@ -153,19 +137,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-2.5">
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-xs font-bold text-black">
-              동
+              ME
             </div>
             <div>
-              <p className="text-xs font-semibold text-white">동키</p>
-              <p className="text-[10px] text-[#666]">10기 · Front-end</p>
+              <p className="text-xs font-semibold text-white">내 프로필</p>
+              <p className="text-[10px] text-[#666]">Front-end</p>
             </div>
           </div>
           <button type="button" className="p-1 text-[#666] hover:text-white">
-            <img
-              src={settingsIcon}
-              alt="설정"
-              className="h-4 w-4 filter invert opacity-60"
-            />
+            <img src={settingsIcon} alt="설정" className="h-4 w-4 filter invert opacity-60" />
           </button>
         </div>
       </div>
