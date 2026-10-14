@@ -1,9 +1,13 @@
 @import "tailwindcss";
 
+/* ===== 친구가 넣은 기본 설정 ===== */
+
+/* 모든 요소의 크기 계산에 테두리·안쪽 여백을 포함시킨다 */
 * {
   box-sizing: border-box;
 }
 
+/* 화면 전체를 꽉 채우고, 브라우저 기본 여백을 없앤다 */
 html,
 body,
 #root {
@@ -29,6 +33,39 @@ body {
     sans-serif;
 }
 
+/* 가로 스크롤이 생기지 않게 한다 */
 body {
   overflow-x: hidden;
+}
+
+/* ===== 내가 넣은 설정 ===== */
+
+/* Tailwind 기본 글꼴(font-sans)을 Pretendard로 바꾼다 */
+@theme {
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+
+/* 누를 수 있는 요소에 마우스를 올리면 손가락 커서 */
+@layer base {
+  button:not(:disabled),
+  label,
+  select,
+  input[type="checkbox"] {
+    cursor: pointer;
+  }
+
+  /* 비활성화된 버튼은 "못 누름" 커서 */
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
+/* scrollbar-hide: 스크롤은 되고 스크롤바 막대만 안 보이게 */
+@utility scrollbar-hide {
+  /* 파이어폭스용 */
+  scrollbar-width: none;
+  /* 크롬·엣지·사파리용 */
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
