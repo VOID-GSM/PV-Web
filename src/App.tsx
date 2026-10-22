@@ -50,8 +50,8 @@ export default function App() {
                 />
               )}
 
-              {/* 3. 활동 상세 페이지 */}
-              {(currentMenu === "활동" || currentMenu === "활동 상세") && (
+              {/* 3. 기타 메뉴 (빈 화면) */}
+              {currentMenu === "활동" && (
                 <div className="flex h-screen w-full overflow-hidden bg-[#f7f7f8]">
                   <Sidebar
                     activeMenu={currentMenu}
@@ -65,11 +65,9 @@ export default function App() {
                 </div>
               )}
 
-              {/* 4. 기타 메뉴 (기본 빈 화면) */}
               {currentMenu !== "오늘 할 일" &&
                 currentMenu !== "통합 캘린더" &&
-                currentMenu !== "활동" &&
-                currentMenu !== "활동 상세" && (
+                currentMenu !== "활동" && (
                   <div className="flex h-screen w-full overflow-hidden bg-[#f7f7f8]">
                     <Sidebar
                       activeMenu={currentMenu}
@@ -90,13 +88,23 @@ export default function App() {
             </>
           }
         />
-
         {/* 초대 페이지 라우트 */}
         <Route path="/invite" element={<InvitePage />} />
         <Route path="/invite/:code" element={<InvitePage />} />
-
-        {/* 활동 상세 페이지 직접 접근 라우트 (예: http://localhost:5173/activity/1) */}
-        <Route path="/activity/:id" element={<ActivityDetailPage />} />
+        {/* 활동 상세 페이지 라우트 */}
+        {/* 오늘 할 일 페이지 */}
+        <Route
+          path="/activity"
+          element={
+            <MainPage
+              events={events}
+              onNavigate={(menu: string) => setCurrentMenu(menu)}
+              onOpenAddModal={() => setIsAddModalOpen(true)}
+            />
+          }
+        />
+        {/* 활동 상세 페이지 */}
+        <Route path="/activity/:id" element={<ActivityDetailPage />} />{" "}
       </Routes>
 
       {/* 새로 만들기 공통 모달 */}
