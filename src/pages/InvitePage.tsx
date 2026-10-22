@@ -14,20 +14,21 @@ import type {
   ViewMode,
 } from "../types/calendar";
 
+// Props를 모두 선택적(?)으로 선언하여 Props 없이 호출해도 에러가 나지 않도록 방지
 interface CalendarPageProps {
-  events: CalendarEvent[];
-  activeMenu: string;
-  onNavigate: (menu: string) => void;
-  onOpenAddModal: () => void;
-  onAddEvent: (newEvent: CalendarEvent) => void;
+  events?: CalendarEvent[];
+  activeMenu?: string;
+  onNavigate?: (menu: string) => void;
+  onOpenAddModal?: () => void;
+  onAddEvent?: (newEvent: CalendarEvent) => void;
 }
 
 export default function CalendarPage({
-  events,
-  activeMenu,
-  onNavigate,
-  onOpenAddModal,
-  onAddEvent,
+  events = [],
+  activeMenu = "통합 캘린더",
+  onNavigate = () => {},
+  onOpenAddModal = () => {},
+  onAddEvent = () => {},
 }: CalendarPageProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("월간");
   const [onlyMyEvents, setOnlyMyEvents] = useState(false);
