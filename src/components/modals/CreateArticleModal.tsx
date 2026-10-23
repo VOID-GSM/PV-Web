@@ -1,5 +1,6 @@
 // src/components/modals/CreateArticleModal.tsx
 import { useState } from "react";
+import Dropdown from "../common/Dropdown";
 
 interface CreateArticleModalProps {
   onClose: () => void;
@@ -159,17 +160,11 @@ export default function CreateArticleModal({
               <label className="block text-xs font-semibold text-gray-700 mb-1">
                 회차 선택
               </label>
-              <select
+              <Dropdown
+                options={["1회차", "2회차", "3회차", "4회차", "5회차"]}
                 value={round}
-                onChange={(e) => setRound(e.target.value)}
-                className="w-full p-2.5 border border-gray-300 rounded-xl text-xs focus:outline-none focus:border-black bg-white"
-              >
-                <option value="1회차">1회차</option>
-                <option value="2회차">2회차</option>
-                <option value="3회차">3회차</option>
-                <option value="4회차">4회차</option>
-                <option value="5회차">5회차</option>
-              </select>
+                onChange={setRound}
+              />
             </div>
             <div className="col-span-3">
               <label className="block text-xs font-semibold text-gray-700 mb-1">

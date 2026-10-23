@@ -1,9 +1,15 @@
+import { useState } from "react";
 
+interface Props {
+  onClose: () => void;
+}
 interface Props {
   onClose: () => void;
 }
 
 export default function CreateNoticeModal({ onClose }: Props) {
+  const [target, setTarget] = useState<"all" | "session">("all");
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl max-w-lg w-full p-6 space-y-4 shadow-xl">
@@ -22,14 +28,59 @@ export default function CreateNoticeModal({ onClose }: Props) {
           onSubmit={(e) => e.preventDefault()}
         >
           <div>
-            <label className="block font-semibold mb-1">수신 대상</label>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-1 cursor-pointer">
-                <input type="radio" name="target" defaultChecked /> 전체
-              </label>
-              <label className="flex items-center gap-1 cursor-pointer">
-                <input type="radio" name="target" /> 특정 세션 참가자
-              </label>
+            <label className="block font-semibold mb-2">수신 대상</label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setTarget("all")}
+                className={`rounded-xl border p-3 text-left transition ${
+                  target === "all"
+                    ? "border-black bg-gray-50 ring-1 ring-black"
+                    : "border-gray-200 hover:border-gray-400"
+                }`}
+              >
+                <span className="flex items-center gap-2 font-semibold text-gray-900">
+                  <span
+                    className={`flex h-4 w-4 items-center justify-center rounded-full border ${
+                      target === "all" ? "border-black" : "border-gray-300"
+                    }`}
+                  >
+                    {target === "all" && (
+                      <span className="h-2 w-2 rounded-full bg-black" />
+                    )}
+                  </span>
+                  전체
+                </span>
+                <span className="mt-1 block pl-6 text-[11px] text-gray-500">
+                  모든 참가자에게 공지
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTarget("session")}
+                className={`rounded-xl border p-3 text-left transition ${
+                  target === "session"
+                    ? "border-black bg-gray-50 ring-1 ring-black"
+                    : "border-gray-200 hover:border-gray-400"
+                }`}
+              >
+                <span className="flex items-center gap-2 font-semibold text-gray-900">
+                  <span
+                    className={`flex h-4 w-4 items-center justify-center rounded-full border ${
+                      target === "session" ? "border-black" : "border-gray-300"
+                    }`}
+                  >
+                    {target === "session" && (
+                      <span className="h-2 w-2 rounded-full bg-black" />
+                    )}
+                  </span>
+                  특정 세션 참가자
+                </span>
+                <span className="mt-1 block pl-6 text-[11px] text-gray-500">
+                  선택한 세션의 참가자에게 공지
+                </span>
+              </button>
             </div>
           </div>
 
