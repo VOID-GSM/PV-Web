@@ -1,12 +1,12 @@
-name: Deploy Web 
+name: Deploy Web
 
 on:
   push:
-  branches: ["main", "develop"]
-workflow_dispatch:
+    branches: ["main", "develop"]
+  workflow_dispatch:
 
 permissions:
-  id-token: write
+  id-token: write 
   contents: read
 
 concurrency:
