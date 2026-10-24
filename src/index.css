@@ -17,6 +17,23 @@ body,
   padding: 0;
 }
 
+/* src/index.css 또는 App.css */
+body {
+  font-family:
+    "Pretendard Variable",
+    Pretendard,
+    -apple-system,
+    BlinkMacSystemFont,
+    system-ui,
+    Roboto,
+    "Helvetica Neue",
+    "Segoe UI",
+    "Apple SD Gothic Neo",
+    "Noto Sans KR",
+    "Malgun Gothic",
+    sans-serif;
+}
+
 /* 가로 스크롤이 생기지 않게 한다 */
 body {
   overflow-x: hidden;

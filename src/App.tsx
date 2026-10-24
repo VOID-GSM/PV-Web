@@ -1,26 +1,113 @@
-// BrowserRouter: 주소창의 주소(URL)를 읽어서 페이지를 바꿔주는 큰 틀
-// Routes: 주소별 페이지 목록을 담는 상자
-// Route: "이 주소면 이 페이지" 한 줄
+import { useState } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-// 친구가 만든 초대 링크 입장 페이지
+import CalendarPage from "./pages/CalendarPage";
+import { MainPage } from "./pages/MainPage";
+import ActivityDetailPage from "./pages/ActivityDetailPage";
 import InvitePage from "./pages/InvitePage";
-// 내가 만든 설정 페이지
 import SettingsPage from "./pages/SettingsPage";
+import { Sidebar } from "./components/layout/Sidebar";
+import { Header } from "./components/layout/Header";
+import { AddEventModal } from "./components/calendar/AddEventModal";
+import type { CalendarEvent } from "./types/calendar";
 
-function App() {
+export default function App() {
+  const [currentMenu, setCurrentMenu] = useState<string>("통합 캘린더");
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  const handleAddEvent = (newEvent: CalendarEvent) => {
+    setEvents((prev) => [...prev, newEvent]);
+  };
+
+  const todayStr = new Date().toISOString().split("T")[0];
+  const todayTaskCount = events.filter((e) => e.date === todayStr).length;
+
   return (
     <BrowserRouter>
       <Routes>
-        {/* localhost:5173/invite 로 들어오면 초대 링크 입장 페이지 */}
-        <Route path="/invite" element={<InvitePage />} />
+        <Route
+          path="/"
+          element={
+            <>
+              {currentMenu === "오늘 할 일" && (
+                <MainPage
+                  events={events}
+                  onNavigate={setCurrentMenu}
+                  onOpenAddModal={() => setIsAddModalOpen(true)}
+                />
+              )}
 
-        {/* localhost:5173/settings 로 들어오면 설정 페이지 */}
+              {currentMenu === "통합 캘린더" && (
+                <CalendarPage
+                  events={events}
+                  activeMenu={currentMenu}
+                  onNavigate={setCurrentMenu}
+                  onOpenAddModal={() => setIsAddModalOpen(true)}
+                  onAddEvent={handleAddEvent}
+                />
+              )}
+
+              {currentMenu === "활동" && (
+                <div className="flex h-screen w-full overflow-hidden bg-[#f7f7f8]">
+                  <Sidebar
+                    activeMenu={currentMenu}
+                    todayTaskCount={todayTaskCount}
+                    assignmentCount={0}
+                    onNavigate={setCurrentMenu}
+                  />
+                  <div className="flex flex-1 flex-col overflow-y-auto">
+                    <ActivityDetailPage />
+                  </div>
+                </div>
+              )}
+
+              {currentMenu !== "오늘 할 일" &&
+                currentMenu !== "통합 캘린더" &&
+                currentMenu !== "활동" && (
+                  <div className="flex h-screen w-full overflow-hidden bg-[#f7f7f8]">
+                    <Sidebar
+                      activeMenu={currentMenu}
+                      todayTaskCount={todayTaskCount}
+                      assignmentCount={0}
+                      onNavigate={setCurrentMenu}
+                    />
+                    <div className="flex flex-1 flex-col overflow-hidden">
+                      <Header
+                        title={currentMenu}
+                        subtitle=""
+                        onOpenAddModal={() => setIsAddModalOpen(true)}
+                      />
+                      <main className="flex-1 bg-white" />
+                    </div>
+                  </div>
+                )}
+            </>
+          }
+        />
+
+        <Route path="/invite" element={<InvitePage />} />
+        <Route path="/invite/:code" element={<InvitePage />} />
         <Route path="/settings" element={<SettingsPage />} />
 
-        {/* 다른 페이지는 각자 PR에서 이 아래에 한 줄씩 추가한다 */}
+        <Route
+          path="/activity"
+          element={
+            <MainPage
+              events={events}
+              onNavigate={setCurrentMenu}
+              onOpenAddModal={() => setIsAddModalOpen(true)}
+            />
+          }
+        />
+
+        <Route path="/activity/:id" element={<ActivityDetailPage />} />
       </Routes>
+
+      <AddEventModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onAddEvent={handleAddEvent}
+      />
     </BrowserRouter>
   );
 }
-
-export default App;
