@@ -15,6 +15,7 @@ import InvitePage from "./pages/InvitePage";
 import SettingsPage from "./pages/SettingsPage";
 import ArchivePage from "./pages/ArchivePage";
 import ArticleEditorPage from "./pages/ArticleEditorPage";
+import WeeklyReportPage from "./pages/WeeklyReportPage"; // 주간 리포트 추가
 import { Sidebar } from "./components/layout/Sidebar";
 import { AddEventModal } from "./components/calendar/AddEventModal";
 import type { CalendarEvent } from "./types/calendar";
@@ -38,6 +39,7 @@ function AppContent() {
     if (path.startsWith("/calendar")) return "통합 캘린더";
     if (path.startsWith("/activity")) return "활동";
     if (path.startsWith("/archive")) return "정리글 아카이브";
+    if (path.startsWith("/report")) return "주간 리포트";
     if (path.startsWith("/invite")) return "팀원 초대";
     if (path.startsWith("/settings")) return "설정";
     return "통합 캘린더";
@@ -58,6 +60,9 @@ function AppContent() {
         break;
       case "정리글 아카이브":
         navigate("/archive");
+        break;
+      case "주간 리포트":
+        navigate("/report");
         break;
       case "팀원 초대":
         navigate("/invite");
@@ -115,24 +120,7 @@ function AppContent() {
             </div>
           }
         />
-        <Route
-          path="/activity/:id"
-          element={
-            <div className="flex h-screen w-full overflow-hidden bg-[#f7f7f8]">
-              <Sidebar
-                activeMenu={currentMenu}
-                todayTaskCount={todayTaskCount}
-                assignmentCount={0}
-                onNavigate={handleNavigate}
-              />
-              <div className="flex flex-1 flex-col overflow-y-auto">
-                <ActivityDetailPage />
-              </div>
-            </div>
-          }
-        />
 
-        {/* 정리글 아카이브 메인 */}
         <Route
           path="/archive"
           element={
@@ -150,7 +138,6 @@ function AppContent() {
           }
         />
 
-        {/* 정리글 작성/수정 에디터 - 사이드바 레이아웃 추가 */}
         <Route
           path="/archive/editor"
           element={
@@ -168,8 +155,9 @@ function AppContent() {
           }
         />
 
+        {/* 주간 리포트 라우트 연결 */}
         <Route
-          path="/invite"
+          path="/report"
           element={
             <div className="flex h-screen w-full overflow-hidden bg-[#f7f7f8]">
               <Sidebar
@@ -178,14 +166,15 @@ function AppContent() {
                 assignmentCount={0}
                 onNavigate={handleNavigate}
               />
-              <div className="flex flex-1 flex-col overflow-y-auto">
-                <InvitePage />
+              <div className="flex flex-1 flex-col overflow-hidden">
+                <WeeklyReportPage />
               </div>
             </div>
           }
         />
+
         <Route
-          path="/invite/:code"
+          path="/invite"
           element={
             <div className="flex h-screen w-full overflow-hidden bg-[#f7f7f8]">
               <Sidebar
