@@ -1,6 +1,12 @@
-// src/App.tsx
 import { useState } from "react";
-import { Routes, Route, useNavigate, Navigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 
 import { MainPage } from "./pages/MainPage";
 import CalendarPage from "./pages/CalendarPage";
@@ -15,8 +21,10 @@ import SidebarLayout from "./components/layout/SidebarLayout";
 import { AddEventModal } from "./components/calendar/AddEventModal";
 import type { CalendarEvent } from "./types/calendar";
 
-export default function App() {
+function AppContent() {
   const navigate = useNavigate();
+  const location = useLocation();
+
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
@@ -25,7 +33,24 @@ export default function App() {
   };
 
   const todayStr = new Date().toISOString().split("T")[0];
-  const todayTaskCount = events.filter((e) => e.date === todayStr).length;
+  const todayTaskCount = events.filter(
+    (event) => event.date === todayStr,
+  ).length;
+
+  const getCurrentMenu = (path: string) => {
+    if (path === "/" || path.startsWith("/today")) return "오늘 할 일";
+    if (path.startsWith("/calendar")) return "통합 캘린더";
+    if (path.startsWith("/activity")) return "활동";
+    if (path.startsWith("/archive") || path.startsWith("/editor")) {
+      return "정리글 아카이브";
+    }
+    if (path.startsWith("/report")) return "주간 리포트";
+    if (path.startsWith("/invite")) return "팀원 초대";
+    if (path.startsWith("/settings")) return "설정";
+    return "통합 캘린더";
+  };
+
+  const currentMenu = getCurrentMenu(location.pathname);
 
   const handleNavigate = (menuName: string) => {
     switch (menuName) {
@@ -60,10 +85,8 @@ export default function App() {
   return (
     <>
       <Routes>
-        {/* 루트 이동 */}
         <Route path="/" element={<Navigate to="/today" replace />} />
 
-        {/* 오늘 할 일 메인 */}
         <Route
           path="/today"
           element={
@@ -75,38 +98,45 @@ export default function App() {
           }
         />
 
-        {/* 사이드바 공유 레이아웃 구역 (통합 캘린더 포함) */}
         <Route element={<SidebarLayout todayTaskCount={todayTaskCount} />}>
           <Route
             path="/calendar"
             element={
               <CalendarPage
                 events={events}
-                activeMenu="통합 캘린더"
+                activeMenu={currentMenu}
                 onNavigate={handleNavigate}
                 onOpenAddModal={() => setIsAddModalOpen(true)}
                 onAddEvent={handleAddEvent}
               />
             }
           />
+
           <Route path="/activity" element={<ActivityDetailPage />} />
           <Route path="/activity/:id" element={<ActivityDetailPage />} />
           <Route path="/archive" element={<ArchivePage />} />
           <Route path="/editor" element={<ArticleEditorPage />} />
           <Route path="/archive/editor" element={<ArticleEditorPage />} />
           <Route path="/report" element={<WeeklyReportPage />} />
-          <Route path="/invite" element={<InvitePage events={events} />} />
-          <Route path="/invite/:code" element={<InvitePage events={events} />} />
+          <Route path="/invite" element={<InvitePage />} />
+          <Route path="/invite/:code" element={<InvitePage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>
 
-      {/* 일정 추가 공통 모달 */}
       <AddEventModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onAddEvent={handleAddEvent}
       />
     </>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppContent />
+    </BrowserRouter>
   );
 }
