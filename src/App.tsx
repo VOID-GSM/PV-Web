@@ -14,7 +14,6 @@ import ActivityDetailPage from "./pages/ActivityDetailPage";
 import InvitePage from "./pages/InvitePage";
 import SettingsPage from "./pages/SettingsPage";
 import WeeklyReportPage from "./pages/WeeklyReportPage";
-// ★ 업무일지 페이지
 import WorklogPage from "./pages/WorklogPage";
 import { Sidebar } from "./components/layout/Sidebar";
 import { AddEventModal } from "./components/calendar/AddEventModal";
@@ -31,10 +30,12 @@ export default function App() {
     setEvents((prev) => [...prev, newEvent]);
   };
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  // ★ 오늘 날짜를 "2026-10-26" 모양으로 (내 컴퓨터의 시간대 = 한국 시간 기준)
+  // toISOString()은 UTC(영국 시간) 기준이라 한국 오전 0~9시에는 하루 전 날짜가 나와서 바꿨다
+  // toLocaleDateString("sv-SE"): 스웨덴 표기법이 YYYY-MM-DD 모양이라 빌려 쓴다
+  const todayStr = new Date().toLocaleDateString("sv-SE");
   const todayTaskCount = events.filter((e) => e.date === todayStr).length;
 
-  // 지금 주소를 보고 사이드바에서 어떤 메뉴에 불을 켤지 정한다
   const getCurrentMenu = (path: string) => {
     if (path === "/today" || path === "/") return "오늘 할 일";
     if (path.startsWith("/calendar")) return "통합 캘린더";
@@ -42,14 +43,12 @@ export default function App() {
     if (path.startsWith("/report")) return "주간 리포트";
     if (path.startsWith("/invite")) return "팀원 초대";
     if (path.startsWith("/settings")) return "설정";
-    // ★ /worklog 주소면 "업무일지" 메뉴에 불을 켠다
     if (path.startsWith("/worklog")) return "업무일지";
     return "통합 캘린더";
   };
 
   const currentMenu = getCurrentMenu(location.pathname);
 
-  // 사이드바 메뉴를 눌렀을 때 해당 주소로 이동한다
   const handleNavigate = (menuName: string) => {
     switch (menuName) {
       case "오늘 할 일":
@@ -70,7 +69,6 @@ export default function App() {
       case "설정":
         navigate("/settings");
         break;
-      // ★ 사이드바에서 "업무일지"를 누르면 /worklog로
       case "업무일지":
         navigate("/worklog");
         break;
@@ -176,7 +174,6 @@ export default function App() {
           }
         />
 
-        {/* ★ 업무일지: 다른 페이지와 똑같이 왼쪽 사이드바 + 오른쪽 페이지 */}
         <Route
           path="/worklog"
           element={
