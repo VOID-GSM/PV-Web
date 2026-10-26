@@ -1,6 +1,7 @@
 // src/App.tsx
 import { useState } from "react";
 import {
+
   BrowserRouter,
   Routes,
   Route,
@@ -13,13 +14,17 @@ import { MainPage } from "./pages/MainPage";
 import ActivityDetailPage from "./pages/ActivityDetailPage";
 import InvitePage from "./pages/InvitePage";
 import SettingsPage from "./pages/SettingsPage";
+
 import ArchivePage from "./pages/ArchivePage";
 import ArticleEditorPage from "./pages/ArticleEditorPage";
-import { Sidebar } from "./components/layout/Sidebar";
+import WeeklyReportPage from "./pages/WeeklyReportPage";
 import { AddEventModal } from "./components/calendar/AddEventModal";
 import type { CalendarEvent } from "./types/calendar";
 
 function AppContent() {
+
+export default function App() {
+
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -37,7 +42,10 @@ function AppContent() {
     if (path === "/today" || path === "/") return "오늘 할 일";
     if (path.startsWith("/calendar")) return "통합 캘린더";
     if (path.startsWith("/activity")) return "활동";
+
     if (path.startsWith("/archive")) return "정리글 아카이브";
+    if (path.startsWith("/report")) return "주간 리포트";
+
     if (path.startsWith("/invite")) return "팀원 초대";
     if (path.startsWith("/settings")) return "설정";
     return "통합 캘린더";
@@ -58,6 +66,10 @@ function AppContent() {
         break;
       case "정리글 아카이브":
         navigate("/archive");
+
+      case "주간 리포트":
+        navigate("/report");
+
         break;
       case "팀원 초대":
         navigate("/invite");
@@ -135,6 +147,10 @@ function AppContent() {
         {/* 정리글 아카이브 메인 */}
         <Route
           path="/archive"
+
+
+        <Route
+          path="/report"
           element={
             <div className="flex h-screen w-full overflow-hidden bg-[#f7f7f8]">
               <Sidebar
@@ -144,6 +160,7 @@ function AppContent() {
                 onNavigate={handleNavigate}
               />
               <div className="flex flex-1 flex-col overflow-hidden">
+
                 <ArchivePage />
               </div>
             </div>
@@ -163,6 +180,7 @@ function AppContent() {
               />
               <div className="flex flex-1 flex-col overflow-hidden">
                 <ArticleEditorPage />
+                <WeeklyReportPage />
               </div>
             </div>
           }
@@ -201,6 +219,8 @@ function AppContent() {
           }
         />
 
+
+
         <Route
           path="/settings"
           element={
@@ -225,6 +245,7 @@ function AppContent() {
         onAddEvent={handleAddEvent}
       />
     </>
+
   );
 }
 
@@ -233,5 +254,6 @@ export default function App() {
     <BrowserRouter>
       <AppContent />
     </BrowserRouter>
+
   );
 }
