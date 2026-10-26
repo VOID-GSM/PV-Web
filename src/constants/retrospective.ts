@@ -3,13 +3,16 @@
 // 지금 로그인한 나 (서버 연결 전이라 고정 값)
 export const ME = "동키";
 
-// 회고를 쓸 수 있는 보드 목록
-export const RETRO_BOARDS = [
-  { name: "빛가람 경진대회", dotColor: "bg-blue-600", period: "9/1 ~ 10/20" },
-  { name: "안끊겨 프로젝트", dotColor: "bg-green-600", period: "9/8 ~ 11/30" },
-  { name: "React 심화", dotColor: "bg-blue-400", period: "9/3 ~ 10/29" },
-  { name: "포폴 피드백", dotColor: "bg-teal-500", period: "9/10 ~ 10/31" },
-];
+// 보드 하나의 모양
+export type RetroBoard = {
+  name: string;
+  dotColor: string;
+  // "9/1 ~ 10/20" 모양의 기간
+  period: string;
+};
+
+// 보드 목록. 실제로는 캘린더에서 만든 보드를 받아와야 해서 빈 상태로 시작한다
+export const RETRO_BOARDS: RetroBoard[] = [];
 
 // KPT 세 칸의 이름표
 export type KptKey = "keep" | "problem" | "tryText";
