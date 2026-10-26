@@ -1,36 +1,37 @@
+// src/pages/ArticleEditorPage.tsx
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Dropdown from "../components/common/Dropdown";
 import { ACTIVITY_OPTIONS } from "../constants/activity";
+import { ArrowLeftIcon } from "../components/icons/ArrowLeftIcon";
 
 const roundOptions = ["회차 선택", "1회차", "2회차", "3회차", "4회차"];
 const memberOptions = ["지정할 팀원 선택", "등록된 팀원 없음"];
 
-type FeedbackOption = "common" | "all" | "custom" | "none";
-
 export default function ArticleEditorPage() {
   const navigate = useNavigate();
 
+  // 모든 값 초기화
   const [title, setTitle] = useState("");
   const [activity, setActivity] = useState("활동 선택");
   const [round, setRound] = useState("회차 선택");
   const [content, setContent] = useState("");
-  const [feedbackOption, setFeedbackOption] = useState<FeedbackOption>("none");
+  const [feedbackOption, setFeedbackOption] = useState<
+    "common" | "all" | "custom" | "none"
+  >("none");
   const [selectedMember, setSelectedMember] = useState("지정할 팀원 선택");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
 
   const handleAddTag = () => {
-    const newTag = tagInput.trim();
-
-    if (newTag && !tags.includes(newTag)) {
-      setTags((previous) => [...previous, newTag]);
+    if (tagInput.trim() && !tags.includes(tagInput.trim())) {
+      setTags([...tags, tagInput.trim()]);
       setTagInput("");
     }
   };
 
   const handleRemoveTag = (tagToRemove: string) => {
-    setTags((previous) => previous.filter((tag) => tag !== tagToRemove));
+    setTags(tags.filter((t) => t !== tagToRemove));
   };
 
   const handlePublish = () => {
@@ -38,22 +39,60 @@ export default function ArticleEditorPage() {
       alert("제목을 입력해주세요.");
       return;
     }
-
-    alert("정리글이 발행되었습니다.");
+    alert("정리글이 성공적으로 발행되었습니다.");
     navigate("/archive");
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-[#f8f9fa] font-pretendard">
-      <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-6 py-4">
-        <div className="flex flex-wrap items-center gap-3">
+    <div className="flex-1 flex flex-col h-screen bg-[#f8f9fa] overflow-hidden font-pretendard">
+      {/* 상단 네비게이션 헤더 */}
+      <header className="bg-white border-b border-gray-200 px-6 py-3 flex justify-between items-center shrink-0">
+        <div className="flex items-center gap-3">
           <button
-            type="button"
             onClick={() => navigate("/archive")}
-            className="flex items-center gap-1 text-xs font-semibold text-gray-500 transition hover:text-gray-900"
+            className="text-xs font-semibold text-gray-500 hover:text-gray-900 flex items-center gap-1 transition"
           >
             <svg
-              className="h-4 w-4"
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <button
+                onClick={() => navigate("/archive")}
+                className="text-xs font-semibold text-gray-500 hover:text-gray-900 flex items-center gap-1"
+              >
+                <ArrowLeftIcon />
+                <span>아카이브로</span>
+              </button>
+              <div className="h-4 w-px bg-gray-200" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
+            </svg>
+            <span>아카이브로</span>
+          </button>
+          <div className="h-4 w-px bg-gray-200" />
+
+          <Dropdown
+            options={[...ACTIVITY_OPTIONS]}
+            value={activity}
+            onChange={setActivity}
+          />
+          <Dropdown options={roundOptions} value={round} onChange={setRound} />
+
+          <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[11px] font-bold rounded">
+            팀 전체 공개 (고정)
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <button className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-200 transition flex items-center gap-1.5">
+            <svg
+              className="w-3.5 h-3.5 text-gray-500"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -62,176 +101,307 @@ export default function ArticleEditorPage() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M15 19l-7-7 7-7"
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
               />
             </svg>
-            아카이브로
+            <span>미리보기</span>
           </button>
-
-          <div className="h-5 w-px bg-gray-200" />
-
-          <Dropdown
-            options={[...ACTIVITY_OPTIONS]}
-            value={activity}
-            onChange={setActivity}
-          />
-
-          <Dropdown options={roundOptions} value={round} onChange={setRound} />
-
-          <span className="rounded bg-blue-50 px-2 py-1 text-[11px] font-bold text-blue-600">
-            팀 전체 공개
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => alert("임시 저장 기능은 아직 연결되지 않았습니다.")}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 transition hover:bg-gray-50"
-          >
+          <button className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-50 transition">
             임시 저장
           </button>
           <button
-            type="button"
             onClick={handlePublish}
-            className="rounded-lg bg-black px-4 py-2 text-xs font-semibold text-white transition hover:bg-gray-800"
+            className="px-4 py-1.5 bg-black text-white rounded-lg text-xs font-semibold hover:bg-gray-800 transition flex items-center gap-1.5"
           >
-            발행하기
+            <svg
+              className="w-3.5 h-3.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+              />
+            </svg>
+            <span>발행하기</span>
           </button>
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-5 lg:flex-row">
-        <section className="flex min-h-[420px] min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-          <div className="border-b border-gray-100 p-4">
-            <input
-              type="text"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder="제목을 입력하세요"
-              className="w-full text-base font-extrabold text-gray-900 outline-none"
-            />
-          </div>
-
-          <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50/60 px-4 py-3">
-            <span className="text-xs font-bold text-gray-600">본문 작성</span>
-            <span className="font-mono text-[10px] text-gray-400">
-              Markdown
-            </span>
-          </div>
-
-          <textarea
-            value={content}
-            onChange={(event) => setContent(event.target.value)}
-            placeholder="배운 내용을 작성하세요."
-            className="min-h-[300px] flex-1 resize-none p-5 text-sm leading-relaxed text-gray-800 outline-none"
-          />
-        </section>
-
-        <section className="flex w-full shrink-0 flex-col gap-5 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm lg:w-80">
-          <div>
-            <h2 className="text-sm font-bold text-gray-900">피드백 요청</h2>
-            <p className="mt-1 text-xs leading-5 text-gray-400">
-              글을 함께 검토할 팀원을 선택할 수 있습니다.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            {(
-              [
-                ["common", "공통 전공 팀원"],
-                ["all", "팀원 전체"],
-                ["custom", "특정 팀원 지정"],
-                ["none", "요청하지 않음"],
-              ] as [FeedbackOption, string][]
-            ).map(([value, label]) => (
-              <label
-                key={value}
-                className={`flex cursor-pointer items-center gap-2 rounded-xl border p-3 text-xs font-semibold transition ${
-                  feedbackOption === value
-                    ? "border-black bg-gray-50"
-                    : "border-gray-200 hover:bg-gray-50"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="feedback"
-                  value={value}
-                  checked={feedbackOption === value}
-                  onChange={() => setFeedbackOption(value)}
-                  className="accent-black"
-                />
-                {label}
-              </label>
-            ))}
-          </div>
-
-          {feedbackOption === "custom" && (
-            <Dropdown
-              options={memberOptions}
-              value={selectedMember}
-              onChange={setSelectedMember}
-            />
-          )}
-
-          <div className="border-t border-gray-100 pt-4">
-            <h2 className="text-sm font-bold text-gray-900">태그</h2>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              {tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="flex items-center gap-1 rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-700"
-                >
-                  {tag}
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveTag(tag)}
-                    aria-label={`${tag} 태그 삭제`}
-                    className="text-gray-400 hover:text-gray-800"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-
-            <div className="mt-3 flex gap-2">
+      {/* 에디터 메인 컨텐츠 영역 */}
+      <div className="flex-1 flex overflow-hidden p-6 gap-6">
+        <div className="flex-1 flex gap-4 overflow-hidden">
+          {/* 에디터 창 */}
+          <div className="flex-1 bg-white rounded-2xl border border-gray-200 flex flex-col overflow-hidden shadow-sm">
+            <div className="p-4 border-b border-gray-100">
               <input
                 type="text"
-                value={tagInput}
-                onChange={(event) => setTagInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    handleAddTag();
-                  }
-                }}
-                placeholder="태그 입력"
-                className="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-2 text-xs outline-none focus:border-gray-400"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="제목을 입력하세요"
+                className="w-full text-base font-extrabold text-gray-900 focus:outline-none"
               />
-              <button
-                type="button"
-                onClick={handleAddTag}
-                className="rounded-lg bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-200"
-              >
-                추가
-              </button>
+            </div>
+
+            {/* 마크다운 툴바 */}
+            <div className="px-4 py-2 border-b border-gray-100 bg-gray-50/60 flex justify-between items-center text-xs text-gray-600">
+              <div className="flex items-center gap-2 font-bold">
+                <button className="p-1 hover:bg-gray-200 rounded text-xs">
+                  H1
+                </button>
+                <button className="p-1 hover:bg-gray-200 rounded text-xs">
+                  H2
+                </button>
+                <button className="p-1 hover:bg-gray-200 rounded font-serif italic text-xs">
+                  B
+                </button>
+                <button className="p-1 hover:bg-gray-200 rounded text-xs">
+                  I
+                </button>
+                <button className="p-1 hover:bg-gray-200 rounded text-xs">
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+                    />
+                  </svg>
+                </button>
+                <button className="p-1 hover:bg-gray-200 rounded text-xs">
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <span className="text-[10px] text-gray-400 font-mono">
+                Markdown
+              </span>
+            </div>
+
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="내용을 작성하세요 (마크다운 지원)"
+              className="flex-1 p-5 text-xs font-mono text-gray-800 focus:outline-none resize-none leading-relaxed"
+            />
+          </div>
+
+          {/* 실시간 미리보기 창 */}
+          <div className="flex-1 bg-white rounded-2xl border border-gray-200 flex flex-col overflow-hidden shadow-sm">
+            <div className="p-3.5 border-b border-gray-100 bg-gray-50/60 flex justify-between items-center">
+              <span className="text-xs font-bold text-gray-700">미리보기</span>
+              <span className="px-2 py-0.5 bg-green-100 text-green-700 font-bold rounded text-[10px]">
+                실시간
+              </span>
+            </div>
+            <div className="flex-1 p-5 overflow-y-auto space-y-3">
+              {title ? (
+                <h1 className="text-lg font-extrabold text-gray-900">
+                  {title}
+                </h1>
+              ) : (
+                <p className="text-xs text-gray-300 italic">
+                  제목이 표시됩니다.
+                </p>
+              )}
+              {content ? (
+                <div className="whitespace-pre-wrap text-xs text-gray-800 leading-relaxed font-pretendard">
+                  {content}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-300 italic">
+                  작성한 본문 내용이 실시간으로 미리보기됩니다.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 우측 피드백 및 옵션 설정 패널 */}
+        <div className="w-80 bg-white rounded-2xl border border-gray-200 p-5 flex flex-col justify-between shrink-0 shadow-sm overflow-y-auto space-y-5">
+          <div className="space-y-5">
+            <div className="space-y-3">
+              <h3 className="text-xs font-bold text-gray-900">피드백 요청</h3>
+              <p className="text-[11px] text-gray-400 leading-snug">
+                발행과 동시에 알림이 발송되고, 지정한 팀원이 내 글을 함께
+                검토합니다.
+              </p>
+
+              <div className="space-y-2 pt-1">
+                <label className="flex items-center gap-2.5 p-2.5 border rounded-xl text-xs font-semibold cursor-pointer hover:bg-gray-50 transition border-gray-200">
+                  <input
+                    type="radio"
+                    name="feedback"
+                    checked={feedbackOption === "common"}
+                    onChange={() => setFeedbackOption("common")}
+                    className="accent-black"
+                  />
+                  <span>공통 전공 팀원</span>
+                </label>
+
+                <label className="flex items-center gap-2.5 p-2.5 border rounded-xl text-xs font-semibold cursor-pointer hover:bg-gray-50 transition border-gray-200">
+                  <input
+                    type="radio"
+                    name="feedback"
+                    checked={feedbackOption === "all"}
+                    onChange={() => setFeedbackOption("all")}
+                    className="accent-black"
+                  />
+                  <span>팀원 전체</span>
+                </label>
+
+                {/* 특정 팀원 지정 라디오 + 서브 지정 드롭다운 UI */}
+                <div className="space-y-2">
+                  <label
+                    className={`flex items-center gap-2.5 p-2.5 border rounded-xl text-xs font-semibold cursor-pointer transition ${
+                      feedbackOption === "custom"
+                        ? "border-black bg-gray-50"
+                        : "border-gray-200 hover:bg-gray-50"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="feedback"
+                      checked={feedbackOption === "custom"}
+                      onChange={() => setFeedbackOption("custom")}
+                      className="accent-black"
+                    />
+                    <span>특정 팀원 지정</span>
+                  </label>
+
+                  {/* 특정 팀원 지정 선택 시 아래에 동적 노출되는 UI */}
+                  {feedbackOption === "custom" && (
+                    <div className="pl-3 pr-1 pt-1 space-y-1.5 animate-in fade-in duration-150">
+                      <Dropdown
+                        options={memberOptions}
+                        value={selectedMember}
+                        onChange={setSelectedMember}
+                      />
+                      <p className="text-[10px] text-gray-400 pl-1">
+                        * 등록된 팀원이 없을 경우 지정할 수 없습니다.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <label className="flex items-center gap-2.5 p-2.5 border rounded-xl text-xs font-semibold cursor-pointer border-black bg-gray-50 transition">
+                  <input
+                    type="radio"
+                    name="feedback"
+                    checked={feedbackOption === "none"}
+                    onChange={() => setFeedbackOption("none")}
+                    className="accent-black"
+                  />
+                  <span>요청하지 않음</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-gray-100">
+              <h3 className="text-xs font-bold text-gray-900">태그</h3>
+              <div className="flex flex-wrap gap-1.5">
+                {tags.map((t) => (
+                  <span
+                    key={t}
+                    className="px-2 py-1 bg-gray-100 text-gray-700 text-[11px] font-semibold rounded-md flex items-center gap-1"
+                  >
+                    <span>{t}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveTag(t)}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex gap-1.5 pt-1">
+                <input
+                  type="text"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  placeholder="태그 입력"
+                  className="flex-1 px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-black"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddTag}
+                  className="px-3 py-1.5 bg-gray-100 text-gray-700 text-xs font-semibold rounded-lg hover:bg-gray-200 transition"
+                >
+                  + 추가
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="mt-auto rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800">
-            발행하기 전에 제목과 본문을 확인해주세요.
-          </div>
+          <div className="space-y-3 pt-3 border-t border-gray-100">
+            <div className="p-3 bg-amber-50 rounded-xl text-[11px] text-amber-800 leading-snug flex items-start gap-1.5">
+              <svg
+                className="w-4 h-4 text-amber-600 shrink-0 mt-0.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
+              </svg>
+              <span>
+                모든 정리글은 팀 전체에 공개됩니다. 내용이 정제되었는지 확인해
+                주세요.
+              </span>
+            </div>
 
-          <button
-            type="button"
-            onClick={handlePublish}
-            className="w-full rounded-xl bg-black py-3 text-xs font-bold text-white transition hover:bg-gray-800"
-          >
-            발행하기
-          </button>
-        </section>
+            <button
+              onClick={handlePublish}
+              className="w-full py-2.5 bg-black text-white font-bold text-xs rounded-xl hover:bg-gray-800 transition flex items-center justify-center gap-1.5"
+            >
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                />
+              </svg>
+              <span>발행하기</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

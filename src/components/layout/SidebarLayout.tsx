@@ -1,4 +1,3 @@
-// src/components/layout/SidebarLayout.tsx
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 
@@ -19,12 +18,13 @@ export default function SidebarLayout({
   const location = useLocation();
 
   const getActiveMenu = (pathname: string) => {
-    if (pathname.startsWith("/today")) return "오늘 할 일";
+    if (pathname.startsWith("/today") || pathname === "/") return "오늘 할 일";
     if (pathname.startsWith("/calendar")) return "통합 캘린더";
     if (pathname.startsWith("/activity")) return "활동";
     if (pathname.startsWith("/archive") || pathname.startsWith("/editor"))
       return "정리글 아카이브";
-    if (pathname.startsWith("/report")) return "주간 리포트";
+    if (pathname.startsWith("/weekly-report") || pathname.startsWith("/report"))
+      return "주간 리포트";
     if (pathname.startsWith("/invite")) return "팀원 초대";
     if (pathname.startsWith("/settings")) return "설정";
     return "";
@@ -53,12 +53,13 @@ export default function SidebarLayout({
         break;
       case "주간 리포트":
       case "주간리포트":
-        navigate("/report");
+        navigate("/weekly-report");
         break;
       case "팀원 초대":
         navigate("/invite");
         break;
       case "설정":
+      case "팀원 관리":
         navigate("/settings");
         break;
       default:
@@ -74,8 +75,7 @@ export default function SidebarLayout({
         assignmentCount={assignmentCount}
         onNavigate={handleNavigate}
       />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {/* 하위 모든 페이지에 모달 핸들러 공유 */}
+      <div className="flex flex-1 flex-col overflow-y-auto">
         <Outlet context={{ onOpenAddModal }} />
       </div>
     </div>
