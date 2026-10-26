@@ -10,6 +10,8 @@ import SettingsPage from "./pages/SettingsPage";
 import ArchivePage from "./pages/ArchivePage";
 import ArticleEditorPage from "./pages/ArticleEditorPage";
 import WeeklyReportPage from "./pages/WeeklyReportPage";
+// ★ 부장 대시보드(팀원 관리) 페이지
+import AdminDashboardPage from "./pages/AdminDashboardPage";
 import SidebarLayout from "./components/layout/SidebarLayout";
 import { AddEventModal } from "./components/calendar/AddEventModal";
 import type { CalendarEvent } from "./types/calendar";
@@ -23,9 +25,12 @@ export default function App() {
     setEvents((prev) => [...prev, newEvent]);
   };
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  // 오늘 날짜 "2026-10-26" (한국 시간 기준)
+  // toISOString()은 UTC 기준이라 한국 오전 0~9시에 하루 전 날짜가 나와서 바꿨다
+  const todayStr = new Date().toLocaleDateString("sv-SE");
   const todayTaskCount = events.filter((e) => e.date === todayStr).length;
 
+  // 오늘 할 일·캘린더 화면의 사이드바에서 메뉴를 눌렀을 때 이동
   const handleNavigate = (menuName: string) => {
     switch (menuName) {
       case "오늘 할 일":
@@ -41,6 +46,10 @@ export default function App() {
       case "아카이브":
       case "정리글 아카이브":
         navigate("/archive");
+        break;
+      // ★ 팀원 관리 → /members
+      case "팀원 관리":
+        navigate("/members");
         break;
       case "주간 리포트":
         navigate("/report");
@@ -85,7 +94,7 @@ export default function App() {
           }
         />
 
-        {/* 사이드바 공유 레이아웃 구역 */}
+        {/* 사이드바 공유 레이아웃 구역: 이 안에 넣은 페이지는 사이드바가 자동으로 붙는다 */}
         <Route element={<SidebarLayout todayTaskCount={todayTaskCount} />}>
           <Route path="/activity" element={<ActivityDetailPage />} />
           <Route path="/activity/:id" element={<ActivityDetailPage />} />
@@ -96,6 +105,8 @@ export default function App() {
           <Route path="/invite" element={<InvitePage />} />
           <Route path="/invite/:code" element={<InvitePage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          {/* ★ 부장 대시보드(팀원 관리) */}
+          <Route path="/members" element={<AdminDashboardPage />} />
         </Route>
       </Routes>
 
