@@ -13,8 +13,10 @@ import SettingsPage from "./pages/SettingsPage";
 import RetrospectivePage from "./pages/RetrospectivePage";
 // 면접 질문 뱅크 페이지
 import QuestionBankPage from "./pages/QuestionBankPage";
-// ★ 과제·역량맵 페이지
+// ★★ 과제 (AssignmentPage.tsx가 없으면 이 줄 삭제)
 import AssignmentPage from "./pages/AssignmentPage";
+// ★ 부장 대시보드(팀원 관리) 페이지
+import AdminDashboardPage from "./pages/AdminDashboardPage";
 
 import SidebarLayout from "./components/layout/SidebarLayout";
 import { AddEventModal } from "./components/calendar/AddEventModal";
@@ -55,9 +57,12 @@ export default function App() {
       case "면접 질문 뱅크":
         navigate("/questions");
         break;
-      // ★ 과제·역량맵
       case "과제 · 역량맵":
         navigate("/assignments");
+        break;
+      // ★ 팀원 관리 → /members
+      case "팀원 관리":
+        navigate("/members");
         break;
       case "주간 리포트":
         navigate("/report");
@@ -117,8 +122,10 @@ export default function App() {
           <Route path="/retrospective" element={<RetrospectivePage />} />
           {/* 면접 질문 뱅크 */}
           <Route path="/questions" element={<QuestionBankPage />} />
-          {/* ★ 과제·역량맵 */}
+          {/* ★★ 과제 (AssignmentPage.tsx가 없으면 아래 줄 삭제) */}
           <Route path="/assignments" element={<AssignmentPage />} />
+          {/* ★ 부장 대시보드(팀원 관리) */}
+          <Route path="/members" element={<AdminDashboardPage />} />
         </Route>
 
         {/* 사이드바 없이 보이는 페이지 (아직 팀원이 아닌 사람이 들어오는 화면) */}
