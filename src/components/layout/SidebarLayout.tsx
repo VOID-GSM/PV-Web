@@ -24,8 +24,9 @@ export default function SidebarLayout({
     if (pathname.startsWith("/activity")) return "활동";
     if (pathname.startsWith("/archive") || pathname.startsWith("/editor"))
       return "정리글 아카이브";
-    // ★ /questions 주소면 "면접 질문 뱅크"에 불을 켠다
     if (pathname.startsWith("/questions")) return "면접 질문 뱅크";
+    // ★ /assignments 주소면 "과제 · 역량맵"에 불을 켠다
+    if (pathname.startsWith("/assignments")) return "과제 · 역량맵";
     if (pathname.startsWith("/weekly-report") || pathname.startsWith("/report"))
       return "주간 리포트";
     if (pathname.startsWith("/invite")) return "팀원 초대";
@@ -55,9 +56,12 @@ export default function SidebarLayout({
       case "정리글 아카이브":
         navigate("/archive");
         break;
-      // ★ 면접 질문 뱅크 → /questions
       case "면접 질문 뱅크":
         navigate("/questions");
+        break;
+      // ★ 과제 · 역량맵 → /assignments
+      case "과제 · 역량맵":
+        navigate("/assignments");
         break;
       case "주간 리포트":
       case "주간리포트":
