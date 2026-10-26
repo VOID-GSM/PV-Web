@@ -10,6 +10,8 @@ import SettingsPage from "./pages/SettingsPage";
 import ArchivePage from "./pages/ArchivePage";
 import ArticleEditorPage from "./pages/ArticleEditorPage";
 import WeeklyReportPage from "./pages/WeeklyReportPage";
+// ★ 과제·역량맵 페이지
+import AssignmentPage from "./pages/AssignmentPage";
 import SidebarLayout from "./components/layout/SidebarLayout";
 import { AddEventModal } from "./components/calendar/AddEventModal";
 import type { CalendarEvent } from "./types/calendar";
@@ -23,7 +25,8 @@ export default function App() {
     setEvents((prev) => [...prev, newEvent]);
   };
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  // 오늘 날짜 "2026-10-26" (한국 시간 기준)
+  const todayStr = new Date().toLocaleDateString("sv-SE");
   const todayTaskCount = events.filter((e) => e.date === todayStr).length;
 
   const handleNavigate = (menuName: string) => {
@@ -41,6 +44,10 @@ export default function App() {
       case "아카이브":
       case "정리글 아카이브":
         navigate("/archive");
+        break;
+      // ★ 과제·역량맵
+      case "과제 · 역량맵":
+        navigate("/assignments");
         break;
       case "주간 리포트":
         navigate("/report");
@@ -85,7 +92,6 @@ export default function App() {
           }
         />
 
-        {/* 사이드바 공유 레이아웃 구역 */}
         <Route element={<SidebarLayout todayTaskCount={todayTaskCount} />}>
           <Route path="/activity" element={<ActivityDetailPage />} />
           <Route path="/activity/:id" element={<ActivityDetailPage />} />
@@ -96,6 +102,8 @@ export default function App() {
           <Route path="/invite" element={<InvitePage />} />
           <Route path="/invite/:code" element={<InvitePage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          {/* ★ 과제·역량맵 */}
+          <Route path="/assignments" element={<AssignmentPage />} />
         </Route>
       </Routes>
 
