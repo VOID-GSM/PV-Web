@@ -1,12 +1,6 @@
+
 import { useState } from "react";
-import {
-  BrowserRouter,
-  Navigate,
-  Route,
-  Routes,
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
+import { Navigate, Route, Routes, useNavigate, useLocation } from "react-router-dom";
 
 import { MainPage } from "./pages/MainPage";
 import CalendarPage from "./pages/CalendarPage";
@@ -21,7 +15,7 @@ import SidebarLayout from "./components/layout/SidebarLayout";
 import { AddEventModal } from "./components/calendar/AddEventModal";
 import type { CalendarEvent } from "./types/calendar";
 
-function AppContent() {
+export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -69,6 +63,7 @@ function AppContent() {
         navigate("/archive");
         break;
       case "주간 리포트":
+      case "주간리포트":
         navigate("/report");
         break;
       case "팀원 초대":
@@ -98,7 +93,18 @@ function AppContent() {
           }
         />
 
-        <Route element={<SidebarLayout todayTaskCount={todayTaskCount} />}>
+        <Route path="/invite" element={<InvitePage />} />
+        <Route path="/invite/:code" element={<InvitePage />} />
+
+        <Route
+          element={
+            <SidebarLayout
+              todayTaskCount={todayTaskCount}
+              onNavigate={handleNavigate}
+              onOpenAddModal={() => setIsAddModalOpen(true)}
+            />
+          }
+        >
           <Route
             path="/calendar"
             element={
@@ -111,15 +117,19 @@ function AppContent() {
               />
             }
           />
-
           <Route path="/activity" element={<ActivityDetailPage />} />
           <Route path="/activity/:id" element={<ActivityDetailPage />} />
           <Route path="/archive" element={<ArchivePage />} />
           <Route path="/editor" element={<ArticleEditorPage />} />
           <Route path="/archive/editor" element={<ArticleEditorPage />} />
-          <Route path="/report" element={<WeeklyReportPage />} />
-          <Route path="/invite" element={<InvitePage />} />
-          <Route path="/invite/:code" element={<InvitePage />} />
+          <Route
+            path="/report"
+            element={
+              <WeeklyReportPage
+                onOpenAddModal={() => setIsAddModalOpen(true)}
+              />
+            }
+          />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>
@@ -130,13 +140,5 @@ function AppContent() {
         onAddEvent={handleAddEvent}
       />
     </>
-  );
-}
-
-export default function App() {
-  return (
-    <BrowserRouter>
-      <AppContent />
-    </BrowserRouter>
   );
 }

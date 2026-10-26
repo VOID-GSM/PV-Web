@@ -5,12 +5,12 @@ import Dropdown from "../components/common/Dropdown";
 
 const periodOptions = ["기간: 최근 3개월", "기간: 최근 6개월", "기간: 전체"];
 
-interface WeeklyReportPageProps {
+export interface WeeklyReportPageProps {
   onOpenAddModal?: () => void;
 }
 
 export default function WeeklyReportPage({
-  onOpenAddModal,
+  onOpenAddModal = () => {},
 }: WeeklyReportPageProps = {}) {
   const [selectedPeriod, setSelectedPeriod] = useState("기간: 최근 3개월");
   const [excludePrivate, setExcludePrivate] = useState(true);
@@ -44,14 +44,14 @@ export default function WeeklyReportPage({
 
   return (
     <div className="flex-1 flex flex-col h-screen bg-[#f8f9fa] overflow-hidden font-pretendard">
-      {/* 1. 공통 헤더 적용 (알림/새로만들기 다른 페이지와 동일 적용) */}
+      {/* 공통 헤더 */}
       <Header
         title="주간 리포트"
         subtitle="생성된 리포트를 확인하고 팀원들과 공유할 수 있습니다."
         onOpenAddModal={onOpenAddModal}
       />
 
-      {/* 2. 필터 및 컨트롤 바 */}
+      {/* 필터 및 컨트롤 바 */}
       <div className="bg-white border-b border-gray-200 px-8 py-3 flex justify-between items-center shrink-0">
         <div className="flex items-center gap-3 text-xs">
           <Dropdown
@@ -173,7 +173,7 @@ export default function WeeklyReportPage({
         </div>
       </div>
 
-      {/* 3. 메인 콘텐츠 대시보드 */}
+      {/* 대시보드 콘텐츠 */}
       <div className="flex-1 overflow-y-auto p-8 space-y-6">
         <div className="bg-[#191f28] text-white rounded-2xl p-6 shadow-sm space-y-3">
           <div className="flex justify-between items-center">

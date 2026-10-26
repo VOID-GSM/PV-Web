@@ -1,146 +1,279 @@
 // src/pages/InvitePage.tsx
-import { useState } from "react";
-import { useParams } from "react-router-dom";
+import React, { useState } from "react";
+import logoWhite from "../assets/images/logo-white.png";
+import linkIcon from "../assets/icons/link.svg";
+import alertIcon from "../assets/icons/alert.svg";
+
+import {
+  GENERATION_OPTIONS,
+  DEPARTMENT_OPTIONS,
+  FEATURE_LIST,
+} from "../constants/invite";
+import { MOCK_INVITE_INFO } from "../mocks/invite";
+import { SelectionChip } from "../components/invite/SelectionChip";
 import type { CalendarEvent } from "../types/calendar";
 
 export interface InvitePageProps {
   events?: CalendarEvent[];
+  activeMenu?: string;
+  onNavigate?: (menu: string) => void;
+  onOpenAddModal?: () => void;
+  onAddEvent?: (newEvent: CalendarEvent) => void;
 }
 
-export default function InvitePage({ events = [] }: InvitePageProps = {}) {
-  const { code } = useParams<{ code?: string }>();
-  const [inviteCode] = useState(code || "PV-2026-TEAM");
-  const [copied, setCopied] = useState(false);
-  const [emailInput, setEmailInput] = useState("");
-  const [invitedMembers, setInvitedMembers] = useState([
-    {
-      id: 1,
-      email: "developer@example.com",
-      status: "초대 대기 중",
-      date: "2026.10.26",
-    },
-  ]);
+const InvitePage: React.FC<InvitePageProps> = () => {
+  // 피드백 반영: 초기 선택값 비워두기 (이름, 기수, 전공)
+  const [name, setName] = useState("");
+  const [generation, setGeneration] = useState("");
+  const [departments, setDepartments] = useState<string[]>([]);
 
-  // 오늘 할 일 수치 계산
-  const todayStr = new Date().toISOString().split("T")[0];
-  const todayTaskCount = events.filter((e) => e.date === todayStr).length;
+  const [errors, setErrors] = useState({
+    name: false,
+    generation: false,
+    departments: false,
+  });
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(`https://pv-web.com/invite/${inviteCode}`);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const toggleGeneration = (item: string) => {
+    setGeneration((prev) => (prev === item ? "" : item));
+    setErrors((prev) => ({
+      ...prev,
+      generation: false,
+    }));
   };
 
-  const handleSendInvite = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!emailInput.trim()) return;
-    setInvitedMembers((prev) => [
+  const toggleDepartment = (department: string) => {
+    setDepartments((prev) =>
+      prev.includes(department)
+        ? prev.filter((item) => item !== department)
+        : [...prev, department],
+    );
+
+    setErrors((prev) => ({
       ...prev,
-      {
-        id: Date.now(),
-        email: emailInput.trim(),
-        status: "초대 대기 중",
-        date: new Date().toLocaleDateString("ko-KR"),
-      },
-    ]);
-    setEmailInput("");
+      departments: false,
+    }));
+  };
+
+  const handleSubmit = () => {
+    const nameError = name.trim() === "";
+    const generationError = generation === "";
+    const departmentsError = departments.length === 0;
+
+    setErrors({
+      name: nameError,
+      generation: generationError,
+      departments: departmentsError,
+    });
+
+    if (nameError || generationError || departmentsError) {
+      return;
+    }
+
+    // TODO: 백엔드 API 연동
   };
 
   return (
-    <div className="flex-1 flex flex-col h-screen bg-[#f8f9fa] overflow-y-auto font-pretendard">
-      {/* 상단 헤더 */}
-      <header className="bg-white border-b border-gray-200 px-8 py-5 flex justify-between items-center shrink-0">
-        <div>
-          <h1 className="text-lg font-extrabold text-gray-900">팀원 초대</h1>
-          <p className="text-xs text-gray-400 mt-0.5">
-            새로운 팀원을 초대하고 함께 프로젝트를 진행하세요. (오늘 남은 할 일:{" "}
-            {todayTaskCount}개)
-          </p>
-        </div>
-      </header>
-
-      {/* 메인 콘텐츠 */}
-      <main className="flex-1 p-8 max-w-4xl space-y-6">
-        {/* 초대 링크 공유 카드 */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-          <h2 className="text-sm font-bold text-gray-900 mb-1">
-            초대 링크 공유
-          </h2>
-          <p className="text-xs text-gray-500 mb-4">
-            아래 링크를 복사하여 초대할 팀원에게 전달하세요.
-          </p>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              readOnly
-              value={`https://pv-web.com/invite/${inviteCode}`}
-              className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono text-gray-700 focus:outline-none"
+    <div className="min-h-screen w-full bg-[#f7f7f7] overflow-hidden font-pretendard">
+      <div className="flex min-h-screen w-full">
+        {/* =========================
+            LEFT SECTION
+        ========================= */}
+        <section className="relative flex min-h-screen w-[41%] min-w-[560px] flex-col bg-black px-[6.5%] py-[5.5%] text-white">
+          {/* Logo */}
+          <div className="mb-[5%]">
+            <img
+              src={logoWhite}
+              alt="VOID"
+              className="h-auto w-[145px] object-contain"
             />
-            <button
-              onClick={handleCopyLink}
-              className="px-5 py-2.5 bg-black text-white text-xs font-bold rounded-xl hover:bg-gray-800 transition shrink-0"
-            >
-              {copied ? "복사 완료!" : "링크 복사"}
-            </button>
           </div>
-        </div>
 
-        {/* 이메일로 직접 초대 */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-          <h2 className="text-sm font-bold text-gray-900 mb-1">
-            이메일로 초대하기
-          </h2>
-          <p className="text-xs text-gray-500 mb-4">
-            초대받을 팀원의 이메일 주소를 입력하세요.
-          </p>
-          <form onSubmit={handleSendInvite} className="flex gap-2">
-            <input
-              type="email"
-              value={emailInput}
-              onChange={(e) => setEmailInput(e.target.value)}
-              placeholder="invited@example.com"
-              className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-black transition"
-            />
-            <button
-              type="submit"
-              className="px-5 py-2.5 bg-black text-white text-xs font-bold rounded-xl hover:bg-gray-800 transition shrink-0"
-            >
-              초대장 발송
-            </button>
-          </form>
-        </div>
+          {/* Main text */}
+          <div>
+            <h1 className="text-[42px] font-bold leading-[1.35] tracking-[-0.04em]">
+              까먹지 않게,
+              <br />
+              먼저 알려주는 팀 운영 도구
+            </h1>
 
-        {/* 초대 현황 */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-          <h2 className="text-sm font-bold text-gray-900 mb-4">
-            초대 현황 ({invitedMembers.length})
-          </h2>
-          <div className="divide-y divide-gray-100">
-            {invitedMembers.length === 0 ? (
-              <p className="text-xs text-gray-400 py-4 text-center">
-                초대한 팀원이 없습니다.
-              </p>
-            ) : (
-              invitedMembers.map((member) => (
-                <div
-                  key={member.id}
-                  className="py-3 flex justify-between items-center text-xs"
-                >
-                  <div>
-                    <p className="font-semibold text-gray-800">
-                      {member.email}
-                    </p>
-                    <p className="text-[11px] text-gray-400">{member.date}</p>
-                  </div>
-                  <span className="px-2.5 py-1 bg-yellow-50 text-yellow-700 font-bold rounded-full text-[10px]">
-                    {member.status}
-                  </span>
+            <p className="mt-5 text-[15px] leading-[1.7] text-[#777]">
+              일정 · 스터디 · 과제 · 기록을 한 곳에 모으고,
+              <br />
+              해야 할 사람에게 해야 할 타이밍에 먼저 알립니다.
+            </p>
+          </div>
+
+          {/* Features list */}
+          <div className="mt-[7%] space-y-7">
+            {FEATURE_LIST.map((feature, idx) => (
+              <div key={idx} className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-[10px] bg-[#1d1d1d]">
+                  <img src={feature.icon} alt="" className="h-6 w-6" />
                 </div>
-              ))
-            )}
+
+                <div>
+                  <p className="text-[16px] font-bold">{feature.title}</p>
+                  <p className="mt-1 text-[12px] text-[#777]">
+                    {feature.description}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
-      </main>
+
+          {/* Invite info */}
+          <div className="absolute bottom-[6%] left-[6.5%] right-[6.5%] rounded-[10px] bg-[#181818] px-5 py-4">
+            <div className="flex items-center gap-3 text-[13px] text-[#777]">
+              <img src={linkIcon} alt="" className="h-5 w-5" />
+
+              <span>
+                {MOCK_INVITE_INFO.inviterRole} {MOCK_INVITE_INFO.inviterName}{" "}
+                님의 초대 · {MOCK_INVITE_INFO.expiresAt}까지 유효 ·{" "}
+                {MOCK_INVITE_INFO.remainingCount}회 남음
+              </span>
+            </div>
+          </div>
+        </section>
+
+        {/* =========================
+            RIGHT SECTION
+        ========================= */}
+        <section className="relative flex min-h-screen flex-1 items-center justify-center bg-[#f7f7f7]">
+          {/* Profile card */}
+          <div className="h-[698px] w-[520px] rounded-[18px] bg-white p-[44px] shadow-[0_8px_30px_rgba(0,0,0,0.08)]">
+            <h2 className="text-[23px] font-bold tracking-[-0.03em]">
+              프로필을 입력하고 입장하세요
+            </h2>
+            <p className="mt-2 text-[11px] text-[#999]">
+              별도 로그인이 없습니다. 입장하면 이 기기에 인증 토큰이 저장돼요.
+            </p>
+
+            {/* 이름 입력 */}
+            <div className="mt-8">
+              <label className="text-[12px] font-medium">이름</label>
+
+              <input
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+
+                  if (e.target.value.trim() !== "") {
+                    setErrors((prev) => ({
+                      ...prev,
+                      name: false,
+                    }));
+                  }
+                }}
+                className={`mt-2 h-[42px] w-full rounded-[7px] border px-3 text-[13px] outline-none ${
+                  errors.name
+                    ? "border-red-500 focus:border-red-500"
+                    : "border-[#999] focus:border-black"
+                }`}
+              />
+
+              {errors.name ? (
+                <p className="mt-2 text-[10px] text-red-500">
+                  이름을 입력해주세요.
+                </p>
+              ) : (
+                <p className="mt-2 text-[10px] text-[#aaa]">
+                  팀원에게 보이는 이름입니다
+                </p>
+              )}
+            </div>
+
+            {/* 기수 선택 */}
+            <div className="mt-7">
+              <label className="text-[12px] font-medium">기수</label>
+
+              <div className="mt-3 flex gap-2">
+                {GENERATION_OPTIONS.map((item) => (
+                  <SelectionChip
+                    key={item}
+                    label={item}
+                    selected={generation === item}
+                    onClick={() => toggleGeneration(item)}
+                  />
+                ))}
+              </div>
+
+              {errors.generation ? (
+                <p className="mt-2 text-[10px] text-red-500">
+                  기수를 선택해주세요.
+                </p>
+              ) : (
+                <p className="mt-2 text-[10px] text-[#aaa]">
+                  기수 목록은 부장이 관리합니다
+                </p>
+              )}
+            </div>
+
+            {/* 전공 선택 */}
+            <div className="mt-7">
+              <div className="flex items-center justify-between">
+                <label className="text-[12px] font-medium">전공</label>
+                <span className="text-[10px] text-[#aaa]">복수 선택 가능</span>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                {DEPARTMENT_OPTIONS.map((department) => (
+                  <SelectionChip
+                    key={department}
+                    label={department}
+                    selected={departments.includes(department)}
+                    onClick={() => toggleDepartment(department)}
+                  />
+                ))}
+              </div>
+
+              {errors.departments ? (
+                <p className="mt-2 text-[10px] text-red-500">
+                  전공을 하나 이상 선택해주세요.
+                </p>
+              ) : (
+                <p className="mt-2 text-[10px] text-[#aaa]">
+                  과제 · 스터디 추천과 아바타 색상에 사용됩니다
+                </p>
+              )}
+            </div>
+
+            {/* Notice */}
+            <div className="mt-7 flex gap-3 rounded-[8px] bg-[#eaf3ff] px-4 py-4 text-[11px] leading-[1.5] text-[#4d78a8]">
+              <img src={alertIcon} alt="" className="mt-[1px] h-4 w-4" />
+
+              <p>
+                입장하면 개인 초대장 코드가 발급됩니다. 기기를 바꿀 때 필요하니
+                설정 화면에서 꼭 확인하세요.
+              </p>
+            </div>
+
+            {/* Enter Button */}
+            <button
+              type="button"
+              onClick={handleSubmit}
+              className="mt-6 flex h-[46px] w-full items-center justify-center gap-2 rounded-[7px] bg-black text-[13px] font-medium text-white transition hover:bg-[#222] active:scale-[0.99]"
+            >
+              입장하기
+              <span className="text-[17px]">→</span>
+            </button>
+
+            {/* Re-enter Button */}
+            <div className="mt-5 text-center text-[10px] text-[#aaa]">
+              <span>이미 입장한 적 있나요? </span>
+
+              <button
+                type="button"
+                onClick={() => {}}
+                className="font-medium text-[#555] underline underline-offset-2 cursor-pointer"
+              >
+                재입장 코드 입력
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
   );
-}
+};
+
+export default InvitePage;

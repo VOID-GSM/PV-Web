@@ -1,16 +1,17 @@
+// src/components/calendar/AddEventModal.tsx
 import React, { useState } from "react";
-import type { CalendarEvent, EventType } from "../../types/calendar";
+import type { CalendarEvent } from "../../types/calendar";
+
+import alertIcon from "../../assets/icons/alert.svg";
+import calendarIcon from "../../assets/icons/calendar.svg";
+import clockIcon from "../../assets/icons/clock.svg";
+import plusIcon from "../../assets/icons/plus.svg";
+import checkCircleIcon from "../../assets/icons/check-circle.svg";
 
 interface AddEventModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddEvent: (newEvent: CalendarEvent) => void;
-}
-
-interface FormErrors {
-  title?: string;
-  board?: string;
-  date?: string;
+  onAddEvent?: (newEvent: CalendarEvent) => void;
 }
 
 export const AddEventModal: React.FC<AddEventModalProps> = ({
@@ -18,63 +19,72 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
   onClose,
   onAddEvent,
 }) => {
-  const [type, setType] = useState<EventType>("활동");
+  const [type, setType] = useState<"마감" | "회의" | "활동" | "개인 일정">(
+    "마감",
+  );
   const [title, setTitle] = useState("");
   const [board, setBoard] = useState("");
-  const [date, setDate] = useState("2026-10-15");
+  const [repeat, setRepeat] = useState("반복 없음");
+  const [date, setDate] = useState("");
   const [time, setTime] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [assignees, setAssignees] = useState<string[]>([]);
+  const [alerts, setAlerts] = useState<string[]>([]);
 
-  const [errors, setErrors] = useState<FormErrors>({});
+  // useEffect 대신 렌더링 단계에서 isOpen 상태 변화를 감지해 폼 초기화 (ESLint 에러 방지)
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
+    if (isOpen) {
+      setType("마감");
+      setTitle("");
+      setBoard("");
+      setRepeat("반복 없음");
+      setDate("");
+      setTime("");
+      setEndDate("");
+      setAssignees([]);
+      setAlerts([]);
+    }
+  }
 
   if (!isOpen) return null;
 
-  const handleClose = () => {
-    setTitle("");
-    setBoard("");
-    setDate("2026-10-15");
-    setTime("");
-    setType("활동");
-    setErrors({});
-    onClose();
+  // ... 이하 동일
+
+  const toggleAlert = (level: string) => {
+    setAlerts((prev) =>
+      prev.includes(level)
+        ? prev.filter((item) => item !== level)
+        : [...prev, level],
+    );
+  };
+
+  const removeAssignee = (name: string) => {
+    setAssignees((prev) => prev.filter((item) => item !== name));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    const newErrors: FormErrors = {};
-
-    if (!title.trim()) {
-      newErrors.title = "일정 제목을 입력해 주세요.";
+    if (onAddEvent && title.trim()) {
+      onAddEvent({
+        id: Date.now().toString(),
+        title,
+        type,
+        board: board || "일반 보드",
+        date: date || new Date().toISOString().split("T")[0],
+        time: time || "00:00",
+        assignees,
+        isMyEvent: true,
+      });
     }
-    if (!board.trim()) {
-      newErrors.board = "보드 이름을 입력해 주세요.";
-    }
-    if (!date) {
-      newErrors.date = "날짜를 선택해 주세요.";
-    }
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return;
-    }
-
-    onAddEvent({
-      id: Date.now().toString(),
-      title: title.trim(),
-      type,
-      board: board.trim(),
-      date,
-      time: time || undefined,
-      isMyEvent: true,
-    });
-
-    handleClose();
+    onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs select-none">
-      <div className="w-full max-w-lg rounded-3xl bg-white p-8 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-        <div className="flex items-start justify-between">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 font-pretendard select-none">
+      <div className="relative w-full max-w-[560px] max-h-[92vh] overflow-y-auto rounded-3xl bg-white p-7 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+        <div className="flex items-start justify-between pb-4">
           <div>
             <h2 className="text-xl font-bold text-gray-900">일정 추가</h2>
             <p className="mt-1 text-xs text-gray-400">
@@ -83,210 +93,242 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
           </div>
           <button
             type="button"
-            onClick={handleClose}
-            className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition cursor-pointer"
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition cursor-pointer"
           >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+            ✕
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5 text-xs">
+          {/* 일정 유형 */}
           <div>
-            <label className="block text-xs font-bold text-gray-700 mb-2">
+            <label className="block font-bold text-gray-700 mb-2">
               일정 유형
             </label>
             <div className="flex gap-2">
-              {(["마감", "회의", "활동", "개인 일정"] as const).map((t) => (
+              {(["마감", "회의", "활동", "개인 일정"] as const).map((item) => (
                 <button
-                  key={t}
+                  key={item}
                   type="button"
-                  onClick={() => setType(t)}
-                  className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition cursor-pointer ${
-                    type === t
-                      ? "border-2 border-black bg-white text-gray-900 shadow-2xs"
-                      : "border border-gray-100 bg-gray-50 text-gray-500 hover:bg-gray-100"
+                  onClick={() => setType(item)}
+                  className={`px-3.5 py-1.5 rounded-full font-semibold border flex items-center gap-1 transition cursor-pointer ${
+                    type === item
+                      ? "border-black bg-black text-white"
+                      : "border-gray-200 text-gray-600 hover:bg-gray-50"
                   }`}
                 >
-                  {type === t && (
-                    <svg
-                      className="h-3.5 w-3.5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2.5}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
+                  {type === item && (
+                    <img
+                      src={checkCircleIcon}
+                      alt=""
+                      className="h-3.5 w-3.5 filter invert"
+                    />
                   )}
-                  {t}
+                  <span>{item}</span>
                 </button>
               ))}
             </div>
           </div>
 
+          {/* 제목 */}
           <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1.5">
-              제목
-            </label>
+            <label className="block font-bold text-gray-700 mb-1.5">제목</label>
             <input
               type="text"
-              placeholder="일정 제목을 입력하세요"
               value={title}
-              onChange={(e) => {
-                setTitle(e.target.value);
-                if (errors.title)
-                  setErrors((prev) => ({ ...prev, title: undefined }));
-              }}
-              className={`h-11 w-full rounded-2xl px-4 text-xs outline-none transition ${
-                errors.title
-                  ? "border-2 border-red-500 bg-red-50/20 text-gray-900 placeholder:text-red-300"
-                  : "border border-gray-200 bg-white placeholder:text-gray-400 focus:border-black"
-              }`}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full rounded-xl border border-gray-300 p-3 text-sm font-semibold outline-none focus:border-black"
+              placeholder="예: 기획서 최종 제출"
             />
-            {errors.title && (
-              <p className="mt-1.5 text-[11px] font-semibold text-red-500 flex items-center gap-1">
-                <svg
-                  className="h-3.5 w-3.5 shrink-0 text-red-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                  />
-                </svg>
-                {errors.title}
-              </p>
-            )}
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1.5">
-              보드
-            </label>
-            <input
-              type="text"
-              placeholder="보드 이름 입력"
-              value={board}
-              onChange={(e) => {
-                setBoard(e.target.value);
-                if (errors.board)
-                  setErrors((prev) => ({ ...prev, board: undefined }));
-              }}
-              className={`h-11 w-full rounded-2xl px-4 text-xs outline-none transition ${
-                errors.board
-                  ? "border-2 border-red-500 bg-red-50/20 text-gray-900 placeholder:text-red-300"
-                  : "border border-gray-200 bg-white placeholder:text-gray-400 focus:border-black"
-              }`}
-            />
-            {errors.board && (
-              <p className="mt-1.5 text-[11px] font-semibold text-red-500 flex items-center gap-1">
-                <svg
-                  className="h-3.5 w-3.5 shrink-0 text-red-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                  />
-                </svg>
-                {errors.board}
-              </p>
-            )}
-          </div>
-
+          {/* 보드 & 반복 */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1.5">
+              <label className="block font-bold text-gray-700 mb-1.5">
+                보드
+              </label>
+              <select
+                value={board}
+                onChange={(e) => setBoard(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 p-3 outline-none focus:border-black bg-white font-medium"
+              >
+                <option value="">보드 선택</option>
+                <option value="빛가람 경진대회">빛가람 경진대회</option>
+                <option value="인공지능 프로젝트">인공지능 프로젝트</option>
+                <option value="개인 일정">개인 일정</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block font-bold text-gray-700 mb-1.5">
+                반복
+              </label>
+              <select
+                value={repeat}
+                onChange={(e) => setRepeat(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 p-3 outline-none focus:border-black bg-white font-medium"
+              >
+                <option value="반복 없음">반복 없음</option>
+                <option value="매주 반복">매주 반복</option>
+                <option value="매월 반복">매월 반복</option>
+              </select>
+            </div>
+          </div>
+
+          {/* 날짜 / 시간 / 종료 */}
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block font-bold text-gray-700 mb-1.5">
                 날짜
               </label>
               <input
-                type="date"
+                type="text"
                 value={date}
-                onChange={(e) => {
-                  setDate(e.target.value);
-                  if (errors.date)
-                    setErrors((prev) => ({ ...prev, date: undefined }));
-                }}
-                className={`h-11 w-full rounded-2xl px-4 text-xs outline-none transition ${
-                  errors.date
-                    ? "border-2 border-red-500 bg-red-50/20 text-gray-900"
-                    : "border border-gray-200 bg-white focus:border-black"
-                }`}
+                onChange={(e) => setDate(e.target.value)}
+                placeholder="2026-09-24"
+                className="w-full rounded-xl border border-gray-200 p-3 outline-none focus:border-black font-medium"
               />
-              {errors.date && (
-                <p className="mt-1.5 text-[11px] font-semibold text-red-500 flex items-center gap-1">
-                  <svg
-                    className="h-3.5 w-3.5 shrink-0 text-red-500"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                    />
-                  </svg>
-                  {errors.date}
-                </p>
-              )}
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1.5">
+              <label className="block font-bold text-gray-700 mb-1.5">
                 시간
               </label>
-              <input
-                type="time"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-                className="h-11 w-full rounded-2xl border border-gray-200 bg-white px-4 text-xs outline-none focus:border-black transition"
-              />
+              <div className="relative flex items-center">
+                <input
+                  type="text"
+                  value={time}
+                  onChange={(e) => setTime(e.target.value)}
+                  placeholder="23:59"
+                  className="w-full rounded-xl border border-gray-200 p-3 pr-8 outline-none focus:border-black font-medium"
+                />
+                <img
+                  src={clockIcon}
+                  alt=""
+                  className="absolute right-3 h-4 w-4 opacity-40 pointer-events-none"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block font-bold text-gray-700 mb-1.5">
+                종료
+              </label>
+              <div className="relative flex items-center">
+                <input
+                  type="text"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  placeholder="당일"
+                  className="w-full rounded-xl border border-gray-200 p-3 pr-8 outline-none focus:border-black font-medium"
+                />
+                <img
+                  src={calendarIcon}
+                  alt=""
+                  className="absolute right-3 h-4 w-4 opacity-40 pointer-events-none"
+                />
+              </div>
             </div>
           </div>
 
-          <div className="mt-8 flex justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={handleClose}
-              className="h-10 rounded-xl border border-gray-200 px-5 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition cursor-pointer"
-            >
-              취소
-            </button>
-            <button
-              type="submit"
-              className="h-10 rounded-xl bg-black px-5 text-xs font-bold text-white hover:bg-gray-800 transition cursor-pointer shadow-xs"
-            >
-              일정 추가
-            </button>
+          {/* 담당자 */}
+          <div>
+            <label className="block font-bold text-gray-700 mb-2">담당자</label>
+            <div className="flex flex-wrap items-center gap-2">
+              {assignees.map((name) => (
+                <span
+                  key={name}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 font-semibold text-gray-800"
+                >
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-black text-[9px] font-bold text-white">
+                    {name[0]}
+                  </span>
+                  <span>{name}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeAssignee(name)}
+                    className="text-gray-400 hover:text-gray-600 ml-0.5 cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-full border border-dashed border-gray-300 px-3 py-1 font-semibold text-gray-500 hover:bg-gray-50 transition cursor-pointer"
+              >
+                <img src={plusIcon} alt="" className="h-3 w-3 opacity-60" />
+                <span>팀원 추가</span>
+              </button>
+            </div>
+          </div>
+
+          {/* D-day 알림 단계 */}
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <label className="font-bold text-gray-700">D-day 알림 단계</label>
+              <span className="text-[10px] text-gray-400">복수 선택</span>
+            </div>
+            <div className="flex gap-2">
+              {["D-7", "D-3", "D-1", "당일"].map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  onClick={() => toggleAlert(level)}
+                  className={`px-3.5 py-1.5 rounded-full font-semibold border transition cursor-pointer ${
+                    alerts.includes(level)
+                      ? "border-black bg-white text-black font-bold ring-1 ring-black"
+                      : "border-gray-200 text-gray-400 hover:bg-gray-50"
+                  }`}
+                >
+                  {level}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 알림 박스 */}
+          <div className="flex gap-3 rounded-2xl bg-amber-50/80 p-4 border border-amber-200/60 text-amber-900">
+            <img
+              src={alertIcon}
+              alt=""
+              className="h-4 w-4 shrink-0 mt-0.5 text-amber-600"
+            />
+            <div>
+              <p className="font-bold">마감 알림이 자동 등록됩니다</p>
+              <p className="mt-0.5 text-[11px] text-amber-700/90 leading-relaxed">
+                선택한 D-day 단계에 따라 담당 팀원에게 알림 메시지가 발송됩니다.
+              </p>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="border-t border-gray-100 pt-4 flex items-center justify-between">
+            <span className="text-[11px] text-gray-400">
+              추가하면 담당자와 모든 팀원에게 알림이 갑니다
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-xl border border-gray-200 px-4 py-2 font-bold text-gray-600 hover:bg-gray-50 transition cursor-pointer"
+              >
+                취소
+              </button>
+              <button
+                type="submit"
+                className="rounded-xl bg-black px-5 py-2 font-bold text-white hover:bg-gray-800 transition cursor-pointer"
+              >
+                일정 추가
+              </button>
+            </div>
           </div>
         </form>
       </div>
     </div>
   );
 };
+
+export default AddEventModal;
