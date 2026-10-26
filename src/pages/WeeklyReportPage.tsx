@@ -1,36 +1,28 @@
 // src/pages/WeeklyReportPage.tsx
 import { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Header } from "../components/layout/Header";
 import Dropdown from "../components/common/Dropdown";
 
-// 아카이브 페이지와 동일한 기간 옵션으로 수정
 const periodOptions = ["기간: 최근 3개월", "기간: 최근 6개월", "기간: 전체"];
 
-export default function WeeklyReportPage() {
-  const navigate = useNavigate();
+export interface WeeklyReportPageProps {
+  onOpenAddModal?: () => void;
+}
 
-  // 드롭다운 및 모달 상태
+export default function WeeklyReportPage({
+  onOpenAddModal = () => {},
+}: WeeklyReportPageProps = {}) {
   const [selectedPeriod, setSelectedPeriod] = useState("기간: 최근 3개월");
   const [excludePrivate, setExcludePrivate] = useState(true);
-  const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
 
-  // 데이터 빈 상태 (초기화)
   const [hasData] = useState(false);
 
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const shareRef = useRef<HTMLDivElement>(null);
 
-  // 외부 클릭 시 드롭다운/모달 닫기
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      ) {
-        setIsCreateMenuOpen(false);
-      }
       if (shareRef.current && !shareRef.current.contains(e.target as Node)) {
         setIsShareModalOpen(false);
       }
@@ -39,14 +31,12 @@ export default function WeeklyReportPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // 링크 복사 처리
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
     setCopySuccess(true);
     setTimeout(() => setCopySuccess(false), 2000);
   };
 
-  // PDF 다운로드 처리
   const handleDownloadPdf = () => {
     alert("리포트를 PDF 파일로 다운로드합니다.");
     setIsShareModalOpen(false);
@@ -54,160 +44,16 @@ export default function WeeklyReportPage() {
 
   return (
     <div className="flex-1 flex flex-col h-screen bg-[#f8f9fa] overflow-hidden font-pretendard">
-      {/* 1. 상단 헤더 */}
-      <header className="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center shrink-0">
-        <div>
-          <h1 className="text-lg font-extrabold text-gray-900">주간 리포트</h1>
-          <p className="text-xs text-gray-400 mt-0.5">
-            생성된 리포트를 확인하고 팀원들과 공유할 수 있습니다.
-          </p>
-        </div>
+      {/* 공통 헤더 */}
+      <Header
+        title="주간 리포트"
+        subtitle="생성된 리포트를 확인하고 팀원들과 공유할 수 있습니다."
+        onOpenAddModal={onOpenAddModal}
+      />
 
-        <div className="flex items-center gap-3">
-          <div className="relative w-64">
-            <input
-              type="text"
-              placeholder="정리글 · 질문 · 팀원 검색"
-              className="w-full pl-8 pr-3 py-1.5 bg-gray-100/80 rounded-lg text-xs focus:outline-none focus:bg-white border border-transparent focus:border-gray-300 transition"
-            />
-            <svg
-              className="w-4 h-4 text-gray-400 absolute left-2.5 top-2"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-          </div>
-
-          <button className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition">
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-              />
-            </svg>
-          </button>
-
-          {/* 새로 만들기 버튼 드롭다운 */}
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={() => setIsCreateMenuOpen(!isCreateMenuOpen)}
-              className="px-4 py-2 bg-[#191f28] text-white text-xs font-bold rounded-xl hover:bg-gray-800 transition flex items-center gap-1.5 shadow-sm"
-            >
-              <svg
-                className="w-3.5 h-3.5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2.5}
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-              <span>새로 만들기</span>
-            </button>
-
-            {isCreateMenuOpen && (
-              <div className="absolute right-0 top-11 w-60 bg-white rounded-2xl shadow-xl border border-gray-100 p-2.5 z-50 animate-in fade-in duration-100">
-                <div className="text-[11px] font-bold text-gray-400 px-3 py-1.5">
-                  새로 만들기
-                </div>
-                <div className="space-y-0.5">
-                  <button
-                    onClick={() => setIsCreateMenuOpen(false)}
-                    className="w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 rounded-xl transition"
-                  >
-                    <svg
-                      className="w-4 h-4 text-gray-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
-                    </svg>
-                    <span>일정 추가</span>
-                  </button>
-                  <button
-                    onClick={() => setIsCreateMenuOpen(false)}
-                    className="w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 rounded-xl transition"
-                  >
-                    <svg
-                      className="w-4 h-4 text-gray-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 16.5 18c-1.747 0-3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                      />
-                    </svg>
-                    <span>활동 개설</span>
-                  </button>
-                </div>
-
-                <div className="my-2 border-t border-gray-100" />
-
-                <div className="text-[11px] font-bold text-gray-400 px-3 py-1.5">
-                  내 기록
-                </div>
-                <div className="space-y-0.5">
-                  <button
-                    onClick={() => {
-                      setIsCreateMenuOpen(false);
-                      navigate("/archive/editor");
-                    }}
-                    className="w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 rounded-xl transition"
-                  >
-                    <svg
-                      className="w-4 h-4 text-gray-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                      />
-                    </svg>
-                    <span>정리글 작성</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
-
-      {/* 2. 필터 및 컨트롤 바 */}
+      {/* 필터 및 컨트롤 바 */}
       <div className="bg-white border-b border-gray-200 px-8 py-3 flex justify-between items-center shrink-0">
         <div className="flex items-center gap-3 text-xs">
-          {/* 아카이브 스타일 기간 드롭다운 */}
           <Dropdown
             options={periodOptions}
             value={selectedPeriod}
@@ -245,7 +91,6 @@ export default function WeeklyReportPage() {
             <span>다시 생성</span>
           </button>
 
-          {/* 팀에 공유 버튼 & 공유 옵션 팝오버 (PDF 다운로드 / 링크 공유) */}
           <div className="relative" ref={shareRef}>
             <button
               onClick={() => setIsShareModalOpen(!isShareModalOpen)}
@@ -267,14 +112,12 @@ export default function WeeklyReportPage() {
               <span>팀에 공유</span>
             </button>
 
-            {/* 공유 옵션 모달 */}
             {isShareModalOpen && (
               <div className="absolute right-0 top-11 w-64 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 z-50 animate-in fade-in duration-100 space-y-1">
                 <div className="text-[11px] font-bold text-gray-400 px-3 py-1.5">
                   리포트 공유 옵션
                 </div>
 
-                {/* PDF 다운로드 옵션 */}
                 <button
                   onClick={handleDownloadPdf}
                   className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 rounded-xl transition"
@@ -300,7 +143,6 @@ export default function WeeklyReportPage() {
                   </div>
                 </button>
 
-                {/* 링크 복사/공유 옵션 */}
                 <button
                   onClick={handleCopyLink}
                   className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 rounded-xl transition"
@@ -331,9 +173,8 @@ export default function WeeklyReportPage() {
         </div>
       </div>
 
-      {/* 3. 메인 콘텐츠 대시보드 */}
+      {/* 대시보드 콘텐츠 */}
       <div className="flex-1 overflow-y-auto p-8 space-y-6">
-        {/* 상단: 이번 주 팀 요약 배너 */}
         <div className="bg-[#191f28] text-white rounded-2xl p-6 shadow-sm space-y-3">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
@@ -363,7 +204,6 @@ export default function WeeklyReportPage() {
           </div>
         </div>
 
-        {/* 하단: 2열 레이아웃 */}
         <div className="grid grid-cols-3 gap-6">
           <div className="col-span-2 space-y-6">
             <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4 shadow-sm">

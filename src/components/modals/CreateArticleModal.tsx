@@ -1,327 +1,232 @@
 // src/components/modals/CreateArticleModal.tsx
-import { useState } from "react";
-import Dropdown from "../common/Dropdown";
+import React, { useState } from "react";
+
+// mode 타입에 "journal", "interview" 추가
+export type ArticleModalMode =
+  | "article"
+  | "assignment"
+  | "journal"
+  | "interview";
 
 interface CreateArticleModalProps {
+  isOpen: boolean;
   onClose: () => void;
-  onSubmit: (article: {
-    round: string;
+  mode?: ArticleModalMode;
+  onSubmitSuccess?: (data: {
+    session: string;
     title: string;
     content: string;
+    mode: ArticleModalMode;
   }) => void;
 }
 
-function MarkdownRenderer({ content }: { content: string }) {
-  const lines = content.split("\n");
+const sessionOptions = [
+  "1회차 · React 기본 개념 및 컴포넌트",
+  "2회차 · 컴포넌트 설계와 합성 패턴",
+  "3회차 · 비동기 상태와 React Query 기본",
+  "4회차 · React 렌더링 최적화와 메모이제이션",
+  "5회차 · 상태관리 라이브러리 비교",
+];
 
-  const parseInline = (text: string) => {
-    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`)/g);
-    return parts.map((part, index) => {
-      if (part.startsWith("**") && part.endsWith("**")) {
-        return (
-          <strong key={index} className="font-bold text-gray-900">
-            {part.slice(2, -2)}
-          </strong>
-        );
-      }
-      if (part.startsWith("*") && part.endsWith("*")) {
-        return (
-          <em key={index} className="italic text-gray-800">
-            {part.slice(1, -1)}
-          </em>
-        );
-      }
-      if (part.startsWith("`") && part.endsWith("`")) {
-        return (
-          <code
-            key={index}
-            className="bg-gray-200 text-red-600 px-1.5 py-0.5 rounded font-mono text-[11px]"
-          >
-            {part.slice(1, -1)}
-          </code>
-        );
-      }
-      return part;
-    });
-  };
-
-  return (
-    <div className="space-y-2 text-xs text-gray-800 leading-relaxed font-pretendard">
-      {lines.map((line, idx) => {
-        const trimmed = line.trim();
-
-        if (trimmed.startsWith("### ")) {
-          return (
-            <h3 key={idx} className="text-sm font-bold text-gray-900 mt-3 mb-1">
-              {parseInline(trimmed.replace(/^###\s+/, ""))}
-            </h3>
-          );
-        }
-        if (trimmed.startsWith("## ")) {
-          return (
-            <h2
-              key={idx}
-              className="text-base font-bold text-gray-900 mt-4 mb-1 border-b border-gray-200 pb-1"
-            >
-              {parseInline(trimmed.replace(/^##\s+/, ""))}
-            </h2>
-          );
-        }
-        if (trimmed.startsWith("# ")) {
-          return (
-            <h1
-              key={idx}
-              className="text-lg font-extrabold text-gray-900 mt-4 mb-2 border-b border-gray-200 pb-1"
-            >
-              {parseInline(trimmed.replace(/^#\s+/, ""))}
-            </h1>
-          );
-        }
-        if (trimmed.startsWith("> ")) {
-          return (
-            <blockquote
-              key={idx}
-              className="border-l-4 border-gray-300 pl-3 italic text-gray-600 my-2"
-            >
-              {parseInline(trimmed.replace(/^>\s+/, ""))}
-            </blockquote>
-          );
-        }
-        if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
-          return (
-            <li key={idx} className="list-disc ml-5 my-0.5">
-              {parseInline(trimmed.replace(/^[-*]\s+/, ""))}
-            </li>
-          );
-        }
-        if (trimmed === "") {
-          return <div key={idx} className="h-2" />;
-        }
-        return <p key={idx}>{parseInline(line)}</p>;
-      })}
-    </div>
-  );
-}
-
-export default function CreateArticleModal({
+export const CreateArticleModal: React.FC<CreateArticleModalProps> = ({
+  isOpen,
   onClose,
-  onSubmit,
-}: CreateArticleModalProps) {
-  const [round, setRound] = useState("1회차");
+  mode = "article",
+  onSubmitSuccess,
+}) => {
+  const [session, setSession] = useState(sessionOptions[0]);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [activeTab, setActiveTab] = useState<"write" | "preview">("write");
+  const [activeTab, setActiveTab] = useState<"Write" | "Preview">("Write");
 
-  const insertFormatting = (prefix: string, suffix: string = "") => {
-    setContent((prev) => prev + `${prefix}텍스트${suffix}`);
+  // 렌더링 단계 폼 초기화 (ESLint 에러 방지)
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
+    if (isOpen) {
+      setSession(sessionOptions[0]);
+      setTitle("");
+      setContent("");
+      setActiveTab("Write");
+    }
+  }
+
+  if (!isOpen) return null;
+
+  // 모드별 타이틀 및 Placeholder 설정
+  const getModalMeta = () => {
+    switch (mode) {
+      case "assignment":
+        return {
+          headerTitle: "과제 출제하기",
+          titlePlaceholder: "과제 제목을 입력해 주세요",
+          contentPlaceholder: "과제 내용 및 제출 가이드를 작성해 주세요",
+          submitButtonText: "과제 출제하기",
+        };
+      case "journal":
+        return {
+          headerTitle: "업무일지 작성하기",
+          titlePlaceholder: "오늘의 업무 일지 제목을 입력해 주세요",
+          contentPlaceholder: "오늘 진행한 업무 내용 및 회고를 작성해 주세요",
+          submitButtonText: "업무일지 저장",
+        };
+      case "interview":
+        return {
+          headerTitle: "면접 답변 남기기",
+          titlePlaceholder: "면접 질문 또는 주제를 입력해 주세요",
+          contentPlaceholder:
+            "질문에 대한 내 답변과 핵심 키워드를 작성해 주세요",
+          submitButtonText: "답변 남기기",
+        };
+      case "article":
+      default:
+        return {
+          headerTitle: "정리글 작성하기",
+          titlePlaceholder: "제목을 입력해 주세요",
+          contentPlaceholder:
+            "학습한 내용을 자유롭게 정리해 주세요 (마크다운 지원)",
+          submitButtonText: "작성 완료",
+        };
+    }
   };
+
+  const meta = getModalMeta();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) {
-      alert("제목을 입력해 주세요.");
-      return;
+    if (onSubmitSuccess && title.trim()) {
+      onSubmitSuccess({
+        session,
+        title,
+        content,
+        mode,
+      });
     }
-    onSubmit({ round, title, content });
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 font-pretendard">
-      <div className="bg-white rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
-          <h2 className="text-base font-bold text-gray-900">정리글 작성하기</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 font-pretendard select-none">
+      <div className="relative w-full max-w-[640px] max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-7 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+        {/* Header */}
+        <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+          <h2 className="text-xl font-bold text-gray-900">
+            {meta.headerTitle}
+          </h2>
           <button
+            type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition p-1"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition cursor-pointer"
           >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+            ✕
           </button>
         </div>
 
-        <form
-          onSubmit={handleSubmit}
-          className="p-6 flex-1 flex flex-col overflow-y-auto space-y-4"
-        >
-          <div className="grid grid-cols-4 gap-3">
-            <div className="col-span-1">
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
+        <form onSubmit={handleSubmit} className="space-y-4 pt-4 text-xs">
+          {/* 회차 선택 & 제목 */}
+          <div className="grid grid-cols-12 gap-3">
+            <div className="col-span-4">
+              <label className="block font-bold text-gray-700 mb-1.5">
                 회차 선택
               </label>
-              <Dropdown
-                options={["1회차", "2회차", "3회차", "4회차", "5회차"]}
-                value={round}
-                onChange={setRound}
-              />
+              <select
+                value={session}
+                onChange={(e) => setSession(e.target.value)}
+                className="w-full rounded-xl border border-gray-300 p-3 font-semibold outline-none focus:border-black bg-white"
+              >
+                {sessionOptions.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt.split(" · ")[0]}
+                  </option>
+                ))}
+              </select>
             </div>
-            <div className="col-span-3">
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                정리글 제목
+
+            <div className="col-span-8">
+              <label className="block font-bold text-gray-700 mb-1.5">
+                제목
               </label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="제목을 입력해 주세요."
-                className="w-full p-2.5 border border-gray-300 rounded-xl text-xs focus:outline-none focus:border-black"
+                placeholder={meta.titlePlaceholder}
+                className="w-full rounded-xl border border-gray-300 p-3 font-semibold outline-none focus:border-black"
               />
             </div>
           </div>
 
-          <div className="border border-gray-300 rounded-xl overflow-hidden flex-1 flex flex-col bg-white">
-            <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50/70 px-3 py-1.5">
-              <div className="flex text-xs font-medium">
+          {/* 에디터 탭 (Write / Preview) */}
+          <div>
+            <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+              <div className="flex gap-2 text-xs font-bold">
                 <button
                   type="button"
-                  onClick={() => setActiveTab("write")}
-                  className={`px-3 py-1.5 rounded-lg transition ${
-                    activeTab === "write"
-                      ? "bg-white text-gray-900 font-semibold shadow-sm border border-gray-200"
-                      : "text-gray-500 hover:text-gray-800"
+                  onClick={() => setActiveTab("Write")}
+                  className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                    activeTab === "Write"
+                      ? "bg-black text-white"
+                      : "text-gray-400 hover:text-gray-700"
                   }`}
                 >
                   Write
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveTab("preview")}
-                  className={`px-3 py-1.5 rounded-lg transition ${
-                    activeTab === "preview"
-                      ? "bg-white text-gray-900 font-semibold shadow-sm border border-gray-200"
-                      : "text-gray-500 hover:text-gray-800"
+                  onClick={() => setActiveTab("Preview")}
+                  className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                    activeTab === "Preview"
+                      ? "bg-black text-white"
+                      : "text-gray-400 hover:text-gray-700"
                   }`}
                 >
                   Preview
                 </button>
               </div>
 
-              {activeTab === "write" && (
-                <div className="flex items-center gap-1 text-gray-600 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => insertFormatting("# ")}
-                    className="p-1.5 hover:bg-gray-200 rounded font-bold"
-                    title="Heading"
-                  >
-                    H
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => insertFormatting("**", "**")}
-                    className="p-1.5 hover:bg-gray-200 rounded font-bold"
-                    title="Bold"
-                  >
-                    B
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => insertFormatting("*", "*")}
-                    className="p-1.5 hover:bg-gray-200 rounded italic font-serif"
-                    title="Italic"
-                  >
-                    I
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => insertFormatting("> ")}
-                    className="p-1.5 hover:bg-gray-200 rounded"
-                    title="Quote"
-                  >
-                    <svg
-                      className="w-3.5 h-3.5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
-                      />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => insertFormatting("`", "`")}
-                    className="p-1.5 hover:bg-gray-200 rounded font-mono"
-                    title="Code"
-                  >
-                    {"< >"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => insertFormatting("[", "](url)")}
-                    className="p-1.5 hover:bg-gray-200 rounded"
-                    title="Link"
-                  >
-                    <svg
-                      className="w-3.5 h-3.5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
-                      />
-                    </svg>
-                  </button>
+              {/* 간단 툴바 안내 */}
+              <span className="text-[10px] text-gray-400 font-medium">
+                H1 B I Quotes Code Link 지원
+              </span>
+            </div>
+
+            <div className="mt-2">
+              {activeTab === "Write" ? (
+                <textarea
+                  rows={10}
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder={meta.contentPlaceholder}
+                  className="w-full rounded-2xl border border-gray-200 p-4 text-xs outline-none focus:border-black leading-relaxed"
+                />
+              ) : (
+                <div className="min-h-[220px] rounded-2xl border border-gray-100 bg-gray-50/60 p-4 text-xs text-gray-800 leading-relaxed whitespace-pre-wrap">
+                  {content.trim() ? content : "작성된 내용이 없습니다."}
                 </div>
               )}
             </div>
-
-            {activeTab === "write" ? (
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="학습한 내용을 자유롭게 작성해 보세요. (마크다운 형식을 지원합니다)"
-                className="w-full h-64 p-4 text-xs font-mono focus:outline-none resize-none"
-              />
-            ) : (
-              <div className="w-full h-64 p-4 text-xs overflow-y-auto bg-gray-50/50">
-                {content.trim() ? (
-                  <MarkdownRenderer content={content} />
-                ) : (
-                  <span className="text-gray-400 italic">
-                    작성된 내용이 없습니다.
-                  </span>
-                )}
-              </div>
-            )}
           </div>
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
+          {/* Footer */}
+          <div className="border-t border-gray-100 pt-4 flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 transition"
+              className="rounded-xl border border-gray-200 px-5 py-2.5 font-bold text-gray-600 hover:bg-gray-50 transition cursor-pointer"
             >
               취소
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-black text-white rounded-xl text-xs font-semibold hover:bg-gray-800 transition"
+              className="rounded-xl bg-black px-6 py-2.5 font-bold text-white hover:bg-gray-800 transition cursor-pointer"
             >
-              작성 완료
+              {meta.submitButtonText}
             </button>
           </div>
         </form>
       </div>
     </div>
   );
-}
+};
+
+export default CreateArticleModal;

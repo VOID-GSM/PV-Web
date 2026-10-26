@@ -1,28 +1,23 @@
-// src/App.tsx
 import { useState } from "react";
-import {
-  Routes,
-  Route,
-  useNavigate,
-  useLocation,
-  Navigate,
-} from "react-router-dom";
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 
-import CalendarPage from "./pages/CalendarPage";
 import { MainPage } from "./pages/MainPage";
+import CalendarPage from "./pages/CalendarPage";
 import ActivityDetailPage from "./pages/ActivityDetailPage";
+import ArchivePage from "./pages/ArchivePage";
+import ArticleEditorPage from "./pages/ArticleEditorPage";
+import WeeklyReportPage from "./pages/WeeklyReportPage";
 import InvitePage from "./pages/InvitePage";
 import SettingsPage from "./pages/SettingsPage";
-import WeeklyReportPage from "./pages/WeeklyReportPage";
 // ★ 회고 페이지
 import RetrospectivePage from "./pages/RetrospectivePage";
-import { Sidebar } from "./components/layout/Sidebar";
+
+import SidebarLayout from "./components/layout/SidebarLayout";
 import { AddEventModal } from "./components/calendar/AddEventModal";
 import type { CalendarEvent } from "./types/calendar";
 
 export default function App() {
   const navigate = useNavigate();
-  const location = useLocation();
 
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -31,23 +26,12 @@ export default function App() {
     setEvents((prev) => [...prev, newEvent]);
   };
 
-  const todayStr = new Date().toISOString().split("T")[0];
-  const todayTaskCount = events.filter((e) => e.date === todayStr).length;
+  // ★ 오늘 날짜 "2026-10-26" (한국 시간 기준)
+  // toISOString()은 UTC 기준이라 한국 오전 0~9시에 하루 전 날짜가 나와서 바꿨다
+  const todayStr = new Date().toLocaleDateString("sv-SE");
+  const todayTaskCount = events.filter((event) => event.date === todayStr).length;
 
-  const getCurrentMenu = (path: string) => {
-    if (path === "/today" || path === "/") return "오늘 할 일";
-    if (path.startsWith("/calendar")) return "통합 캘린더";
-    if (path.startsWith("/activity")) return "활동";
-    if (path.startsWith("/report")) return "주간 리포트";
-    if (path.startsWith("/invite")) return "팀원 초대";
-    if (path.startsWith("/settings")) return "설정";
-    // ★ 회고는 보드(캘린더)에서 이어지는 화면이라 "통합 캘린더"에 불을 켠다
-    if (path.startsWith("/retrospective")) return "통합 캘린더";
-    return "통합 캘린더";
-  };
-
-  const currentMenu = getCurrentMenu(location.pathname);
-
+  // 캘린더 화면 안에서 메뉴 이동이 필요할 때 쓰는 함수
   const handleNavigate = (menuName: string) => {
     switch (menuName) {
       case "오늘 할 일":
@@ -58,6 +42,11 @@ export default function App() {
         break;
       case "활동":
         navigate("/activity");
+        break;
+      case "정리글":
+      case "아카이브":
+      case "정리글 아카이브":
+        navigate("/archive");
         break;
       case "주간 리포트":
         navigate("/report");
@@ -76,117 +65,50 @@ export default function App() {
   return (
     <>
       <Routes>
-        <Route path="/" element={<Navigate to="/today" replace />} />
-
+        {/* 사이드바가 붙는 페이지들 */}
         <Route
-          path="/today"
           element={
-            <MainPage
-              events={events}
-              onNavigate={handleNavigate}
+            <SidebarLayout
+              todayTaskCount={todayTaskCount}
               onOpenAddModal={() => setIsAddModalOpen(true)}
             />
           }
-        />
+        >
+          <Route path="/" element={<Navigate to="/today" replace />} />
 
-        <Route
-          path="/calendar"
-          element={
-            <CalendarPage
-              events={events}
-              activeMenu={currentMenu}
-              onNavigate={handleNavigate}
-              onOpenAddModal={() => setIsAddModalOpen(true)}
-              onAddEvent={handleAddEvent}
-            />
-          }
-        />
+          <Route
+            path="/today"
+            element={<MainPage events={events} onOpenAddModal={() => setIsAddModalOpen(true)} />}
+          />
 
-        <Route
-          path="/activity"
-          element={
-            <div className="flex h-screen w-full overflow-hidden bg-[#f7f7f8]">
-              <Sidebar
-                activeMenu={currentMenu}
-                todayTaskCount={todayTaskCount}
-                assignmentCount={0}
+          <Route
+            path="/calendar"
+            element={
+              <CalendarPage
+                events={events}
+                activeMenu="통합 캘린더"
                 onNavigate={handleNavigate}
+                onOpenAddModal={() => setIsAddModalOpen(true)}
+                onAddEvent={handleAddEvent}
               />
-              <div className="flex flex-1 flex-col overflow-y-auto">
-                <ActivityDetailPage />
-              </div>
-            </div>
-          }
-        />
+            }
+          />
 
-        <Route
-          path="/report"
-          element={
-            <div className="flex h-screen w-full overflow-hidden bg-[#f7f7f8]">
-              <Sidebar
-                activeMenu={currentMenu}
-                todayTaskCount={todayTaskCount}
-                assignmentCount={0}
-                onNavigate={handleNavigate}
-              />
-              <div className="flex flex-1 flex-col overflow-hidden">
-                <WeeklyReportPage />
-              </div>
-            </div>
-          }
-        />
+          <Route path="/activity" element={<ActivityDetailPage />} />
+          <Route path="/activity/:id" element={<ActivityDetailPage />} />
+          <Route path="/archive" element={<ArchivePage />} />
+          <Route path="/editor" element={<ArticleEditorPage />} />
+          <Route path="/archive/editor" element={<ArticleEditorPage />} />
+          <Route path="/report" element={<Navigate to="/weekly-report" replace />} />
+          <Route path="/weekly-report" element={<WeeklyReportPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          {/* ★ 회고 (사이드바에 메뉴가 없어서 주소로 접근) */}
+          <Route path="/retrospective" element={<RetrospectivePage />} />
+        </Route>
 
-        <Route
-          path="/invite"
-          element={
-            <div className="flex h-screen w-full overflow-hidden bg-[#f7f7f8]">
-              <Sidebar
-                activeMenu={currentMenu}
-                todayTaskCount={todayTaskCount}
-                assignmentCount={0}
-                onNavigate={handleNavigate}
-              />
-              <div className="flex flex-1 flex-col overflow-y-auto">
-                <InvitePage />
-              </div>
-            </div>
-          }
-        />
-
-        <Route
-          path="/settings"
-          element={
-            <div className="flex h-screen w-full overflow-hidden bg-[#f7f7f8]">
-              <Sidebar
-                activeMenu={currentMenu}
-                todayTaskCount={todayTaskCount}
-                assignmentCount={0}
-                onNavigate={handleNavigate}
-              />
-              <div className="flex flex-1 flex-col overflow-y-auto">
-                <SettingsPage />
-              </div>
-            </div>
-          }
-        />
-
-        {/* ★ 회고 */}
-        <Route
-          path="/retrospective"
-          element={
-            <div className="flex h-screen w-full overflow-hidden bg-[#f7f7f8]">
-              <Sidebar
-                activeMenu={currentMenu}
-                todayTaskCount={todayTaskCount}
-                assignmentCount={0}
-                onNavigate={handleNavigate}
-              />
-              <div className="flex flex-1 flex-col overflow-y-auto">
-                <RetrospectivePage />
-              </div>
-            </div>
-          }
-        />
+        {/* 사이드바 없이 보이는 페이지 (아직 팀원이 아닌 사람이 들어오는 화면) */}
+        <Route path="/invite" element={<InvitePage />} />
+        <Route path="/invite/:code" element={<InvitePage />} />
       </Routes>
 
       <AddEventModal
