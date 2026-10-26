@@ -1,23 +1,26 @@
-// src/App.tsx
 import { useState } from "react";
-import { Routes, Route, useNavigate, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 
-import CalendarPage from "./pages/CalendarPage";
 import { MainPage } from "./pages/MainPage";
+import CalendarPage from "./pages/CalendarPage";
 import ActivityDetailPage from "./pages/ActivityDetailPage";
-import InvitePage from "./pages/InvitePage";
-import SettingsPage from "./pages/SettingsPage";
 import ArchivePage from "./pages/ArchivePage";
 import ArticleEditorPage from "./pages/ArticleEditorPage";
 import WeeklyReportPage from "./pages/WeeklyReportPage";
+import InvitePage from "./pages/InvitePage";
+import SettingsPage from "./pages/SettingsPage";
+// 회고 페이지
+import RetrospectivePage from "./pages/RetrospectivePage";
 // ★ 과제·역량맵 페이지
 import AssignmentPage from "./pages/AssignmentPage";
+
 import SidebarLayout from "./components/layout/SidebarLayout";
 import { AddEventModal } from "./components/calendar/AddEventModal";
 import type { CalendarEvent } from "./types/calendar";
 
 export default function App() {
   const navigate = useNavigate();
+
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
@@ -25,10 +28,12 @@ export default function App() {
     setEvents((prev) => [...prev, newEvent]);
   };
 
-  // 오늘 날짜 "2026-10-26" (한국 시간 기준)
+  // ★ 오늘 날짜 "2026-10-26" (한국 시간 기준) - 한 번만 선언한다
+  // toISOString()은 UTC 기준이라 한국 오전 0~9시에 하루 전 날짜가 나와서 바꿨다
   const todayStr = new Date().toLocaleDateString("sv-SE");
-  const todayTaskCount = events.filter((e) => e.date === todayStr).length;
+  const todayTaskCount = events.filter((event) => event.date === todayStr).length;
 
+  // 캘린더 화면 안에서 메뉴 이동이 필요할 때 쓰는 함수
   const handleNavigate = (menuName: string) => {
     switch (menuName) {
       case "오늘 할 일":
@@ -66,45 +71,52 @@ export default function App() {
   return (
     <>
       <Routes>
-        <Route path="/" element={<Navigate to="/today" replace />} />
-
+        {/* 사이드바가 붙는 페이지들 */}
         <Route
-          path="/today"
           element={
-            <MainPage
-              events={events}
-              onNavigate={handleNavigate}
+            <SidebarLayout
+              todayTaskCount={todayTaskCount}
               onOpenAddModal={() => setIsAddModalOpen(true)}
             />
           }
-        />
+        >
+          <Route path="/" element={<Navigate to="/today" replace />} />
 
-        <Route
-          path="/calendar"
-          element={
-            <CalendarPage
-              events={events}
-              activeMenu="통합 캘린더"
-              onNavigate={handleNavigate}
-              onOpenAddModal={() => setIsAddModalOpen(true)}
-              onAddEvent={handleAddEvent}
-            />
-          }
-        />
+          <Route
+            path="/today"
+            element={<MainPage events={events} onOpenAddModal={() => setIsAddModalOpen(true)} />}
+          />
 
-        <Route element={<SidebarLayout todayTaskCount={todayTaskCount} />}>
+          <Route
+            path="/calendar"
+            element={
+              <CalendarPage
+                events={events}
+                activeMenu="통합 캘린더"
+                onNavigate={handleNavigate}
+                onOpenAddModal={() => setIsAddModalOpen(true)}
+                onAddEvent={handleAddEvent}
+              />
+            }
+          />
+
           <Route path="/activity" element={<ActivityDetailPage />} />
           <Route path="/activity/:id" element={<ActivityDetailPage />} />
           <Route path="/archive" element={<ArchivePage />} />
           <Route path="/editor" element={<ArticleEditorPage />} />
           <Route path="/archive/editor" element={<ArticleEditorPage />} />
-          <Route path="/report" element={<WeeklyReportPage />} />
-          <Route path="/invite" element={<InvitePage />} />
-          <Route path="/invite/:code" element={<InvitePage />} />
+          <Route path="/report" element={<Navigate to="/weekly-report" replace />} />
+          <Route path="/weekly-report" element={<WeeklyReportPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          {/* 회고 (사이드바에 메뉴가 없어서 주소로 접근) */}
+          <Route path="/retrospective" element={<RetrospectivePage />} />
           {/* ★ 과제·역량맵 */}
           <Route path="/assignments" element={<AssignmentPage />} />
         </Route>
+
+        {/* 사이드바 없이 보이는 페이지 (아직 팀원이 아닌 사람이 들어오는 화면) */}
+        <Route path="/invite" element={<InvitePage />} />
+        <Route path="/invite/:code" element={<InvitePage />} />
       </Routes>
 
       <AddEventModal

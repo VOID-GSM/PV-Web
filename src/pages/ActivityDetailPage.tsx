@@ -1,570 +1,515 @@
 // src/pages/ActivityDetailPage.tsx
 import { useState } from "react";
 import { Header } from "../components/layout/Header";
-import CreateActivityModal from "../components/modals/CreateActivityModal";
+
 import CreateNoticeModal from "../components/modals/CreateNoticeModal";
 import AbsenceRequestModal from "../components/modals/AbsenceRequestModal";
 import CreateArticleModal from "../components/modals/CreateArticleModal";
-import ArticleDetailModal from "../components/modals/ArticleDetailModal";
-import ActivitySettingsModal, {
-  type ActivityInfo,
-} from "../components/modals/ActivitySettingsModal";
+import ActivitySettingsModal from "../components/modals/ActivitySettingsModal";
+import ArticleDetailModal, {
+  type ArticleDetailData,
+} from "../components/modals/ArticleDetailModal";
 
-type TabType = "회차" | "참여자" | "출석 현황" | "정리글" | "공지";
+import bellIcon from "../assets/icons/bell.svg";
+import settingsIcon from "../assets/icons/settings.svg";
+import calendarIcon from "../assets/icons/calendar.svg";
+import clockIcon from "../assets/icons/clock.svg";
+import checkCircleIcon from "../assets/icons/check-circle.svg";
+import plusIcon from "../assets/icons/plus.svg";
 
-interface Article {
-  id: number;
-  round: string;
-  title: string;
-  author: string;
+interface SessionItem {
+  id: string;
+  sessionNum: string;
   date: string;
-  comments: number;
-  content?: string;
-}
-
-interface Member {
-  name: string;
-  role: string;
-  gen: string;
-  avatar: string;
-  attendance: string;
-  isLeader: boolean;
-}
-
-interface Round {
-  id: number;
-  roundName: string;
-  date: string;
-  status: "진행 예정" | "완료" | "휴강";
   title: string;
   description: string;
-  attendanceCount: number;
-  totalMembers: number;
+  status: "진행 예정" | "완료" | "휴강";
 }
 
-interface VoteTopic {
-  id: number;
+interface VoteItem {
+  id: string;
   text: string;
   votes: number;
 }
 
 interface AbsenceRequest {
-  id: number;
-  userName: string;
-  userAvatar: string;
-  roundInfo: string;
+  id: string;
+  name: string;
+  session: string;
   reason: string;
 }
 
-interface Notice {
-  id: number;
-  title: string;
-  author: string;
-  date: string;
-  target: string;
-}
-
 export default function ActivityDetailPage() {
-  const [activeTab, setActiveTab] = useState<TabType>("회차");
-  const [selectedVoteTopic, setSelectedVoteTopic] = useState<number | null>(
+  const [activeTab, setActiveTab] = useState("회차");
+
+  // 활동 정보 상태
+  const [activityTitle, setActivityTitle] = useState("활동 제목 없음");
+  const [activitySchedule, setActivitySchedule] = useState("일정 미정");
+  const [activityPeriod, setActivityPeriod] = useState("기간 미정");
+  const [activityRule, setActivityRule] = useState("규칙 미정");
+  const [members] = useState<string[]>([]);
+
+  // 탭별 데이터 상태
+  const [sessions] = useState<SessionItem[]>([]);
+  const [votes] = useState<VoteItem[]>([]);
+  const [selectedVoteOption, setSelectedVoteOption] = useState<number | null>(
     null,
   );
+  const [absenceRequests, setAbsenceRequests] = useState<AbsenceRequest[]>([]);
 
-  // 모달 상태 관리
-  const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
+  // 정리글
+  const [articles, setArticles] = useState<ArticleDetailData[]>([]);
+  const [selectedArticle, setSelectedArticle] =
+    useState<ArticleDetailData | null>(null);
+
+  // 모달 제어 상태
   const [isNoticeModalOpen, setIsNoticeModalOpen] = useState(false);
   const [isAbsenceModalOpen, setIsAbsenceModalOpen] = useState(false);
-  const [isArticleModalOpen, setIsArticleModalOpen] = useState(false);
+  const [isCreateArticleOpen, setIsCreateArticleOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
-  // 선택된 상세 정리글 모달 상태
-  const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
+  const handleApproveAbsence = (id: string) => {
+    setAbsenceRequests((prev) => prev.filter((item) => item.id !== id));
+  };
 
-  // 활동 정보 상태 관리
-  const [activityInfo, setActivityInfo] = useState<ActivityInfo>({
-    title: "",
-    statusTag: "",
-    categoryTag: "",
-    scheduleText: "",
-    periodText: "",
-    ruleText: "",
-    leaderName: "",
-    averageAttendance: "0%",
-  });
-
-  const [members] = useState<Member[]>([]);
-  const [rounds] = useState<Round[]>([]);
-  const [voteTopics] = useState<VoteTopic[]>([]);
-  const [absenceRequests] = useState<AbsenceRequest[]>([]);
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [notices] = useState<Notice[]>([]);
-
-  // 정리글 추가 핸들러
-  const handleAddArticle = (newArticle: {
-    round: string;
-    title: string;
-    content: string;
-  }) => {
-    const created: Article = {
-      id: Date.now(),
-      round: newArticle.round,
-      title: newArticle.title,
-      author: "나",
-      date: new Date().toISOString().slice(0, 10).replace(/-/g, "."),
-      comments: 0,
-      content: newArticle.content,
-    };
-    setArticles((prev) => [created, ...prev]);
+  const handleAddFeedback = (articleId: string, feedbackText: string) => {
+    setArticles((prev) =>
+      prev.map((art) =>
+        art.id === articleId
+          ? {
+              ...art,
+              feedbacks: [
+                ...art.feedbacks,
+                {
+                  id: Date.now().toString(),
+                  author: "나",
+                  text: feedbackText,
+                  date: "방금 전",
+                },
+              ],
+            }
+          : art,
+      ),
+    );
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-[#f8f9fa] min-h-screen font-pretendard overflow-y-auto">
-      {/* 1. 공통 헤더 고정 */}
+    <div className="flex flex-1 flex-col h-screen overflow-hidden bg-[#f8f9fa] font-pretendard select-none">
       <Header
-        title="활동"
-        subtitle={activityInfo.title || "활동 상세"}
-        onOpenAddModal={() => setIsActivityModalOpen(true)}
+        title={activityTitle}
+        subtitle="모든 보드의 마감·회의·활동을 한 화면에서"
       />
 
-      <main className="p-8 flex-1">
-        {/* 2. 스터디 요약 메인 카드 */}
-        <div className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-sm mb-6">
-          <div className="flex justify-between items-start mb-4">
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold text-gray-900">
-                {activityInfo.title || "활동 제목 없음"}
-              </h2>
-              {activityInfo.statusTag && (
-                <span className="px-2.5 py-0.5 border border-emerald-500 text-emerald-600 bg-emerald-50 text-[11px] rounded-full font-semibold">
-                  {activityInfo.statusTag}
+      {/* 메인 스크롤 영역 (토글바 완전히 제거됨) */}
+      <div className="flex-1 overflow-y-auto p-8 space-y-6">
+        {/* 상단 활동 요약 카드 */}
+        <div className="rounded-3xl bg-white p-6 shadow-xs border border-gray-100">
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-2xl font-black text-gray-900">
+                {activityTitle}
+              </h1>
+
+              <div className="mt-3 flex flex-wrap items-center gap-4 text-xs font-medium text-gray-400">
+                <span className="flex items-center gap-1.5">
+                  <img
+                    src={calendarIcon}
+                    alt=""
+                    className="h-3.5 w-3.5 opacity-40"
+                  />
+                  <span>{activitySchedule}</span>
                 </span>
-              )}
-              {activityInfo.categoryTag && (
-                <span className="px-2.5 py-0.5 bg-sky-50 text-sky-600 text-[11px] rounded-full font-semibold">
-                  ● {activityInfo.categoryTag}
+                <span className="flex items-center gap-1.5">
+                  <img
+                    src={clockIcon}
+                    alt=""
+                    className="h-3.5 w-3.5 opacity-40"
+                  />
+                  <span>{activityPeriod}</span>
                 </span>
-              )}
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => setIsNoticeModalOpen(true)}
-                className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-1.5"
-              >
-                <svg
-                  className="w-3.5 h-3.5 text-gray-500"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                <span className="flex items-center gap-1.5">
+                  <img
+                    src={checkCircleIcon}
+                    alt=""
+                    className="h-3.5 w-3.5 opacity-40"
                   />
-                </svg>
-                공지 보내기
-              </button>
-              <button
-                onClick={() => setIsSettingsModalOpen(true)}
-                className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-1.5"
-              >
-                <svg
-                  className="w-3.5 h-3.5 text-gray-500"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                  />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                  />
-                </svg>
-                활동 설정
-              </button>
-            </div>
-          </div>
-
-          {/* 안내 정보 메타 데이터 */}
-          <div className="flex items-center gap-6 text-xs text-gray-600 border-b border-gray-100 pb-4 mb-4">
-            <span className="flex items-center gap-1.5">
-              <svg
-                className="w-3.5 h-3.5 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                />
-              </svg>
-              {activityInfo.scheduleText || "일정 미정"}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <svg
-                className="w-3.5 h-3.5 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              {activityInfo.periodText || "기간 미정"}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <svg
-                className="w-3.5 h-3.5 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              {activityInfo.ruleText || "규칙 미정"}
-            </span>
-          </div>
-
-          {/* 참여자 아바타 및 출석률 */}
-          <div className="flex justify-between items-center text-xs">
-            <div className="flex items-center gap-2">
-              <span className="text-gray-500 font-medium">
-                참여자 {members.length}명
-              </span>
-              <div className="flex -space-x-1">
-                {members.map((m, i) => (
-                  <div
-                    key={i}
-                    className="w-6 h-6 rounded-full bg-black text-white text-[10px] font-bold flex items-center justify-center border-2 border-white"
-                  >
-                    {m.avatar}
-                  </div>
-                ))}
+                  <span>{activityRule}</span>
+                </span>
               </div>
-              {activityInfo.leaderName && (
-                <span className="text-gray-500 ml-1">
-                  스터디장 {activityInfo.leaderName}
+
+              <div className="mt-4 flex items-center gap-2 text-xs">
+                <span className="font-bold text-gray-700">
+                  참여자 {members.length}명
                 </span>
-              )}
-            </div>
-
-            <div className="font-bold text-emerald-600 text-xs">
-              평균 출석률 {activityInfo.averageAttendance}
-            </div>
-          </div>
-        </div>
-
-        {/* 3. 탭 네비게이션 */}
-        <div className="flex border-b border-gray-200 mb-6 gap-6 text-sm">
-          {(["회차", "참여자", "출석 현황", "정리글", "공지"] as TabType[]).map(
-            (tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`pb-2.5 font-medium transition-colors border-b-2 -mb-px ${
-                  activeTab === tab
-                    ? "border-black text-black font-bold"
-                    : "border-transparent text-gray-400 hover:text-gray-600"
-                }`}
-              >
-                {tab}
-              </button>
-            ),
-          )}
-        </div>
-
-        {/* 4. 탭별 컨텐츠 */}
-        {activeTab === "회차" && (
-          <div className="grid grid-cols-12 gap-6">
-            <div className="col-span-8 space-y-4">
-              {rounds.length === 0 ? (
-                <div className="bg-white border border-gray-200 rounded-2xl p-12 text-center text-xs text-gray-400">
-                  등록된 회차가 없습니다.
-                </div>
-              ) : (
-                rounds.map((round) => (
-                  <div
-                    key={round.id}
-                    className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
-                  >
-                    <h3 className="text-base font-bold">{round.title}</h3>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="col-span-4 space-y-4">
-              {/* 주제 투표 위젯 */}
-              <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-                <h4 className="font-bold text-sm text-gray-900 mb-2">
-                  주제 투표
-                </h4>
-                {voteTopics.length === 0 ? (
-                  <p className="text-xs text-gray-400 py-6 text-center">
-                    진행 중인 투표가 없습니다.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {voteTopics.map((topic) => (
-                      <label
-                        key={topic.id}
-                        className="flex items-center gap-2 text-xs p-2 rounded hover:bg-gray-50 cursor-pointer"
+                {members.length > 0 && (
+                  <div className="flex -space-x-1.5">
+                    {members.map((m, i) => (
+                      <div
+                        key={i}
+                        className="flex h-6 w-6 items-center justify-center rounded-full bg-black text-[10px] font-bold text-white border-2 border-white"
                       >
-                        <input
-                          type="radio"
-                          name="vote"
-                          checked={selectedVoteTopic === topic.id}
-                          onChange={() => setSelectedVoteTopic(topic.id)}
-                          className="accent-black"
-                        />
-                        <span>
-                          {topic.text} ({topic.votes}표)
-                        </span>
-                      </label>
+                        {m[0]}
+                      </div>
                     ))}
                   </div>
                 )}
               </div>
+            </div>
 
-              {/* 불참 요청 승인 대기 위젯 */}
-              <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-                <div className="flex justify-between items-center mb-2">
-                  <h4 className="font-bold text-sm text-gray-900">
-                    불참 요청 승인 대기
-                  </h4>
-                  <span className="px-2 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full">
-                    {absenceRequests.length}건
-                  </span>
-                </div>
-                {absenceRequests.length === 0 ? (
-                  <p className="text-xs text-gray-400 py-6 text-center">
-                    대기 중인 불참 요청이 없습니다.
-                  </p>
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-xl">
+                평균 출석률 0%
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsNoticeModalOpen(true)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 cursor-pointer"
+              >
+                <img src={bellIcon} alt="" className="h-3.5 w-3.5 opacity-70" />
+                <span>공지 보내기</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsSettingsModalOpen(true)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 cursor-pointer"
+              >
+                <img
+                  src={settingsIcon}
+                  alt=""
+                  className="h-3.5 w-3.5 opacity-70"
+                />
+                <span>활동 설정</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* 대시보드 그리드 */}
+        <div className="grid grid-cols-12 gap-6">
+          {/* 좌측 콘텐츠 탭 */}
+          <div className="col-span-8 space-y-4">
+            <div className="flex gap-6 border-b border-gray-200 pb-2 text-xs font-bold text-gray-400">
+              {["회차", "참여자", "출석 현황", "정리글", "공지"].map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveTab(tab)}
+                  className={`pb-2 relative cursor-pointer transition ${
+                    activeTab === tab
+                      ? "text-gray-900 border-b-2 border-black font-extrabold"
+                      : "hover:text-gray-600"
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+
+            {/* 1. 회차 탭 */}
+            {activeTab === "회차" && (
+              <div>
+                {sessions.length === 0 ? (
+                  <div className="rounded-3xl bg-white p-16 text-center text-xs text-gray-400 shadow-xs border border-gray-100">
+                    등록된 회차가 없습니다.
+                  </div>
                 ) : (
-                  absenceRequests.map((req) => (
-                    <div
-                      key={req.id}
-                      className="p-3 bg-gray-50 rounded-xl mb-2 text-xs"
-                    >
-                      <span className="font-bold">{req.userName}</span>:{" "}
-                      {req.reason}
-                    </div>
-                  ))
+                  <div className="space-y-3">
+                    {sessions.map((s) => (
+                      <div
+                        key={s.id}
+                        className="rounded-3xl bg-white p-5 shadow-xs border border-gray-100 hover:shadow-md transition"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-gray-400">
+                                {s.sessionNum} {s.date}
+                              </span>
+                              <h3 className="text-base font-bold text-gray-900">
+                                {s.title}
+                              </h3>
+                            </div>
+                            <p className="mt-1 text-xs text-gray-500">
+                              {s.description}
+                            </p>
+                          </div>
+                          <span className="rounded-full bg-gray-100 text-gray-700 text-xs font-bold px-3 py-1">
+                            {s.status}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {/* TAB: 정리글 */}
-        {activeTab === "정리글" && (
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-base font-bold">제출된 정리글 목록</h3>
-              <button
-                onClick={() => setIsArticleModalOpen(true)}
-                className="px-3.5 py-2 bg-black text-white text-xs rounded-xl font-semibold hover:bg-gray-800 transition flex items-center gap-1.5"
-              >
-                <svg
-                  className="w-3.5 h-3.5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-                정리글 작성하기
-              </button>
-            </div>
-
-            {articles.length === 0 ? (
-              <div className="text-center text-xs text-gray-400 py-12 border border-dashed border-gray-200 rounded-xl">
-                작성된 정리글이 없습니다. 우측 상단 버튼을 눌러 정리글을 작성해
-                보세요!
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {articles.map((a) => (
-                  <div
-                    key={a.id}
-                    onClick={() => setSelectedArticle(a)}
-                    className="p-4 border border-gray-200 rounded-xl hover:border-black transition flex justify-between items-center bg-gray-50/30 cursor-pointer group"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="px-2 py-0.5 bg-gray-100 text-gray-700 text-[10px] rounded font-bold">
-                          {a.round}
-                        </span>
-                        <h4 className="text-sm font-bold text-gray-900 group-hover:text-black">
-                          {a.title}
-                        </h4>
-                      </div>
-                      <p className="text-xs text-gray-400">
-                        {a.author} · {a.date}
-                      </p>
-                    </div>
-                    <div className="text-xs text-gray-500 font-medium flex items-center gap-1">
-                      <svg
-                        className="w-3.5 h-3.5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+            {/* 2. 참여자 탭 */}
+            {activeTab === "참여자" && (
+              <div className="rounded-3xl bg-white p-6 shadow-xs border border-gray-100 space-y-4">
+                <h3 className="font-bold text-gray-900 text-sm">
+                  스터디 참여자 ({members.length}명)
+                </h3>
+                {members.length === 0 ? (
+                  <div className="py-12 text-center text-xs text-gray-400">
+                    등록된 참여자가 없습니다.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {members.map((m, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center gap-3 p-3 bg-gray-50 rounded-2xl"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
-                        />
-                      </svg>
-                      피드백 {a.comments}개
+                        <div className="h-8 w-8 rounded-full bg-black text-white flex items-center justify-center font-bold text-xs">
+                          {m[0]}
+                        </div>
+                        <span className="font-bold text-xs text-gray-800">
+                          {m}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 3. 출석 현황 탭 */}
+            {activeTab === "출석 현황" && (
+              <div className="rounded-3xl bg-white p-6 shadow-xs border border-gray-100 space-y-4">
+                <h3 className="font-bold text-gray-900 text-sm">
+                  회차별 출석 현황
+                </h3>
+                <div className="py-16 text-center text-xs text-gray-400">
+                  출석 현황 데이터가 없습니다.
+                </div>
+              </div>
+            )}
+
+            {/* 4. 정리글 탭 */}
+            {activeTab === "정리글" && (
+              <div className="rounded-3xl bg-white p-6 shadow-xs border border-gray-100 space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-bold text-gray-900 text-sm">
+                    제출된 정리글 목록
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setIsCreateArticleOpen(true)}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-black text-white text-xs font-bold rounded-xl hover:bg-gray-800 transition cursor-pointer"
+                  >
+                    <img
+                      src={plusIcon}
+                      alt=""
+                      className="h-3.5 w-3.5 filter invert"
+                    />
+                    <span>정리글 작성하기</span>
+                  </button>
+                </div>
+
+                {articles.length === 0 ? (
+                  <div className="py-12 text-center text-xs text-gray-400">
+                    제출된 정리글이 없습니다.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {articles.map((art) => (
+                      <div
+                        key={art.id}
+                        onClick={() => setSelectedArticle(art)}
+                        className="flex items-center justify-between p-4 rounded-2xl bg-gray-50/70 border border-gray-100 hover:bg-gray-100/60 transition cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="rounded-md bg-gray-200 px-2 py-0.5 text-[10px] font-bold text-gray-600">
+                            {art.session}
+                          </span>
+                          <span className="font-bold text-xs text-gray-900">
+                            {art.title}
+                          </span>
+                          <span className="text-[11px] text-gray-400">
+                            {art.author} · {art.date}
+                          </span>
+                        </div>
+                        <span className="text-[11px] font-semibold text-gray-500">
+                          💬 피드백 {art.feedbacks.length}개
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 5. 공지 탭 */}
+            {activeTab === "공지" && (
+              <div className="rounded-3xl bg-white p-6 shadow-xs border border-gray-100 space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-bold text-gray-900 text-sm">공지사항</h3>
+                  <button
+                    type="button"
+                    onClick={() => setIsNoticeModalOpen(true)}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-black text-white text-xs font-bold rounded-xl hover:bg-gray-800 transition cursor-pointer"
+                  >
+                    <img
+                      src={plusIcon}
+                      alt=""
+                      className="h-3.5 w-3.5 filter invert"
+                    />
+                    <span>공지 작성</span>
+                  </button>
+                </div>
+                <div className="py-12 text-center text-xs text-gray-400">
+                  등록된 공지사항이 없습니다.
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 우측 카드 영역: 주제 투표 & 불참 요청 승인 대기 */}
+          <div className="col-span-4 space-y-4">
+            {/* 주제 투표 카드 */}
+            <div className="rounded-3xl bg-white p-5 shadow-xs border border-gray-100 text-xs space-y-3">
+              <h3 className="font-bold text-gray-900 text-sm">주제 투표</h3>
+
+              {votes.length === 0 ? (
+                <p className="py-8 text-center text-gray-400">
+                  진행 중인 투표가 없습니다.
+                </p>
+              ) : (
+                <>
+                  <div className="space-y-2 pt-1">
+                    {votes.map((item, idx) => (
+                      <div
+                        key={item.id}
+                        onClick={() => setSelectedVoteOption(idx)}
+                        className={`flex items-center justify-between rounded-xl border p-3 cursor-pointer transition ${
+                          selectedVoteOption === idx
+                            ? "border-black bg-white ring-1 ring-black font-bold"
+                            : "border-gray-200 bg-gray-50 text-gray-600"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`h-3.5 w-3.5 rounded-md border border-gray-400 flex items-center justify-center ${
+                              selectedVoteOption === idx
+                                ? "bg-black border-black"
+                                : "bg-white"
+                            }`}
+                          >
+                            {selectedVoteOption === idx && (
+                              <img
+                                src={checkCircleIcon}
+                                alt=""
+                                className="h-3 w-3 filter invert"
+                              />
+                            )}
+                          </span>
+                          <span>{item.text}</span>
+                        </div>
+                        <span className="text-[11px] text-gray-400 font-bold">
+                          {item.votes}표
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    className="w-full rounded-xl bg-black py-2.5 font-bold text-white hover:bg-gray-800 transition cursor-pointer"
+                  >
+                    투표하기
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* 불참 요청 승인 대기 카드 */}
+            <div className="rounded-3xl bg-white p-5 shadow-xs border border-gray-100 text-xs space-y-3">
+              <div className="flex justify-between items-center">
+                <h3 className="font-bold text-gray-900 text-sm">
+                  불참 요청 승인 대기
+                </h3>
+                <span className="rounded-full bg-red-500 text-white text-[10px] font-bold px-2 py-0.5">
+                  {absenceRequests.length}건
+                </span>
+              </div>
+
+              {absenceRequests.length === 0 ? (
+                <p className="py-8 text-center text-gray-400">
+                  대기 중인 불참 요청이 없습니다.
+                </p>
+              ) : (
+                absenceRequests.map((req) => (
+                  <div
+                    key={req.id}
+                    className="rounded-2xl bg-gray-50 p-4 space-y-2 border border-gray-100"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-black text-[10px] font-bold text-white">
+                        {req.name[0]}
+                      </div>
+                      <span className="font-bold text-gray-900">
+                        {req.name}
+                      </span>
+                      <span className="text-gray-400">· {req.session}</span>
+                    </div>
+                    <p className="text-[11px] text-gray-600 leading-relaxed bg-white p-2.5 rounded-xl border border-gray-100">
+                      "{req.reason}"
+                    </p>
+
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleApproveAbsence(req.id)}
+                        className="flex-1 rounded-xl bg-black py-1.5 font-bold text-white hover:bg-gray-800 transition cursor-pointer"
+                      >
+                        승인
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleApproveAbsence(req.id)}
+                        className="flex-1 rounded-xl border border-gray-200 py-1.5 font-bold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
+                      >
+                        거절 + 코멘트
+                      </button>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* TAB: 참여자 */}
-        {activeTab === "참여자" && (
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-            <h3 className="text-base font-bold mb-4">
-              스터디 참여자 ({members.length}명)
-            </h3>
-            {members.length === 0 ? (
-              <div className="text-center text-xs text-gray-400 py-12">
-                등록된 참여자가 없습니다.
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-4">
-                {members.map((m, idx) => (
-                  <div
-                    key={idx}
-                    className="p-4 border border-gray-100 rounded-xl text-xs font-bold"
-                  >
-                    {m.name} ({m.role})
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* TAB: 출석 현황 */}
-        {activeTab === "출석 현황" && (
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-            <h3 className="text-base font-bold mb-4">회차별 출석 현황</h3>
-            <div className="text-center text-xs text-gray-400 py-12">
-              출석 현황 데이터가 없습니다.
+                ))
+              )}
             </div>
           </div>
-        )}
+        </div>
+      </div>
 
-        {/* TAB: 공지 */}
-        {activeTab === "공지" && (
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-base font-bold">공지사항</h3>
-              <button
-                onClick={() => setIsNoticeModalOpen(true)}
-                className="px-3.5 py-2 bg-black text-white text-xs rounded-xl font-semibold hover:bg-gray-800 transition flex items-center gap-1.5"
-              >
-                <svg
-                  className="w-3.5 h-3.5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-                공지 작성
-              </button>
-            </div>
-
-            {notices.length === 0 ? (
-              <div className="text-center text-xs text-gray-400 py-12 border border-dashed border-gray-200 rounded-xl">
-                등록된 공지사항이 없습니다.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {notices.map((n) => (
-                  <div
-                    key={n.id}
-                    className="p-4 border border-gray-200 rounded-xl text-xs"
-                  >
-                    <h4 className="font-bold">{n.title}</h4>
-                    <p className="text-gray-400">
-                      {n.author} · {n.date}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </main>
-
-      {/* 모달 5종 연동 */}
-      {isActivityModalOpen && (
-        <CreateActivityModal onClose={() => setIsActivityModalOpen(false)} />
-      )}
-      {isNoticeModalOpen && (
-        <CreateNoticeModal onClose={() => setIsNoticeModalOpen(false)} />
-      )}
-      {isAbsenceModalOpen && (
-        <AbsenceRequestModal onClose={() => setIsAbsenceModalOpen(false)} />
-      )}
-      {isArticleModalOpen && (
-        <CreateArticleModal
-          onClose={() => setIsArticleModalOpen(false)}
-          onSubmit={handleAddArticle}
-        />
-      )}
-      {isSettingsModalOpen && (
-        <ActivitySettingsModal
-          activityInfo={activityInfo}
-          onClose={() => setIsSettingsModalOpen(false)}
-          onSubmit={(updated) => setActivityInfo(updated)}
-        />
-      )}
-      {selectedArticle && (
-        <ArticleDetailModal
-          article={selectedArticle}
-          onClose={() => setSelectedArticle(null)}
-        />
-      )}
+      {/* 모달 연동 레이어 */}
+      <CreateNoticeModal
+        isOpen={isNoticeModalOpen}
+        onClose={() => setIsNoticeModalOpen(false)}
+      />
+      <AbsenceRequestModal
+        isOpen={isAbsenceModalOpen}
+        onClose={() => setIsAbsenceModalOpen(false)}
+      />
+      <CreateArticleModal
+        isOpen={isCreateArticleOpen}
+        onClose={() => setIsCreateArticleOpen(false)}
+        mode="article"
+      />
+      <ActivitySettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        onSave={(data) => {
+          if (data.title) setActivityTitle(data.title);
+          if (data.schedule) setActivitySchedule(data.schedule);
+          if (data.period) setActivityPeriod(data.period);
+          if (data.rule) setActivityRule(data.rule);
+        }}
+      />
+      <ArticleDetailModal
+        article={selectedArticle}
+        onClose={() => setSelectedArticle(null)}
+        onAddFeedback={handleAddFeedback}
+      />
     </div>
   );
 }
