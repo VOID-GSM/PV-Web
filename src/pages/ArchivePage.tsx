@@ -23,7 +23,6 @@ interface Comment {
   text: string;
 }
 
-// 드롭다운 옵션 값 완전 초기화
 const activityFilterOptions = ["활동 선택", "등록된 활동 없음"];
 const periodFilterOptions = ["기간 선택", "전체"];
 
@@ -31,20 +30,24 @@ export default function ArchivePage() {
   const navigate = useNavigate();
 
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
+  const [isNoticeOpen, setIsNoticeOpen] = useState(false);
+  const [noticeTab, setNoticeTab] = useState<"all" | "unread" | "mention">(
+    "all",
+  ); // 알림 탭 상태
+
   const [selectedTab, setSelectedTab] = useState<
     "all" | "my" | "compare" | "feedback"
   >("all");
 
-  // 드롭다운 선택값 초기화
   const [selectedActivity, setSelectedActivity] = useState("활동 선택");
   const [selectedPeriod, setSelectedPeriod] = useState("기간 선택");
 
-  // 초기화된 데이터 (빈 상태)
   const [articles] = useState<Article[]>([]);
   const [commentList, setCommentList] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const noticeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -53,6 +56,9 @@ export default function ArchivePage() {
         !dropdownRef.current.contains(e.target as Node)
       ) {
         setIsCreateMenuOpen(false);
+      }
+      if (noticeRef.current && !noticeRef.current.contains(e.target as Node)) {
+        setIsNoticeOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -107,21 +113,95 @@ export default function ArchivePage() {
             </svg>
           </div>
 
-          <button className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition">
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          {/* 알람 버튼 및 1번 디자인 전용 팝업 */}
+          <div className="relative" ref={noticeRef}>
+            <button
+              onClick={() => setIsNoticeOpen((prev) => !prev)}
+              className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition relative"
+              aria-label="알림 목록 보기"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-              />
-            </svg>
-          </button>
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                />
+              </svg>
+            </button>
+
+            {/* 1번 사진의 알림 팝업 디자인 적용 */}
+            {isNoticeOpen && (
+              <div className="absolute right-0 top-11 w-96 bg-white rounded-3xl shadow-2xl border border-gray-100 p-5 z-50 animate-in fade-in duration-100">
+                {/* 헤더: 알림 + 안 읽음 배지 + 모두 읽음 */}
+                <div className="flex justify-between items-center mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base font-extrabold text-gray-900">
+                      알림
+                    </span>
+                    <span className="bg-[#ef4444] text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+                      안 읽음 0
+                    </span>
+                  </div>
+                  <button className="text-xs text-gray-400 hover:text-gray-600 font-medium">
+                    모두 읽음
+                  </button>
+                </div>
+
+                {/* 탭: 전체 / 안 읽음 / 멘션 */}
+                <div className="flex gap-4 border-b border-gray-100 text-xs font-bold text-gray-400">
+                  <button
+                    onClick={() => setNoticeTab("all")}
+                    className={`pb-2 transition relative ${
+                      noticeTab === "all"
+                        ? "text-gray-900 border-b-2 border-black"
+                        : "hover:text-gray-600"
+                    }`}
+                  >
+                    전체
+                  </button>
+                  <button
+                    onClick={() => setNoticeTab("unread")}
+                    className={`pb-2 transition relative ${
+                      noticeTab === "unread"
+                        ? "text-gray-900 border-b-2 border-black"
+                        : "hover:text-gray-600"
+                    }`}
+                  >
+                    안 읽음
+                  </button>
+                  <button
+                    onClick={() => setNoticeTab("mention")}
+                    className={`pb-2 transition relative ${
+                      noticeTab === "mention"
+                        ? "text-gray-900 border-b-2 border-black"
+                        : "hover:text-gray-600"
+                    }`}
+                  >
+                    멘션
+                  </button>
+                </div>
+
+                {/* 본문: 알림 없음 메시지 */}
+                <div className="py-12 text-center text-xs font-medium text-gray-400">
+                  새로운 알림이 없습니다.
+                </div>
+
+                {/* 푸터: 디스코드 안내 + 알림 설정 */}
+                <div className="pt-3 border-t border-gray-100 flex justify-between items-center text-[11px] text-gray-400">
+                  <span>디스코드에서도 함께 받고 있습니다</span>
+                  <button className="font-bold text-gray-800 hover:text-black">
+                    알림 설정
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* 새로 만들기 드롭다운 */}
           <div className="relative" ref={dropdownRef}>
@@ -184,7 +264,7 @@ export default function ArchivePage() {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                        d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 16.5 18c-1.746 0-3.332.477-4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
                       />
                     </svg>
                     <span>활동 개설</span>
@@ -238,7 +318,7 @@ export default function ArchivePage() {
                   <button
                     onClick={() => {
                       setIsCreateMenuOpen(false);
-                      navigate("/archive/editor");
+                      navigate("/editor");
                     }}
                     className="w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 rounded-xl transition"
                   >
@@ -347,7 +427,6 @@ export default function ArchivePage() {
           </button>
         </div>
 
-        {/* 초기화된 드롭다운 적용 */}
         <div className="flex items-center gap-2">
           <Dropdown
             options={activityFilterOptions}
@@ -360,7 +439,7 @@ export default function ArchivePage() {
             onChange={setSelectedPeriod}
           />
           <button
-            onClick={() => navigate("/archive/editor")}
+            onClick={() => navigate("/editor")}
             className="px-3.5 py-1.5 bg-black text-white text-xs font-semibold rounded-lg hover:bg-gray-800 transition flex items-center gap-1.5"
           >
             <svg
@@ -381,7 +460,7 @@ export default function ArchivePage() {
         </div>
       </div>
 
-      {/* 메인 3열 레이아웃 (데이터 빈 상태) */}
+      {/* 메인 3열 레이아웃 */}
       <div className="flex-1 flex overflow-hidden p-6 gap-5">
         <div className="w-80 bg-white rounded-2xl border border-gray-200 flex flex-col shrink-0 overflow-hidden shadow-sm">
           <div className="p-4 border-b border-gray-100 flex justify-between items-center">
@@ -411,7 +490,7 @@ export default function ArchivePage() {
                 작성된 정리글이 없습니다.
               </p>
               <button
-                onClick={() => navigate("/archive/editor")}
+                onClick={() => navigate("/editor")}
                 className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold transition"
               >
                 + 첫 정리글 작성하기

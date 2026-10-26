@@ -2,8 +2,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Dropdown from "../components/common/Dropdown";
+import { ACTIVITY_OPTIONS } from "../constants/activity";
+import { ArrowLeftIcon } from "../components/icons/ArrowLeftIcon";
 
-const activityOptions = ["활동 선택", "React 심화 스터디", "면접 준비"];
 const roundOptions = ["회차 선택", "1회차", "2회차", "3회차", "4회차"];
 const memberOptions = ["지정할 팀원 선택", "등록된 팀원 없음"];
 
@@ -57,6 +58,14 @@ export default function ArticleEditorPage() {
               stroke="currentColor"
               viewBox="0 0 24 24"
             >
+              <button
+                onClick={() => navigate("/archive")}
+                className="text-xs font-semibold text-gray-500 hover:text-gray-900 flex items-center gap-1"
+              >
+                <ArrowLeftIcon />
+                <span>아카이브로</span>
+              </button>
+              <div className="h-4 w-px bg-gray-200" />
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -69,7 +78,7 @@ export default function ArticleEditorPage() {
           <div className="h-4 w-px bg-gray-200" />
 
           <Dropdown
-            options={activityOptions}
+            options={[...ACTIVITY_OPTIONS]}
             value={activity}
             onChange={setActivity}
           />

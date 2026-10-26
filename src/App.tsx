@@ -1,5 +1,6 @@
 // src/App.tsx
 import { useState } from "react";
+<<<<<<< HEAD
 import {
 
   BrowserRouter,
@@ -9,6 +10,10 @@ import {
   useLocation,
   Navigate,
 } from "react-router-dom";
+=======
+import { Routes, Route, useNavigate, Navigate } from "react-router-dom";
+
+>>>>>>> 542a135 (fix: 알림 모달 UI 디자인 동기화 및 라우팅·CSS 오류 수정)
 import CalendarPage from "./pages/CalendarPage";
 import { MainPage } from "./pages/MainPage";
 import ActivityDetailPage from "./pages/ActivityDetailPage";
@@ -17,6 +22,7 @@ import SettingsPage from "./pages/SettingsPage";
 
 import ArchivePage from "./pages/ArchivePage";
 import ArticleEditorPage from "./pages/ArticleEditorPage";
+<<<<<<< HEAD
 import WeeklyReportPage from "./pages/WeeklyReportPage";
 import { AddEventModal } from "./components/calendar/AddEventModal";
 import type { CalendarEvent } from "./types/calendar";
@@ -25,9 +31,14 @@ function AppContent() {
 
 export default function App() {
 
-  const navigate = useNavigate();
-  const location = useLocation();
+=======
+import SidebarLayout from "./components/layout/SidebarLayout";
+import { AddEventModal } from "./components/calendar/AddEventModal";
+import type { CalendarEvent } from "./types/calendar";
 
+export default function App() {
+>>>>>>> 542a135 (fix: 알림 모달 UI 디자인 동기화 및 라우팅·CSS 오류 수정)
+  const navigate = useNavigate();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
@@ -38,6 +49,7 @@ export default function App() {
   const todayStr = new Date().toISOString().split("T")[0];
   const todayTaskCount = events.filter((e) => e.date === todayStr).length;
 
+<<<<<<< HEAD
   const getCurrentMenu = (path: string) => {
     if (path === "/today" || path === "/") return "오늘 할 일";
     if (path.startsWith("/calendar")) return "통합 캘린더";
@@ -53,6 +65,8 @@ export default function App() {
 
   const currentMenu = getCurrentMenu(location.pathname);
 
+=======
+>>>>>>> 542a135 (fix: 알림 모달 UI 디자인 동기화 및 라우팅·CSS 오류 수정)
   const handleNavigate = (menuName: string) => {
     switch (menuName) {
       case "오늘 할 일":
@@ -64,6 +78,8 @@ export default function App() {
       case "활동":
         navigate("/activity");
         break;
+      case "정리글":
+      case "아카이브":
       case "정리글 아카이브":
         navigate("/archive");
 
@@ -103,7 +119,7 @@ export default function App() {
           element={
             <CalendarPage
               events={events}
-              activeMenu={currentMenu}
+              activeMenu="통합 캘린더"
               onNavigate={handleNavigate}
               onOpenAddModal={() => setIsAddModalOpen(true)}
               onAddEvent={handleAddEvent}
@@ -111,6 +127,7 @@ export default function App() {
           }
         />
 
+<<<<<<< HEAD
         <Route
           path="/activity"
           element={
@@ -237,6 +254,15 @@ export default function App() {
             </div>
           }
         />
+=======
+        <Route element={<SidebarLayout todayTaskCount={todayTaskCount} />}>
+          <Route path="/activity" element={<ActivityDetailPage />} />
+          <Route path="/archive" element={<ArchivePage />} />
+          <Route path="/editor" element={<ArticleEditorPage />} />
+          <Route path="/invite" element={<InvitePage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+        </Route>
+>>>>>>> 542a135 (fix: 알림 모달 UI 디자인 동기화 및 라우팅·CSS 오류 수정)
       </Routes>
 
       <AddEventModal
@@ -248,6 +274,7 @@ export default function App() {
 
   );
 }
+<<<<<<< HEAD
 
 export default function App() {
   return (
@@ -257,3 +284,5 @@ export default function App() {
 
   );
 }
+=======
+>>>>>>> 542a135 (fix: 알림 모달 UI 디자인 동기화 및 라우팅·CSS 오류 수정)
