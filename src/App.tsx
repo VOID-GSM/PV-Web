@@ -14,6 +14,8 @@ import ActivityDetailPage from "./pages/ActivityDetailPage";
 import InvitePage from "./pages/InvitePage";
 import SettingsPage from "./pages/SettingsPage";
 import WeeklyReportPage from "./pages/WeeklyReportPage";
+// ★ 회고 페이지
+import RetrospectivePage from "./pages/RetrospectivePage";
 import { Sidebar } from "./components/layout/Sidebar";
 import { AddEventModal } from "./components/calendar/AddEventModal";
 import type { CalendarEvent } from "./types/calendar";
@@ -39,6 +41,8 @@ export default function App() {
     if (path.startsWith("/report")) return "주간 리포트";
     if (path.startsWith("/invite")) return "팀원 초대";
     if (path.startsWith("/settings")) return "설정";
+    // ★ 회고는 보드(캘린더)에서 이어지는 화면이라 "통합 캘린더"에 불을 켠다
+    if (path.startsWith("/retrospective")) return "통합 캘린더";
     return "통합 캘린더";
   };
 
@@ -161,6 +165,24 @@ export default function App() {
               />
               <div className="flex flex-1 flex-col overflow-y-auto">
                 <SettingsPage />
+              </div>
+            </div>
+          }
+        />
+
+        {/* ★ 회고 */}
+        <Route
+          path="/retrospective"
+          element={
+            <div className="flex h-screen w-full overflow-hidden bg-[#f7f7f8]">
+              <Sidebar
+                activeMenu={currentMenu}
+                todayTaskCount={todayTaskCount}
+                assignmentCount={0}
+                onNavigate={handleNavigate}
+              />
+              <div className="flex flex-1 flex-col overflow-y-auto">
+                <RetrospectivePage />
               </div>
             </div>
           }
