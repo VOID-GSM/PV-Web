@@ -2,6 +2,7 @@ import { useState } from "react";
 import Dropdown from "../common/Dropdown";
 import RecipientStatusList from "./RecipientStatusList";
 import {
+  STATUS_BADGE,
   getRecipients,
   formatDeadline,
   type Assignment,
@@ -33,7 +34,6 @@ export default function SubmissionReview({
   onReview,
   onRemind,
 }: SubmissionReviewProps) {
-  // 선택한 제출자. 처음엔 선택 안 됨
   const [selectedName, setSelectedName] = useState("");
   const [feedback, setFeedback] = useState("");
 
@@ -54,9 +54,24 @@ export default function SubmissionReview({
   const recipients = assignment ? getRecipients(assignment.targets, assignment.personalTargets) : [];
   const submittedCount = assignment ? submissions.filter((s) => s.assignmentId === assignment.id).length : 0;
 
+  // ★ 이미 결정이 끝난 제출물인지 (통과 또는 재제출 요청이면 잠금)
+  const isPassed = submission?.status === "통과";
+  const isWaitingResubmit = submission?.status === "재제출 요청";
+  const isLocked = isPassed || isWaitingResubmit;
+
+  // ★ 버튼을 누를 수 있는지: 제출물이 있고 잠기지 않았을 때만
+  const canReview = submission !== undefined && !isLocked;
+  const hasFeedback = feedback.trim() !== "";
+
   const handleReview = (action: ReviewAction) => {
-    if (!submission) return;
+    if (!submission || isLocked) return;
     onReview(submission.id, action, feedback.trim());
+    setFeedback("");
+  };
+
+  // ★ 사람을 바꾸면 쓰던 피드백은 비운다
+  const handleSelectPerson = (name: string) => {
+    setSelectedName(name);
     setFeedback("");
   };
 
@@ -72,7 +87,7 @@ export default function SubmissionReview({
               const found = assignments.find((a) => a.title === title);
               if (found) {
                 onSelectAssignment(found.id);
-                setSelectedName("");
+                handleSelectPerson("");
               }
             }}
             placeholder="과제를 선택하세요"
@@ -110,7 +125,7 @@ export default function SubmissionReview({
                 assignment={assignment}
                 submissions={submissions}
                 selectedName={selectedName}
-                onSelect={setSelectedName}
+                onSelect={handleSelectPerson}
               />
             </div>
           </section>
@@ -130,12 +145,12 @@ export default function SubmissionReview({
                       {submission.submittedAt} 제출 · 마감 {formatDeadline(assignment.deadline)}
                     </p>
                   </div>
-                  <span className="rounded-full bg-green-50 px-2 py-0.5 text-[11px] text-green-700">
+                  {/* ★ 상태에 맞는 배지 색 */}
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] ${STATUS_BADGE[submission.status]}`}>
                     {submission.status}
                   </span>
                 </div>
 
-                {/* 제출 내용: GitHub 링크면 링크 상자, 아니면 글 */}
                 <div className="mt-4 rounded bg-neutral-50 p-4">
                   <p className="text-[11px] text-neutral-400">{submission.type}</p>
                   {submission.type === "GitHub 링크" ? (
@@ -152,7 +167,6 @@ export default function SubmissionReview({
                   )}
                 </div>
 
-                {/* 받은 피드백 */}
                 <p className="mt-5 text-sm font-semibold">피드백 {submission.feedbacks.length}</p>
                 {submission.feedbacks.length === 0 ? (
                   <p className="mt-2 text-xs text-neutral-400">아직 피드백이 없습니다</p>
@@ -163,7 +177,7 @@ export default function SubmissionReview({
                         <p className="text-[11px] text-neutral-500">
                           {f.author} · {f.date}
                         </p>
-                        <p className="mt-1 text-sm">{f.content}</p>
+                        <p className="mt-1 whitespace-pre-wrap text-sm">{f.content}</p>
                       </li>
                     ))}
                   </ul>
@@ -181,51 +195,75 @@ export default function SubmissionReview({
               <div className="mt-3 rounded bg-neutral-50 p-3 text-xs">
                 <div className="flex justify-between">
                   <span>{skill.name}</span>
-                  <span className="font-semibold text-green-700">
-                    {myScores[skill.id] ?? 0} → {Math.min(5, (myScores[skill.id] ?? 0) + 1)}
-                  </span>
+                  {/* ★ 통과된 뒤에는 "반영 완료"로 보여준다 */}
+                  {isPassed ? (
+                    <span className="font-semibold text-green-700">반영 완료</span>
+                  ) : (
+                    <span className="font-semibold text-green-700">
+                      {myScores[skill.id] ?? 0} → {Math.min(5, (myScores[skill.id] ?? 0) + 1)}
+                    </span>
+                  )}
                 </div>
                 <p className="mt-1 text-[11px] text-neutral-400">통과 시 +1점</p>
               </div>
             )}
 
-            <p className="mt-3 text-xs font-medium">피드백 남기기</p>
-            <textarea
-              value={feedback}
-              onChange={(e) => setFeedback(e.target.value)}
-              maxLength={2000}
-              rows={4}
-              disabled={!submission}
-              className="mt-1 w-full resize-none rounded border px-3 py-2 text-sm disabled:bg-neutral-50"
-            />
-            <p className="text-right text-[11px] text-neutral-400">{feedback.length} / 2000</p>
+            {/* ★ 잠겨 있으면 이유를 보여주고, 아니면 피드백 입력칸과 버튼 */}
+            {isLocked ? (
+              <div
+                className={`mt-4 rounded p-4 text-center text-sm ${
+                  isPassed ? "bg-neutral-900 text-white" : "bg-blue-50 text-blue-700"
+                }`}
+              >
+                <p className="font-semibold">{isPassed ? "✓ 통과 처리된 제출물입니다" : "재제출을 기다리는 중입니다"}</p>
+                <p className={`mt-1 text-[11px] ${isPassed ? "text-neutral-400" : "text-blue-600"}`}>
+                  {isPassed
+                    ? "더 이상 상태를 바꿀 수 없습니다"
+                    : "제출자가 다시 제출하면 다시 확인할 수 있습니다"}
+                </p>
+              </div>
+            ) : (
+              <>
+                <p className="mt-3 text-xs font-medium">피드백 남기기</p>
+                <textarea
+                  value={feedback}
+                  onChange={(e) => setFeedback(e.target.value)}
+                  maxLength={2000}
+                  rows={4}
+                  disabled={!canReview}
+                  placeholder={submission ? "" : "제출자를 먼저 선택하세요"}
+                  className="mt-1 w-full resize-none rounded border px-3 py-2 text-sm disabled:bg-neutral-50"
+                />
+                <p className="text-right text-[11px] text-neutral-400">{feedback.length} / 2000</p>
 
-            <button
-              onClick={() => handleReview("통과")}
-              disabled={!submission}
-              className="mt-2 w-full rounded bg-black py-2 text-sm font-semibold text-white disabled:opacity-40"
-            >
-              ✓ 통과 처리
-            </button>
-            <div className="mt-2 flex gap-2">
-              <button
-                onClick={() => handleReview("재제출 요청")}
-                disabled={!submission || feedback.trim() === ""}
-                className="flex-1 rounded border py-2 text-sm disabled:opacity-40"
-              >
-                재제출 요청
-              </button>
-              <button
-                onClick={() => handleReview("보류")}
-                disabled={!submission || feedback.trim() === ""}
-                className="flex-1 py-2 text-sm disabled:opacity-40"
-              >
-                보류
-              </button>
-            </div>
-            <p className="mt-3 rounded bg-blue-50 p-2 text-[11px] text-blue-700">
-              재제출 요청 시 받는 사람의 "오늘 할 일"에 다시 쌓이고 마감은 유지됩니다. 재제출 요청과 보류는 피드백을 적어야 누를 수 있어요.
-            </p>
+                <button
+                  onClick={() => handleReview("통과")}
+                  disabled={!canReview}
+                  className="mt-2 w-full rounded bg-black py-2 text-sm font-semibold text-white disabled:opacity-40"
+                >
+                  ✓ 통과 처리
+                </button>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    onClick={() => handleReview("재제출 요청")}
+                    disabled={!canReview || !hasFeedback}
+                    className="flex-1 rounded border py-2 text-sm disabled:opacity-40"
+                  >
+                    재제출 요청
+                  </button>
+                  <button
+                    onClick={() => handleReview("보류")}
+                    disabled={!canReview || !hasFeedback}
+                    className="flex-1 py-2 text-sm disabled:opacity-40"
+                  >
+                    보류
+                  </button>
+                </div>
+                <p className="mt-3 rounded bg-blue-50 p-2 text-[11px] text-blue-700">
+                  통과와 재제출 요청은 한 번만 할 수 있어요. 보류는 결정을 미루고 피드백만 남기며, 재제출 요청과 보류는 피드백을 적어야 누를 수 있어요.
+                </p>
+              </>
+            )}
           </section>
         </div>
       )}
