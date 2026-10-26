@@ -1,6 +1,6 @@
 name: CI
 
-on: 
+on:
   pull_request:
     branches: ["main", "develop"]
   push:
@@ -25,11 +25,11 @@ jobs:
       - name: set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - name: 의존성 설치
-        run: npm ci
+        run: npm install
 
       - name: Lint
         run: npm run lint
