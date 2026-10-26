@@ -1,5 +1,6 @@
 // src/pages/InvitePage.tsx
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom"; // 1. useNavigate 추가
 import logoWhite from "../assets/images/logo-white.png";
 import linkIcon from "../assets/icons/link.svg";
 import alertIcon from "../assets/icons/alert.svg";
@@ -22,7 +23,9 @@ export interface InvitePageProps {
 }
 
 const InvitePage: React.FC<InvitePageProps> = () => {
-  // 피드백 반영: 초기 선택값 비워두기 (이름, 기수, 전공)
+  const navigate = useNavigate(); // 2. navigate 선언
+
+  // 초기 선택값 비워두기 (이름, 기수, 전공)
   const [name, setName] = useState("");
   const [generation, setGeneration] = useState("");
   const [departments, setDepartments] = useState<string[]>([]);
@@ -69,7 +72,8 @@ const InvitePage: React.FC<InvitePageProps> = () => {
       return;
     }
 
-    // TODO: 백엔드 API 연동
+    // 3. 유효성 검사 통과 시 오늘 할 일 페이지(/today)로 이동
+    navigate("/today");
   };
 
   return (
@@ -251,7 +255,7 @@ const InvitePage: React.FC<InvitePageProps> = () => {
             <button
               type="button"
               onClick={handleSubmit}
-              className="mt-6 flex h-[46px] w-full items-center justify-center gap-2 rounded-[7px] bg-black text-[13px] font-medium text-white transition hover:bg-[#222] active:scale-[0.99]"
+              className="mt-6 flex h-[46px] w-full items-center justify-center gap-2 rounded-[7px] bg-black text-[13px] font-medium text-white transition hover:bg-[#222] active:scale-[0.99] cursor-pointer"
             >
               입장하기
               <span className="text-[17px]">→</span>
