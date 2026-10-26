@@ -12,14 +12,12 @@ import {
   type AssignmentForm,
   type Skill,
 } from "../../constants/assignment";
+import checkCircleIcon from "../../assets/icons/check-circle.svg";
 
 type AssignmentCreateModalProps = {
   skills: Skill[];
-  // 처음부터 골라둘 역량 항목 (역량 맵에서 "이 항목으로 출제"를 눌렀을 때)
   initialSkillId: number | null;
-  // 임시 저장한 과제를 이어서 쓸 때
   editing: Assignment | null;
-  // 출제가 없어서 리마인더가 떠 있는 전공들
   remindedMajors: string[];
   onSubmit: (form: AssignmentForm, isDraft: boolean) => void;
   onClose: () => void;
@@ -27,6 +25,27 @@ type AssignmentCreateModalProps = {
 
 // 대상 칩: 10기 전체 + 전공들 + 개인 지정
 const TARGET_OPTIONS = [TARGET_ALL, ...MAJORS, TARGET_PERSONAL];
+
+// 여러 개 고르는 칩 (골랐으면 체크 아이콘). 모달 바깥에 만들어 둔다
+type CheckChipProps = {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+};
+
+function CheckChip({ label, selected, onClick }: CheckChipProps) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs ${
+        selected ? "border-black font-semibold" : "border-neutral-200 text-neutral-500"
+      }`}
+    >
+      {selected && <img src={checkCircleIcon} alt="" className="h-3.5 w-3.5" />}
+      {label}
+    </button>
+  );
+}
 
 export default function AssignmentCreateModal({
   skills,
@@ -36,7 +55,6 @@ export default function AssignmentCreateModal({
   onSubmit,
   onClose,
 }: AssignmentCreateModalProps) {
-  // 이어서 쓰는 과제가 있으면 그 값으로, 없으면 빈 값으로 시작
   const [title, setTitle] = useState(editing?.title ?? "");
   const [description, setDescription] = useState(editing?.description ?? "");
   const [skillId, setSkillId] = useState<number | null>(editing?.skillId ?? initialSkillId);
@@ -46,11 +64,9 @@ export default function AssignmentCreateModal({
   const [submitTypes, setSubmitTypes] = useState<string[]>(editing?.submitTypes ?? []);
   const [remind, setRemind] = useState(editing?.remind ?? false);
 
-  // 배열에서 값 켜고 끄기 (여러 곳에서 쓰는 공통 함수)
   const toggleIn = (list: string[], value: string) =>
     list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 
-  // 드롭다운에 보일 글자: "React 상태관리 (Front-end)"
   const skillLabel = (s: Skill) => `${s.name} (${s.major})`;
   const selectedSkill = skills.find((s) => s.id === skillId);
 
@@ -59,7 +75,6 @@ export default function AssignmentCreateModal({
   // 이 과제로 리마인더가 풀리는 전공
   const clearedMajors = remindedMajors.filter((m) => targets.includes(TARGET_ALL) || targets.includes(m));
 
-  // 빠진 필수 항목
   const missing = [
     title.trim() === "" ? "과제 제목" : "",
     description.trim() === "" ? "설명" : "",
@@ -85,17 +100,12 @@ export default function AssignmentCreateModal({
     onClose();
   };
 
-  // 공통 칩 스타일
-  const chip = (on: boolean) =>
-    `rounded-full border px-3 py-1.5 text-xs ${on ? "border-black font-semibold" : "border-neutral-200 text-neutral-500"}`;
-
   return (
     <div onClick={onClose} className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div
         onClick={(e) => e.stopPropagation()}
         className="scrollbar-hide max-h-[90vh] w-full max-w-[620px] overflow-y-auto rounded-xl bg-white"
       >
-        {/* 머리 */}
         <div className="flex items-start justify-between border-b px-6 py-5">
           <div>
             <h2 className="text-lg font-bold">과제 출제</h2>
@@ -109,7 +119,6 @@ export default function AssignmentCreateModal({
         </div>
 
         <div className="flex flex-col gap-5 px-6 py-5">
-          {/* 제목 */}
           <div>
             <p className="text-xs font-medium">
               과제 제목 <span className="text-red-500">*</span>
@@ -122,7 +131,6 @@ export default function AssignmentCreateModal({
             />
           </div>
 
-          {/* 설명 */}
           <div>
             <p className="text-xs font-medium">
               설명 <span className="text-red-500">*</span>
@@ -142,7 +150,6 @@ export default function AssignmentCreateModal({
             </div>
           </div>
 
-          {/* 역량 항목 + 마감 */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <p className="text-xs font-medium">
@@ -157,7 +164,6 @@ export default function AssignmentCreateModal({
                   <Dropdown
                     options={skills.map(skillLabel)}
                     value={selectedSkill ? skillLabel(selectedSkill) : ""}
-                    // 고른 글자로 역량 항목을 다시 찾는다
                     onChange={(label) => setSkillId(skills.find((s) => skillLabel(s) === label)?.id ?? null)}
                   />
                 )}
@@ -167,7 +173,6 @@ export default function AssignmentCreateModal({
               <p className="text-xs font-medium">
                 마감 <span className="text-red-500">*</span>
               </p>
-              {/* datetime-local: 날짜와 시간을 같이 고르는 입력칸 */}
               <input
                 type="datetime-local"
                 value={deadline}
@@ -187,29 +192,28 @@ export default function AssignmentCreateModal({
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
               {TARGET_OPTIONS.map((t) => (
-                <button key={t} onClick={() => setTargets(toggleIn(targets, t))} className={chip(targets.includes(t))}>
-                  {targets.includes(t) && "✓ "}
-                  {t}
-                </button>
+                <CheckChip
+                  key={t}
+                  label={t}
+                  selected={targets.includes(t)}
+                  onClick={() => setTargets(toggleIn(targets, t))}
+                />
               ))}
             </div>
 
-            {/* 개인 지정을 골랐을 때만 팀원 고르기 */}
             {targets.includes(TARGET_PERSONAL) && (
               <div className="mt-2 flex flex-wrap gap-2 rounded bg-neutral-50 p-2">
                 {MEMBERS.filter((m) => m.generation === "10기").map((m) => (
-                  <button
+                  <CheckChip
                     key={m.name}
+                    label={m.name}
+                    selected={personalTargets.includes(m.name)}
                     onClick={() => setPersonalTargets(toggleIn(personalTargets, m.name))}
-                    className={chip(personalTargets.includes(m.name))}
-                  >
-                    {m.name}
-                  </button>
+                  />
                 ))}
               </div>
             )}
 
-            {/* 받는 사람 미리보기 */}
             <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-neutral-500">
               받는 사람 {recipients.length}명
               {recipients.map((m) => (
@@ -233,14 +237,12 @@ export default function AssignmentCreateModal({
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
               {SUBMIT_TYPES.map((t) => (
-                <button
+                <CheckChip
                   key={t}
+                  label={t}
+                  selected={submitTypes.includes(t)}
                   onClick={() => setSubmitTypes(toggleIn(submitTypes, t))}
-                  className={chip(submitTypes.includes(t))}
-                >
-                  {submitTypes.includes(t) && "✓ "}
-                  {t}
-                </button>
+                />
               ))}
             </div>
           </div>
@@ -263,16 +265,18 @@ export default function AssignmentCreateModal({
 
           {/* 리마인더 해제 안내 */}
           {clearedMajors.length > 0 && (
-            <div className="rounded-lg border-l-4 border-green-500 bg-green-50 px-4 py-3">
-              <p className="text-sm font-semibold text-green-700">
-                ✓ {clearedMajors.join(", ")} 전공 출제 리마인더가 해제됩니다
-              </p>
-              <p className="mt-1 text-xs text-neutral-600">이 과제를 출제하면 알림이 사라집니다.</p>
+            <div className="flex gap-2 rounded-lg border-l-4 border-green-500 bg-green-50 px-4 py-3">
+              <img src={checkCircleIcon} alt="" className="mt-0.5 h-4 w-4 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-green-700">
+                  {clearedMajors.join(", ")} 전공 출제 리마인더가 해제됩니다
+                </p>
+                <p className="mt-1 text-xs text-neutral-600">이 과제를 출제하면 알림이 사라집니다.</p>
+              </div>
             </div>
           )}
         </div>
 
-        {/* 바닥 */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t px-6 py-4">
           {missing.length === 0 ? (
             <p className="text-xs text-neutral-400">출제하면 대상 팀원의 "오늘 할 일"에 바로 쌓입니다</p>
@@ -280,7 +284,6 @@ export default function AssignmentCreateModal({
             <p className="text-xs text-red-500">{missing.join(", ")}을(를) 입력해 주세요</p>
           )}
           <div className="flex shrink-0 gap-2">
-            {/* 임시 저장은 제목만 있으면 된다 */}
             <button
               onClick={() => handleSubmit(true)}
               disabled={title.trim() === ""}

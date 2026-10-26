@@ -9,6 +9,9 @@ import {
   type Skill,
   type Submission,
 } from "../../constants/assignment";
+import bellIcon from "../../assets/icons/bell.svg";
+import linkIcon from "../../assets/icons/link.svg";
+import checkCircleIcon from "../../assets/icons/check-circle.svg";
 
 // 리뷰 동작: 통과 / 재제출 요청 / 보류(피드백만 남김)
 export type ReviewAction = "통과" | "재제출 요청" | "보류";
@@ -54,12 +57,11 @@ export default function SubmissionReview({
   const recipients = assignment ? getRecipients(assignment.targets, assignment.personalTargets) : [];
   const submittedCount = assignment ? submissions.filter((s) => s.assignmentId === assignment.id).length : 0;
 
-  // ★ 이미 결정이 끝난 제출물인지 (통과 또는 재제출 요청이면 잠금)
+  // 이미 결정이 끝난 제출물인지 (통과 또는 재제출 요청이면 잠금)
   const isPassed = submission?.status === "통과";
   const isWaitingResubmit = submission?.status === "재제출 요청";
   const isLocked = isPassed || isWaitingResubmit;
 
-  // ★ 버튼을 누를 수 있는지: 제출물이 있고 잠기지 않았을 때만
   const canReview = submission !== undefined && !isLocked;
   const hasFeedback = feedback.trim() !== "";
 
@@ -69,7 +71,6 @@ export default function SubmissionReview({
     setFeedback("");
   };
 
-  // ★ 사람을 바꾸면 쓰던 피드백은 비운다
   const handleSelectPerson = (name: string) => {
     setSelectedName(name);
     setFeedback("");
@@ -94,8 +95,12 @@ export default function SubmissionReview({
           />
         </div>
         {assignment && (
-          <button onClick={() => onRemind(assignment.id)} className="rounded border bg-white px-3 py-2 text-xs">
-            🔔 미제출자에게 알림
+          <button
+            onClick={() => onRemind(assignment.id)}
+            className="flex items-center gap-1.5 rounded border bg-white px-3 py-2 text-xs"
+          >
+            <img src={bellIcon} alt="" className="h-3.5 w-3.5" />
+            미제출자에게 알림
           </button>
         )}
       </div>
@@ -145,7 +150,6 @@ export default function SubmissionReview({
                       {submission.submittedAt} 제출 · 마감 {formatDeadline(assignment.deadline)}
                     </p>
                   </div>
-                  {/* ★ 상태에 맞는 배지 색 */}
                   <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] ${STATUS_BADGE[submission.status]}`}>
                     {submission.status}
                   </span>
@@ -158,9 +162,10 @@ export default function SubmissionReview({
                       href={submission.content}
                       target="_blank"
                       rel="noreferrer"
-                      className="mt-1 block break-all font-mono text-sm underline"
+                      className="mt-1 flex items-center gap-2 break-all font-mono text-sm underline"
                     >
-                      🔗 {submission.content}
+                      <img src={linkIcon} alt="" className="h-4 w-4 shrink-0" />
+                      {submission.content}
                     </a>
                   ) : (
                     <p className="mt-1 whitespace-pre-wrap text-sm">{submission.content}</p>
@@ -195,7 +200,6 @@ export default function SubmissionReview({
               <div className="mt-3 rounded bg-neutral-50 p-3 text-xs">
                 <div className="flex justify-between">
                   <span>{skill.name}</span>
-                  {/* ★ 통과된 뒤에는 "반영 완료"로 보여준다 */}
                   {isPassed ? (
                     <span className="font-semibold text-green-700">반영 완료</span>
                   ) : (
@@ -208,18 +212,18 @@ export default function SubmissionReview({
               </div>
             )}
 
-            {/* ★ 잠겨 있으면 이유를 보여주고, 아니면 피드백 입력칸과 버튼 */}
             {isLocked ? (
               <div
                 className={`mt-4 rounded p-4 text-center text-sm ${
                   isPassed ? "bg-neutral-900 text-white" : "bg-blue-50 text-blue-700"
                 }`}
               >
-                <p className="font-semibold">{isPassed ? "✓ 통과 처리된 제출물입니다" : "재제출을 기다리는 중입니다"}</p>
+                <p className="flex items-center justify-center gap-1.5 font-semibold">
+                  {isPassed && <img src={checkCircleIcon} alt="" className="h-4 w-4 invert" />}
+                  {isPassed ? "통과 처리된 제출물입니다" : "재제출을 기다리는 중입니다"}
+                </p>
                 <p className={`mt-1 text-[11px] ${isPassed ? "text-neutral-400" : "text-blue-600"}`}>
-                  {isPassed
-                    ? "더 이상 상태를 바꿀 수 없습니다"
-                    : "제출자가 다시 제출하면 다시 확인할 수 있습니다"}
+                  {isPassed ? "더 이상 상태를 바꿀 수 없습니다" : "제출자가 다시 제출하면 다시 확인할 수 있습니다"}
                 </p>
               </div>
             ) : (
@@ -239,9 +243,10 @@ export default function SubmissionReview({
                 <button
                   onClick={() => handleReview("통과")}
                   disabled={!canReview}
-                  className="mt-2 w-full rounded bg-black py-2 text-sm font-semibold text-white disabled:opacity-40"
+                  className="mt-2 flex w-full items-center justify-center gap-1.5 rounded bg-black py-2 text-sm font-semibold text-white disabled:opacity-40"
                 >
-                  ✓ 통과 처리
+                  <img src={checkCircleIcon} alt="" className="h-4 w-4 invert" />
+                  통과 처리
                 </button>
                 <div className="mt-2 flex gap-2">
                   <button
