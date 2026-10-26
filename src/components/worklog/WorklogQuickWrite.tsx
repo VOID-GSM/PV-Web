@@ -1,13 +1,16 @@
 import { useState } from "react";
-import { BOARDS, TEMPLATES } from "../../constants/worklog";
-// ★ 방금 만든 작성 창을 가져온다
+import { BOARDS, TEMPLATES, type NewWorklog } from "../../constants/worklog";
 import WorklogWriteModal from "./WorklogWriteModal";
 
-export default function WorklogQuickWrite() {
+type WorklogQuickWriteProps = {
+  // 작성 창에서 올린 일지를 페이지로 넘겨주는 함수
+  onSubmit: (data: NewWorklog) => void;
+};
+
+export default function WorklogQuickWrite({ onSubmit }: WorklogQuickWriteProps) {
   const [checkedTemplates, setCheckedTemplates] = useState<string[]>([]);
   const [isPublic, setIsPublic] = useState(false);
   const [selectedBoards, setSelectedBoards] = useState<string[]>([]);
-  // ★ 작성 창이 열려 있는지. 처음엔 닫힘
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const toggleTemplate = (template: string) => {
@@ -26,8 +29,15 @@ export default function WorklogQuickWrite() {
     }
   };
 
+  // 작성 창에서 올렸을 때: 페이지로 넘기고, 이 카드의 선택값은 다시 비운다
+  const handleSubmit = (data: NewWorklog) => {
+    onSubmit(data);
+    setCheckedTemplates([]);
+    setSelectedBoards([]);
+    setIsPublic(false);
+  };
+
   return (
-    // ★ <> </>: 카드와 작성 창 두 개를 한 번에 돌려주려고 감싸는 빈 껍데기
     <>
       <section className="rounded-lg border-2 border-black bg-white p-5">
         <div className="flex items-center justify-between">
@@ -38,11 +48,12 @@ export default function WorklogQuickWrite() {
           쓰고 싶을 때만 쓰면 됩니다. 작성 알림이나 미작성 체크는 없습니다.
         </p>
 
+        {/* 템플릿 */}
         <div className="mt-4 rounded bg-neutral-50 p-3">
           <p className="text-xs text-neutral-500">템플릿</p>
           <div className="mt-2 flex flex-col gap-2">
             {TEMPLATES.map((template) => (
-              <label key={template} className="flex cursor-pointer items-center gap-2 text-sm">
+              <label key={template} className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
                   checked={checkedTemplates.includes(template)}
@@ -55,6 +66,7 @@ export default function WorklogQuickWrite() {
           </div>
         </div>
 
+        {/* 공개 토글 */}
         <div className="mt-3 flex items-center justify-between gap-3 rounded bg-neutral-100 p-3">
           <div>
             <p className="text-sm font-medium">팀 전체에 공개</p>
@@ -76,6 +88,7 @@ export default function WorklogQuickWrite() {
           </button>
         </div>
 
+        {/* 보드 태그 */}
         <p className="mt-4 text-xs text-neutral-500">보드 태그</p>
         <div className="mt-2 flex flex-wrap gap-2">
           {BOARDS.map((board) => (
@@ -95,7 +108,6 @@ export default function WorklogQuickWrite() {
         </div>
 
         <button
-          // ★ 누르면 작성 창을 연다
           onClick={() => setIsModalOpen(true)}
           className="mt-5 w-full rounded bg-black py-2.5 text-sm font-semibold text-white"
         >
@@ -103,11 +115,10 @@ export default function WorklogQuickWrite() {
         </button>
       </section>
 
-      {/* ★ 열려 있을 때만 작성 창을 그린다 */}
-      {/* 여기서 고른 템플릿·보드·공개 여부를 처음 값으로 넘겨준다 */}
       {isModalOpen && (
         <WorklogWriteModal
           onClose={() => setIsModalOpen(false)}
+          onSubmit={handleSubmit}
           initialTemplates={checkedTemplates}
           initialBoards={selectedBoards}
           initialPublic={isPublic}
