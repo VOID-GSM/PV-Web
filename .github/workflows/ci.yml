@@ -27,6 +27,14 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Update npm
+        run: npm install -g npm@11.6.0
+
+      - name: Check versions
+        run: |
+          node --version
+          npm --version
+
       - name: 의존성 설치
         run: npm install
 
