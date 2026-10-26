@@ -11,15 +11,18 @@ import {
   type PracticeStatus,
   type Question,
 } from "../../constants/questionBank";
+import micIcon from "../../assets/icons/mic.svg";
+import editIcon from "../../assets/icons/edit.svg";
+import checkCircleIcon from "../../assets/icons/check-circle.svg";
+import playIcon from "../../assets/icons/play.svg";
+import alertIcon from "../../assets/icons/alert.svg";
+import arrowRightIcon from "../../assets/icons/arrow-right.svg";
 
 type MockInterviewSessionProps = {
-  // 이번 세션에 뽑힌 질문들 (이미 섞여서 들어온다)
   questions: Question[];
   categories: string[];
   major: string;
-  // 글로 쓴 답변을 질문 뱅크에 저장
   onSaveAnswer: (questionId: number, content: string) => void;
-  // 세션 종료: 이번 기록들을 넘긴다
   onFinish: (records: PracticeRecord[]) => void;
   onExit: () => void;
 };
@@ -32,14 +35,10 @@ export default function MockInterviewSession({
   onFinish,
   onExit,
 }: MockInterviewSessionProps) {
-  // 지금 몇 번째 질문인지 (0부터)
   const [index, setIndex] = useState(0);
-  // 남은 시간(초)
   const [remaining, setRemaining] = useState(ANSWER_TIME_LIMIT);
-  // "idle": 기본, "write": 글로 답변 중, "record": 말로 연습 중
   const [mode, setMode] = useState<"idle" | "write" | "record">("idle");
   const [answerText, setAnswerText] = useState("");
-  // 이번 세션 기록
   const [records, setRecords] = useState<PracticeRecord[]>([]);
 
   // 1초마다 남은 시간을 1씩 줄인다 (0이 되면 멈춘다)
@@ -47,7 +46,6 @@ export default function MockInterviewSession({
     const timerId = setInterval(() => {
       setRemaining((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
-    // 화면에서 사라질 때 타이머 정리
     return () => clearInterval(timerId);
   }, []);
 
@@ -55,7 +53,6 @@ export default function MockInterviewSession({
   const current = questions[index];
   const isTimeOver = remaining === 0;
 
-  // 지금 질문을 기록하고 다음 질문으로
   const goNext = (status: PracticeStatus) => {
     const now = new Date();
     setRecords([
@@ -75,7 +72,6 @@ export default function MockInterviewSession({
     setAnswerText("");
   };
 
-  // 말로 연습하기: 처음 누르면 녹음 시작 표시, 다시 누르면 기록하고 다음
   const handleRecord = () => {
     if (mode !== "record") {
       setMode("record");
@@ -84,13 +80,11 @@ export default function MockInterviewSession({
     goNext(isTimeOver ? "시간 초과" : "말로 연습");
   };
 
-  // 글로 쓴 답변 저장하고 다음
   const handleSaveWritten = () => {
     onSaveAnswer(current.id, answerText.trim());
     goNext(isTimeOver ? "시간 초과" : "저장됨");
   };
 
-  // 다른 질문 뽑기 (건너뛰기)
   const handleSkip = () => {
     goNext(isTimeOver ? "시간 초과" : "건너뜀");
   };
@@ -100,17 +94,15 @@ export default function MockInterviewSession({
     onExit();
   };
 
-  // 진행 막대 길이(%)
   const progress = (Math.min(index + 1, questions.length) / questions.length) * 100;
 
   return (
-    // 화면 전체를 덮는 검은 집중 모드
     <div className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-black text-white">
       {/* 위쪽 줄 */}
       <div className="flex items-center justify-between gap-4 border-b border-neutral-800 px-6 py-4">
         <div className="flex flex-wrap items-center gap-2">
           <button onClick={handleExit} className="rounded bg-neutral-800 px-3 py-1.5 text-xs">
-            ✕ 나가기
+            × 나가기
           </button>
           <p className="ml-2 text-sm font-semibold">랜덤 모의면접</p>
           {categories.map((c) => (
@@ -134,12 +126,11 @@ export default function MockInterviewSession({
       </div>
 
       <div className="flex flex-1 flex-col gap-6 p-6 lg:flex-row">
-        {/* 가운데: 타이머 + 질문 */}
         <div className="flex flex-1 flex-col items-center justify-center gap-6">
           {isDone ? (
-            // 모든 질문을 끝냈을 때
             <div className="w-full max-w-2xl rounded-xl bg-white px-8 py-12 text-center text-black">
-              <p className="text-2xl font-bold">모든 질문을 마쳤습니다 🎉</p>
+              <img src={checkCircleIcon} alt="" className="mx-auto h-10 w-10" />
+              <p className="mt-3 text-2xl font-bold">모든 질문을 마쳤습니다</p>
               <p className="mt-2 text-sm text-neutral-500">
                 오른쪽 아래 '세션 종료하고 결과 보기'를 누르면 연습 기록에 저장됩니다
               </p>
@@ -169,7 +160,6 @@ export default function MockInterviewSession({
                 <p className="mt-4 text-2xl font-bold leading-snug">{current.title}</p>
               </div>
 
-              {/* 글로 답변 입력칸 */}
               {mode === "write" && (
                 <div className="w-full max-w-3xl">
                   <textarea
@@ -190,42 +180,52 @@ export default function MockInterviewSession({
               <div className="flex flex-wrap justify-center gap-3">
                 <button
                   onClick={handleRecord}
-                  className="rounded-full bg-red-600 px-5 py-2.5 text-sm font-semibold text-white"
+                  className="flex items-center gap-1.5 rounded-full bg-red-600 px-5 py-2.5 text-sm font-semibold text-white"
                 >
-                  🎙 {mode === "record" ? "녹음 끝내고 다음" : "말로 연습하기 (녹음)"}
+                  <img src={micIcon} alt="" className="h-4 w-4 invert" />
+                  {mode === "record" ? "녹음 끝내고 다음" : "말로 연습하기 (녹음)"}
                 </button>
                 {mode === "write" ? (
                   <button
                     onClick={handleSaveWritten}
                     disabled={answerText.trim() === ""}
-                    className="rounded bg-white px-5 py-2.5 text-sm font-semibold text-black disabled:opacity-40"
+                    className="flex items-center gap-1.5 rounded bg-white px-5 py-2.5 text-sm font-semibold text-black disabled:opacity-40"
                   >
-                    ✓ 저장하고 다음
+                    <img src={checkCircleIcon} alt="" className="h-4 w-4" />
+                    저장하고 다음
                   </button>
                 ) : (
                   <button
                     onClick={() => setMode("write")}
-                    className="rounded bg-white px-5 py-2.5 text-sm font-semibold text-black"
+                    className="flex items-center gap-1.5 rounded bg-white px-5 py-2.5 text-sm font-semibold text-black"
                   >
-                    ✎ 글로 답변 작성
+                    <img src={editIcon} alt="" className="h-4 w-4" />
+                    글로 답변 작성
                   </button>
                 )}
-                <button onClick={handleSkip} className="px-3 py-2.5 text-sm">
-                  ▷ 다른 질문 뽑기
+                <button onClick={handleSkip} className="flex items-center gap-1.5 px-3 py-2.5 text-sm">
+                  <img src={playIcon} alt="" className="h-4 w-4 invert" />
+                  다른 질문 뽑기
                 </button>
               </div>
 
               {/* 안내 */}
               <p
-                className={`rounded px-4 py-2 text-xs ${
+                className={`flex items-center gap-2 rounded px-4 py-2 text-xs ${
                   isTimeOver ? "bg-orange-500/20 text-orange-300" : "bg-neutral-900 text-neutral-400"
                 }`}
               >
+                {mode === "record" && !isTimeOver ? (
+                  // 녹음 중 표시: 빨간 점
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" />
+                ) : (
+                  <img src={alertIcon} alt="" className="h-3.5 w-3.5 shrink-0 opacity-70 invert" />
+                )}
                 {isTimeOver
-                  ? "⚠ 시간이 끝났습니다. 다음으로 넘어가면 '시간 초과'로 기록됩니다"
+                  ? "시간이 끝났습니다. 다음으로 넘어가면 '시간 초과'로 기록됩니다"
                   : mode === "record"
-                    ? "● 말로 연습 중입니다. 다 말했으면 '녹음 끝내고 다음'을 누르세요"
-                    : "⚠ 2분 안에 답변해 보세요. 글로 쓴 답변은 질문 뱅크에 저장됩니다"}
+                    ? "말로 연습 중입니다. 다 말했으면 '녹음 끝내고 다음'을 누르세요"
+                    : "2분 안에 답변해 보세요. 글로 쓴 답변은 질문 뱅크에 저장됩니다"}
               </p>
             </>
           )}
@@ -246,7 +246,6 @@ export default function MockInterviewSession({
                 </div>
               </li>
             ))}
-            {/* 지금 풀고 있는 질문 */}
             {!isDone && (
               <li className="rounded bg-white px-3 py-2 text-black">
                 <p className="truncate text-xs font-medium">{current.title}</p>
@@ -262,9 +261,10 @@ export default function MockInterviewSession({
           </p>
           <button
             onClick={() => onFinish(records)}
-            className="mt-3 rounded bg-white py-2.5 text-sm font-semibold text-black"
+            className="mt-3 flex items-center justify-center gap-1.5 rounded bg-white py-2.5 text-sm font-semibold text-black"
           >
-            → 세션 종료하고 결과 보기
+            <img src={arrowRightIcon} alt="" className="h-4 w-4" />
+            세션 종료하고 결과 보기
           </button>
         </aside>
       </div>

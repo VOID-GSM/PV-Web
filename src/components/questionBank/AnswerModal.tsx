@@ -6,10 +6,11 @@ import {
   type Answer,
   type Question,
 } from "../../constants/questionBank";
+import alertIcon from "../../assets/icons/alert.svg";
+import chevronDownIcon from "../../assets/icons/chevron-down.svg";
 
 type AnswerModalProps = {
   question: Question;
-  // 이 질문의 답변 전체 (내 답변이 있으면 수정 모드)
   answers: Answer[];
   onSave: (content: string, alsoArchive: boolean) => void;
   onDelete: () => void;
@@ -21,9 +22,7 @@ export default function AnswerModal({ question, answers, onSave, onDelete, onClo
   const otherAnswers = answers.filter((a) => a.author !== ME);
   const isEdit = myAnswer !== undefined;
 
-  // 입력칸: 수정이면 기존 답변, 처음이면 빈 칸
   const [content, setContent] = useState(myAnswer?.content ?? "");
-  // 정리글 아카이브에도 올릴지. 처음엔 꺼짐
   const [alsoArchive, setAlsoArchive] = useState(false);
   // 펼쳐 본 다른 팀원 답변 번호들
   const [openIds, setOpenIds] = useState<number[]>([]);
@@ -51,7 +50,6 @@ export default function AnswerModal({ question, answers, onSave, onDelete, onClo
         onClick={(e) => e.stopPropagation()}
         className="scrollbar-hide max-h-[90vh] w-full max-w-[520px] overflow-y-auto rounded-xl bg-white"
       >
-        {/* 머리 */}
         <div className="flex items-start justify-between border-b px-6 py-5">
           <div>
             <h2 className="text-lg font-bold">{isEdit ? "답변 수정" : "답변 작성"}</h2>
@@ -97,11 +95,14 @@ export default function AnswerModal({ question, answers, onSave, onDelete, onClo
           </div>
 
           {/* 공개 안내 */}
-          <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
-            <p className="text-sm font-semibold text-blue-700">⚠ 이 답변은 팀 전체에 공개됩니다</p>
-            <p className="mt-1 text-xs text-neutral-600">
-              같은 질문에 답한 다른 팀원 글과 나란히 비교되고, 기수가 바뀌어도 아카이브에 남습니다.
-            </p>
+          <div className="flex gap-2 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+            <img src={alertIcon} alt="" className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-blue-700">이 답변은 팀 전체에 공개됩니다</p>
+              <p className="mt-1 text-xs text-neutral-600">
+                같은 질문에 답한 다른 팀원 글과 나란히 비교되고, 기수가 바뀌어도 아카이브에 남습니다.
+              </p>
+            </div>
           </div>
 
           {/* 다른 팀원 답변 참고 */}
@@ -125,12 +126,16 @@ export default function AnswerModal({ question, answers, onSave, onDelete, onClo
                           <span className="block text-[11px] text-neutral-400">
                             {a.author} · {a.generation}
                           </span>
-                          {/* 접혀 있으면 한 줄로 자르기(truncate) */}
                           <span className={`block text-xs ${isOpen ? "whitespace-pre-wrap" : "truncate"}`}>
                             {a.content}
                           </span>
                         </span>
-                        <span className="text-xs text-neutral-400">{isOpen ? "▲" : "▼"}</span>
+                        {/* 펼치면 화살표를 위로 뒤집는다 */}
+                        <img
+                          src={chevronDownIcon}
+                          alt={isOpen ? "접기" : "펼치기"}
+                          className={`mt-1 h-4 w-4 shrink-0 opacity-50 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                        />
                       </button>
                     </li>
                   );
@@ -139,7 +144,6 @@ export default function AnswerModal({ question, answers, onSave, onDelete, onClo
             )}
           </div>
 
-          {/* 정리글 아카이브 체크 */}
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -151,11 +155,9 @@ export default function AnswerModal({ question, answers, onSave, onDelete, onClo
           </label>
         </div>
 
-        {/* 바닥 */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t px-6 py-4">
           <p className="text-[11px] text-neutral-400">수정 기록이 남고, 피드백을 받은 답변은 알림이 갑니다</p>
           <div className="flex shrink-0 gap-2">
-            {/* 수정일 때만 삭제 버튼 */}
             {isEdit && (
               <button onClick={handleDelete} className="rounded bg-red-600 px-4 py-2 text-sm font-semibold text-white">
                 답변 삭제

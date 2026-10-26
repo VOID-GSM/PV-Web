@@ -1,8 +1,9 @@
 import { ME, getCategoryBadge, type Answer, type Question } from "../../constants/questionBank";
+import editIcon from "../../assets/icons/edit.svg";
+import starIcon from "../../assets/icons/star.svg";
 
 type QuestionDetailProps = {
   question: Question | null;
-  // 이 질문에 달린 답변들
   answers: Answer[];
   onOpenAnswerModal: () => void;
   onToggleLike: (answerId: number) => void;
@@ -14,7 +15,6 @@ export default function QuestionDetail({
   onOpenAnswerModal,
   onToggleLike,
 }: QuestionDetailProps) {
-  // 질문을 아직 안 골랐을 때
   if (!question) {
     return (
       <section className="flex min-h-[400px] items-center justify-center rounded-lg bg-white">
@@ -29,7 +29,6 @@ export default function QuestionDetail({
 
   return (
     <section className="rounded-lg bg-white p-6">
-      {/* 배지들 + 답변 버튼 */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-1.5">
           <span className={`rounded px-2 py-0.5 text-xs ${getCategoryBadge(question.category)}`}>
@@ -38,8 +37,12 @@ export default function QuestionDetail({
           <span className="rounded-full border px-2 py-0.5 text-xs">{question.major}</span>
           <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs">{question.week} 공통</span>
         </div>
-        <button onClick={onOpenAnswerModal} className="rounded border px-3 py-1.5 text-xs font-medium">
-          ✎ {hasMine ? "내 답변 수정" : "내 답변 작성"}
+        <button
+          onClick={onOpenAnswerModal}
+          className="flex items-center gap-1.5 rounded border px-3 py-1.5 text-xs font-medium"
+        >
+          <img src={editIcon} alt="" className="h-3.5 w-3.5" />
+          {hasMine ? "내 답변 수정" : "내 답변 작성"}
         </button>
       </div>
 
@@ -48,7 +51,6 @@ export default function QuestionDetail({
         같은 질문에 대한 팀원 {answers.length}명의 답변을 나란히 비교할 수 있습니다. 기수가 바뀌어도 그대로 남습니다.
       </p>
 
-      {/* 답변 모음 */}
       <div className="mt-5 border-t pt-5">
         {sorted.length === 0 ? (
           <p className="rounded border border-dashed py-10 text-center text-xs text-neutral-400">
@@ -62,7 +64,6 @@ export default function QuestionDetail({
               return (
                 <li
                   key={answer.id}
-                  // 내 답변은 검은 테두리
                   className={`rounded-lg p-4 ${isMine ? "border-2 border-black" : "bg-neutral-50"}`}
                 >
                   <div className="flex items-center gap-2">
@@ -74,12 +75,18 @@ export default function QuestionDetail({
                       {answer.generation} · {answer.date}
                     </p>
                     {isMine && <span className="ml-auto rounded-full border px-2 py-0.5 text-[11px]">내 답변</span>}
-                    {/* ★ 누르기 */}
+                    {/* 별 버튼: 눌렀으면 진하게, 안 눌렀으면 흐리게 */}
                     <button
                       onClick={() => onToggleLike(answer.id)}
-                      className={`text-xs ${isMine ? "" : "ml-auto"} ${likedByMe ? "text-amber-500" : "text-neutral-400"}`}
+                      className={`flex items-center gap-1 rounded px-1 text-xs ${isMine ? "" : "ml-auto"}`}
+                      title={likedByMe ? "추천 취소" : "추천"}
                     >
-                      {likedByMe ? "★" : "☆"} {answer.likedBy.length}
+                      <img
+                        src={starIcon}
+                        alt="추천"
+                        className={`h-3.5 w-3.5 ${likedByMe ? "opacity-100" : "opacity-30"}`}
+                      />
+                      <span className={likedByMe ? "font-semibold" : "text-neutral-400"}>{answer.likedBy.length}</span>
                     </button>
                   </div>
                   <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">{answer.content}</p>
