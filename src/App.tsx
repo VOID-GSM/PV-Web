@@ -11,6 +11,8 @@ import InvitePage from "./pages/InvitePage";
 import SettingsPage from "./pages/SettingsPage";
 // 회고 페이지
 import RetrospectivePage from "./pages/RetrospectivePage";
+// 면접 질문 뱅크 페이지
+import QuestionBankPage from "./pages/QuestionBankPage";
 // ★ 과제·역량맵 페이지
 import AssignmentPage from "./pages/AssignmentPage";
 
@@ -28,7 +30,7 @@ export default function App() {
     setEvents((prev) => [...prev, newEvent]);
   };
 
-  // ★ 오늘 날짜 "2026-10-26" (한국 시간 기준) - 한 번만 선언한다
+  // 오늘 날짜 "2026-10-26" (한국 시간 기준) - 한 번만 선언한다
   // toISOString()은 UTC 기준이라 한국 오전 0~9시에 하루 전 날짜가 나와서 바꿨다
   const todayStr = new Date().toLocaleDateString("sv-SE");
   const todayTaskCount = events.filter((event) => event.date === todayStr).length;
@@ -49,6 +51,9 @@ export default function App() {
       case "아카이브":
       case "정리글 아카이브":
         navigate("/archive");
+        break;
+      case "면접 질문 뱅크":
+        navigate("/questions");
         break;
       // ★ 과제·역량맵
       case "과제 · 역량맵":
@@ -110,6 +115,8 @@ export default function App() {
           <Route path="/settings" element={<SettingsPage />} />
           {/* 회고 (사이드바에 메뉴가 없어서 주소로 접근) */}
           <Route path="/retrospective" element={<RetrospectivePage />} />
+          {/* 면접 질문 뱅크 */}
+          <Route path="/questions" element={<QuestionBankPage />} />
           {/* ★ 과제·역량맵 */}
           <Route path="/assignments" element={<AssignmentPage />} />
         </Route>

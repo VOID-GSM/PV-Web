@@ -24,6 +24,7 @@ export default function SidebarLayout({
     if (pathname.startsWith("/activity")) return "활동";
     if (pathname.startsWith("/archive") || pathname.startsWith("/editor"))
       return "정리글 아카이브";
+    if (pathname.startsWith("/questions")) return "면접 질문 뱅크";
     // ★ /assignments 주소면 "과제 · 역량맵"에 불을 켠다
     if (pathname.startsWith("/assignments")) return "과제 · 역량맵";
     if (pathname.startsWith("/weekly-report") || pathname.startsWith("/report"))
@@ -54,6 +55,9 @@ export default function SidebarLayout({
       case "아카이브":
       case "정리글 아카이브":
         navigate("/archive");
+        break;
+      case "면접 질문 뱅크":
+        navigate("/questions");
         break;
       // ★ 과제 · 역량맵 → /assignments
       case "과제 · 역량맵":
