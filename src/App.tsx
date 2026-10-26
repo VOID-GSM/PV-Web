@@ -9,8 +9,10 @@ import ArticleEditorPage from "./pages/ArticleEditorPage";
 import WeeklyReportPage from "./pages/WeeklyReportPage";
 import InvitePage from "./pages/InvitePage";
 import SettingsPage from "./pages/SettingsPage";
-// ★ 회고 페이지
+// 회고 페이지
 import RetrospectivePage from "./pages/RetrospectivePage";
+// ★ 면접 질문 뱅크 페이지
+import QuestionBankPage from "./pages/QuestionBankPage";
 
 import SidebarLayout from "./components/layout/SidebarLayout";
 import { AddEventModal } from "./components/calendar/AddEventModal";
@@ -26,7 +28,7 @@ export default function App() {
     setEvents((prev) => [...prev, newEvent]);
   };
 
-  // ★ 오늘 날짜 "2026-10-26" (한국 시간 기준)
+  // 오늘 날짜 "2026-10-26" (한국 시간 기준)
   // toISOString()은 UTC 기준이라 한국 오전 0~9시에 하루 전 날짜가 나와서 바꿨다
   const todayStr = new Date().toLocaleDateString("sv-SE");
   const todayTaskCount = events.filter((event) => event.date === todayStr).length;
@@ -47,6 +49,10 @@ export default function App() {
       case "아카이브":
       case "정리글 아카이브":
         navigate("/archive");
+        break;
+      // ★ 면접 질문 뱅크
+      case "면접 질문 뱅크":
+        navigate("/questions");
         break;
       case "주간 리포트":
         navigate("/report");
@@ -102,8 +108,10 @@ export default function App() {
           <Route path="/report" element={<Navigate to="/weekly-report" replace />} />
           <Route path="/weekly-report" element={<WeeklyReportPage />} />
           <Route path="/settings" element={<SettingsPage />} />
-          {/* ★ 회고 (사이드바에 메뉴가 없어서 주소로 접근) */}
+          {/* 회고 (사이드바에 메뉴가 없어서 주소로 접근) */}
           <Route path="/retrospective" element={<RetrospectivePage />} />
+          {/* ★ 면접 질문 뱅크 */}
+          <Route path="/questions" element={<QuestionBankPage />} />
         </Route>
 
         {/* 사이드바 없이 보이는 페이지 (아직 팀원이 아닌 사람이 들어오는 화면) */}
