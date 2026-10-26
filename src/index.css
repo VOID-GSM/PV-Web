@@ -1,9 +1,11 @@
 @import "tailwindcss";
 
+
 * {
   box-sizing: border-box;
 }
 
+/* 화면 전체를 꽉 채우고, 브라우저 기본 여백을 없앤다 */
 html,
 body,
 #root {
@@ -13,6 +15,52 @@ body,
   padding: 0;
 }
 
+/* 글꼴 설정 및 가로 스크롤 방지 */
 body {
+  font-family:
+    "Pretendard Variable",
+    Pretendard,
+    -apple-system,
+    BlinkMacSystemFont,
+    system-ui,
+    Roboto,
+    "Helvetica Neue",
+    "Segoe UI",
+    "Apple SD Gothic Neo",
+    "Noto Sans KR",
+    "Malgun Gothic",
+    sans-serif;
   overflow-x: hidden;
+}
+
+/* ===== Tailwind 추가 설정 ===== */
+
+/* Tailwind 기본 글꼴(font-sans)을 Pretendard로 설정 */
+@theme {
+  --font-sans:
+    "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+    system-ui, sans-serif;
+}
+
+/* 버튼 및 폼 요소 커서 스타일 */
+@layer base {
+  button:not(:disabled),
+  label,
+  select,
+  input[type="checkbox"] {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
+/* scrollbar-hide: 스크롤은 동작하되 스크롤바는 숨김 */
+@utility scrollbar-hide {
+  scrollbar-width: none; /* 파이어폭스용 */
+
+  &::-webkit-scrollbar {
+    display: none; /* 크롬, 엣지, 사파리용 */
+  }
 }

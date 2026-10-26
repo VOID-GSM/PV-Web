@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import bellIcon from "../../assets/icons/bell.svg";
 import plusIcon from "../../assets/icons/plus.svg";
 import calendarIcon from "../../assets/icons/calendar.svg";
@@ -24,7 +24,27 @@ export const Header: React.FC<HeaderProps> = ({
     "전체" | "안 읽음" | "멘션"
   >("전체");
 
+  const noticeRef = useRef<HTMLDivElement>(null);
+  const createRef = useRef<HTMLDivElement>(null);
+
   const notifications: [] = [];
+
+  // 외부 영역 클릭 감지
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (noticeRef.current && !noticeRef.current.contains(e.target as Node)) {
+        setIsNoticeOpen(false);
+      }
+      if (createRef.current && !createRef.current.contains(e.target as Node)) {
+        setIsCreateOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   return (
     <header className="flex h-16 w-full items-center justify-between border-b border-gray-100 bg-white px-8 select-none shrink-0 relative">
@@ -34,7 +54,7 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="relative">
+        <div className="relative" ref={noticeRef}>
           <button
             type="button"
             onClick={() => {
@@ -100,7 +120,7 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
 
-        <div className="relative">
+        <div className="relative" ref={createRef}>
           <button
             type="button"
             onClick={() => {
