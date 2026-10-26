@@ -1,43 +1,20 @@
 // src/App.tsx
 import { useState } from "react";
-<<<<<<< HEAD
-import {
-
-  BrowserRouter,
-  Routes,
-  Route,
-  useNavigate,
-  useLocation,
-  Navigate,
-} from "react-router-dom";
-=======
 import { Routes, Route, useNavigate, Navigate } from "react-router-dom";
 
->>>>>>> 542a135 (fix: 알림 모달 UI 디자인 동기화 및 라우팅·CSS 오류 수정)
 import CalendarPage from "./pages/CalendarPage";
 import { MainPage } from "./pages/MainPage";
 import ActivityDetailPage from "./pages/ActivityDetailPage";
 import InvitePage from "./pages/InvitePage";
 import SettingsPage from "./pages/SettingsPage";
-
 import ArchivePage from "./pages/ArchivePage";
 import ArticleEditorPage from "./pages/ArticleEditorPage";
-<<<<<<< HEAD
 import WeeklyReportPage from "./pages/WeeklyReportPage";
-import { AddEventModal } from "./components/calendar/AddEventModal";
-import type { CalendarEvent } from "./types/calendar";
-
-function AppContent() {
-
-export default function App() {
-
-=======
 import SidebarLayout from "./components/layout/SidebarLayout";
 import { AddEventModal } from "./components/calendar/AddEventModal";
 import type { CalendarEvent } from "./types/calendar";
 
 export default function App() {
->>>>>>> 542a135 (fix: 알림 모달 UI 디자인 동기화 및 라우팅·CSS 오류 수정)
   const navigate = useNavigate();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -49,24 +26,6 @@ export default function App() {
   const todayStr = new Date().toISOString().split("T")[0];
   const todayTaskCount = events.filter((e) => e.date === todayStr).length;
 
-<<<<<<< HEAD
-  const getCurrentMenu = (path: string) => {
-    if (path === "/today" || path === "/") return "오늘 할 일";
-    if (path.startsWith("/calendar")) return "통합 캘린더";
-    if (path.startsWith("/activity")) return "활동";
-
-    if (path.startsWith("/archive")) return "정리글 아카이브";
-    if (path.startsWith("/report")) return "주간 리포트";
-
-    if (path.startsWith("/invite")) return "팀원 초대";
-    if (path.startsWith("/settings")) return "설정";
-    return "통합 캘린더";
-  };
-
-  const currentMenu = getCurrentMenu(location.pathname);
-
-=======
->>>>>>> 542a135 (fix: 알림 모달 UI 디자인 동기화 및 라우팅·CSS 오류 수정)
   const handleNavigate = (menuName: string) => {
     switch (menuName) {
       case "오늘 할 일":
@@ -82,10 +41,9 @@ export default function App() {
       case "아카이브":
       case "정리글 아카이브":
         navigate("/archive");
-
+        break;
       case "주간 리포트":
         navigate("/report");
-
         break;
       case "팀원 초대":
         navigate("/invite");
@@ -127,142 +85,18 @@ export default function App() {
           }
         />
 
-<<<<<<< HEAD
-        <Route
-          path="/activity"
-          element={
-            <div className="flex h-screen w-full overflow-hidden bg-[#f7f7f8]">
-              <Sidebar
-                activeMenu={currentMenu}
-                todayTaskCount={todayTaskCount}
-                assignmentCount={0}
-                onNavigate={handleNavigate}
-              />
-              <div className="flex flex-1 flex-col overflow-y-auto">
-                <ActivityDetailPage />
-              </div>
-            </div>
-          }
-        />
-        <Route
-          path="/activity/:id"
-          element={
-            <div className="flex h-screen w-full overflow-hidden bg-[#f7f7f8]">
-              <Sidebar
-                activeMenu={currentMenu}
-                todayTaskCount={todayTaskCount}
-                assignmentCount={0}
-                onNavigate={handleNavigate}
-              />
-              <div className="flex flex-1 flex-col overflow-y-auto">
-                <ActivityDetailPage />
-              </div>
-            </div>
-          }
-        />
-
-        {/* 정리글 아카이브 메인 */}
-        <Route
-          path="/archive"
-
-
-        <Route
-          path="/report"
-          element={
-            <div className="flex h-screen w-full overflow-hidden bg-[#f7f7f8]">
-              <Sidebar
-                activeMenu={currentMenu}
-                todayTaskCount={todayTaskCount}
-                assignmentCount={0}
-                onNavigate={handleNavigate}
-              />
-              <div className="flex flex-1 flex-col overflow-hidden">
-
-                <ArchivePage />
-              </div>
-            </div>
-          }
-        />
-
-        {/* 정리글 작성/수정 에디터 - 사이드바 레이아웃 추가 */}
-        <Route
-          path="/archive/editor"
-          element={
-            <div className="flex h-screen w-full overflow-hidden bg-[#f7f7f8]">
-              <Sidebar
-                activeMenu={currentMenu}
-                todayTaskCount={todayTaskCount}
-                assignmentCount={0}
-                onNavigate={handleNavigate}
-              />
-              <div className="flex flex-1 flex-col overflow-hidden">
-                <ArticleEditorPage />
-                <WeeklyReportPage />
-              </div>
-            </div>
-          }
-        />
-
-        <Route
-          path="/invite"
-          element={
-            <div className="flex h-screen w-full overflow-hidden bg-[#f7f7f8]">
-              <Sidebar
-                activeMenu={currentMenu}
-                todayTaskCount={todayTaskCount}
-                assignmentCount={0}
-                onNavigate={handleNavigate}
-              />
-              <div className="flex flex-1 flex-col overflow-y-auto">
-                <InvitePage />
-              </div>
-            </div>
-          }
-        />
-        <Route
-          path="/invite/:code"
-          element={
-            <div className="flex h-screen w-full overflow-hidden bg-[#f7f7f8]">
-              <Sidebar
-                activeMenu={currentMenu}
-                todayTaskCount={todayTaskCount}
-                assignmentCount={0}
-                onNavigate={handleNavigate}
-              />
-              <div className="flex flex-1 flex-col overflow-y-auto">
-                <InvitePage />
-              </div>
-            </div>
-          }
-        />
-
-
-
-        <Route
-          path="/settings"
-          element={
-            <div className="flex h-screen w-full overflow-hidden bg-[#f7f7f8]">
-              <Sidebar
-                activeMenu={currentMenu}
-                todayTaskCount={todayTaskCount}
-                assignmentCount={0}
-                onNavigate={handleNavigate}
-              />
-              <div className="flex flex-1 flex-col overflow-y-auto">
-                <SettingsPage />
-              </div>
-            </div>
-          }
-        />
-=======
+        {/* 사이드바 공유 레이아웃 구역 */}
         <Route element={<SidebarLayout todayTaskCount={todayTaskCount} />}>
           <Route path="/activity" element={<ActivityDetailPage />} />
+          <Route path="/activity/:id" element={<ActivityDetailPage />} />
           <Route path="/archive" element={<ArchivePage />} />
           <Route path="/editor" element={<ArticleEditorPage />} />
+          <Route path="/archive/editor" element={<ArticleEditorPage />} />
+          <Route path="/report" element={<WeeklyReportPage />} />
           <Route path="/invite" element={<InvitePage />} />
+          <Route path="/invite/:code" element={<InvitePage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
->>>>>>> 542a135 (fix: 알림 모달 UI 디자인 동기화 및 라우팅·CSS 오류 수정)
       </Routes>
 
       <AddEventModal
@@ -271,18 +105,5 @@ export default function App() {
         onAddEvent={handleAddEvent}
       />
     </>
-
   );
 }
-<<<<<<< HEAD
-
-export default function App() {
-  return (
-    <BrowserRouter>
-      <AppContent />
-    </BrowserRouter>
-
-  );
-}
-=======
->>>>>>> 542a135 (fix: 알림 모달 UI 디자인 동기화 및 라우팅·CSS 오류 수정)
