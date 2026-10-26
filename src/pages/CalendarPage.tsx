@@ -1,5 +1,6 @@
+// src/pages/CalendarPage.tsx
 import { useState } from "react";
-import { Sidebar } from "../components/layout/Sidebar";
+
 import { Header } from "../components/layout/Header";
 import { CalendarHeader } from "../components/calendar/CalendarHeader";
 import { CalendarGrid } from "../components/calendar/CalendarGrid";
@@ -13,7 +14,7 @@ import type {
   ViewMode,
 } from "../types/calendar";
 
-export interface CalendarPageProps {
+interface CalendarPageProps {
   events?: CalendarEvent[];
   activeMenu?: string;
   onNavigate?: (menu: string) => void;
@@ -23,23 +24,19 @@ export interface CalendarPageProps {
 
 export default function CalendarPage({
   events = [],
-  activeMenu = "통합 캘린더",
-  onNavigate,
-  onOpenAddModal,
-  onAddEvent,
-}: CalendarPageProps) {
+  onOpenAddModal = () => {},
+  onAddEvent = () => {},
+}: CalendarPageProps = {}) {
   const [viewMode, setViewMode] = useState<ViewMode>("월간");
   const [onlyMyEvents, setOnlyMyEvents] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
+
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
     null,
   );
 
   const [boardFilters, setBoardFilters] = useState<BoardFilter[]>([]);
   const [milestones, setMilestones] = useState<MilestoneItem[]>([]);
-
-  const todayStr = currentDate.toISOString().split("T")[0];
-  const todayTaskCount = events.filter((e) => e.date === todayStr).length;
 
   const handlePrevDate = () => {
     const newDate = new Date(currentDate);
@@ -61,8 +58,22 @@ export default function CalendarPage({
     setCurrentDate(newDate);
   };
 
+  const handleDeleteEvent = () => {
+    setSelectedEvent(null);
+  };
+
+  const handleAddMilestone = (title: string, date: string) => {
+    const newItem: MilestoneItem = {
+      id: Date.now().toString(),
+      title,
+      date,
+      status: "제안",
+    };
+    setMilestones((prev) => [...prev, newItem]);
+  };
+
   const handleApplyMilestonesToCalendar = () => {
-    if (milestones.length === 0 || !onAddEvent) return;
+    if (milestones.length === 0) return;
 
     milestones.forEach((m) => {
       onAddEvent({
@@ -85,68 +96,54 @@ export default function CalendarPage({
     : events;
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-[#f7f7f8]">
-      <Sidebar
-        activeMenu={activeMenu}
-        todayTaskCount={todayTaskCount}
-        assignmentCount={0}
-        onNavigate={onNavigate}
+    <div className="flex flex-1 flex-col overflow-hidden h-full">
+      <Header
+        title="통합 캘린더"
+        subtitle="모든 보드의 마감·회의·활동을 한 화면에서"
+        onOpenAddModal={onOpenAddModal}
       />
 
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Header
-          title="통합 캘린더"
-          subtitle="모든 보드의 마감·회의·활동을 한 화면에서"
-          onOpenAddModal={onOpenAddModal}
-        />
-
-        <main className="flex flex-1 gap-5 overflow-hidden p-6">
-          <div className="flex flex-1 flex-col overflow-hidden rounded-3xl bg-white p-6 shadow-xs">
-            <CalendarHeader
-              currentDate={currentDate}
-              viewMode={viewMode}
-              onlyMyEvents={onlyMyEvents}
-              onViewChange={(mode) => setViewMode(mode)}
-              onToggleOnlyMyEvents={() => setOnlyMyEvents(!onlyMyEvents)}
-              onPrev={handlePrevDate}
-              onNext={handleNextDate}
-              onOpenAddModal={onOpenAddModal ?? (() => {})}
-            />
-
-            <CalendarGrid
-              currentDate={currentDate}
-              events={filteredEvents}
-              viewMode={viewMode}
-              onSelectEvent={(evt) => setSelectedEvent(evt)}
-            />
-          </div>
-
-          <RightPanel
-            boardFilters={boardFilters}
-            milestones={milestones}
-            onToggleFilter={(id) => {
-              setBoardFilters((prev) =>
-                prev.map((f) =>
-                  f.id === id ? { ...f, checked: !f.checked } : f,
-                ),
-              );
-            }}
-            onAddMilestone={(title, date) => {
-              setMilestones((prev) => [
-                ...prev,
-                { id: Date.now().toString(), title, date, status: "제안" },
-              ]);
-            }}
-            onApplyMilestonesToCalendar={handleApplyMilestonesToCalendar}
+      <main className="flex flex-1 gap-5 overflow-hidden p-6">
+        <div className="flex flex-1 flex-col overflow-hidden rounded-3xl bg-white p-6 shadow-sm">
+          <CalendarHeader
+            currentDate={currentDate}
+            viewMode={viewMode}
+            onlyMyEvents={onlyMyEvents}
+            onViewChange={(mode) => setViewMode(mode)}
+            onToggleOnlyMyEvents={() => setOnlyMyEvents(!onlyMyEvents)}
+            onPrev={handlePrevDate}
+            onNext={handleNextDate}
+            onOpenAddModal={onOpenAddModal}
           />
-        </main>
-      </div>
+
+          <CalendarGrid
+            currentDate={currentDate}
+            events={filteredEvents}
+            viewMode={viewMode}
+            onSelectEvent={(evt) => setSelectedEvent(evt)}
+          />
+        </div>
+
+        <RightPanel
+          boardFilters={boardFilters}
+          milestones={milestones}
+          onToggleFilter={(id) => {
+            setBoardFilters((prev) =>
+              prev.map((f) =>
+                f.id === id ? { ...f, checked: !f.checked } : f,
+              ),
+            );
+          }}
+          onAddMilestone={handleAddMilestone}
+          onApplyMilestonesToCalendar={handleApplyMilestonesToCalendar}
+        />
+      </main>
 
       {selectedEvent && (
         <EventDetailModal
           event={selectedEvent}
           onClose={() => setSelectedEvent(null)}
-          onDelete={() => setSelectedEvent(null)}
+          onDelete={handleDeleteEvent}
         />
       )}
     </div>
