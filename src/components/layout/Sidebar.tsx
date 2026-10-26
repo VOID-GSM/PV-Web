@@ -1,4 +1,6 @@
 import React from "react";
+import { useNavigate, useLocation } from "react-router-dom"; // 라우터 이동 및 현재 경로 확인
+
 import logo from "../../assets/images/logo.svg";
 import homeIcon from "../../assets/icons/home.svg";
 import calendarIcon from "../../assets/icons/calendar.svg";
@@ -10,7 +12,6 @@ import trendingUpIcon from "../../assets/icons/trending-up.svg";
 import usersIcon from "../../assets/icons/users.svg";
 import filterIcon from "../../assets/icons/filter.svg";
 
-// 1. activeMenu 속성 추가
 export interface SidebarProps {
   activeMenu?: string;
   todayTaskCount?: number;
@@ -18,14 +19,52 @@ export interface SidebarProps {
   onNavigate?: (menu: string) => void;
 }
 
+// 메뉴 이름과 라우터 경로 매핑
+const MENU_TO_PATH: Record<string, string> = {
+  "오늘 할 일": "/today",
+  "통합 캘린더": "/calendar",
+  활동: "/activity",
+  "정리글 아카이브": "/archive",
+  "주간 리포트": "/weekly-report",
+  "팀원 관리": "/settings",
+};
+
+const PATH_TO_MENU: Record<string, string> = {
+  "/today": "오늘 할 일",
+  "/calendar": "통합 캘린더",
+  "/activity": "활동",
+  "/archive": "정리글 아카이브",
+  "/weekly-report": "주간 리포트",
+  "/settings": "팀원 관리",
+};
+
 export const Sidebar: React.FC<SidebarProps> = ({
-  activeMenu = "오늘 할 일",
+  activeMenu,
   todayTaskCount = 0,
   assignmentCount = 0,
   onNavigate,
 }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // activeMenu prop이 따로 전달되지 않으면 현재 URL 경로를 기반으로 자동 활성화
+  const currentActiveMenu =
+    activeMenu || PATH_TO_MENU[location.pathname] || "오늘 할 일";
+
+  // 메뉴 클릭 시 실행되는 함수
+  const handleMenuClick = (menuName: string) => {
+    // 1. 기존 onNavigate 콜백이 있으면 호출
+    onNavigate?.(menuName);
+
+    // 2. 해당 메뉴에 연결된 라우터 경로로 이동
+    const targetPath = MENU_TO_PATH[menuName];
+    if (targetPath) {
+      navigate(targetPath);
+    }
+  };
+
   return (
-    <aside className="flex h-screen w-60 flex-col border-r border-gray-100 bg-white px-4 py-5 select-none shrink-0">
+    <aside className="flex h-screen w-60 flex-col border-r border-gray-100 bg-white px-4 py-5 select-none shrink-0 font-pretendard">
       {/* Logo */}
       <div className="mb-6 px-2 flex items-center gap-2.5">
         <img src={logo} alt="" className="h-6 w-auto object-contain" />
@@ -44,9 +83,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* 오늘 할 일 */}
             <button
               type="button"
-              onClick={() => onNavigate?.("오늘 할 일")}
+              onClick={() => handleMenuClick("오늘 할 일")}
               className={`flex w-full items-center justify-between rounded-xl px-2.5 py-2.5 text-xs font-medium transition cursor-pointer ${
-                activeMenu === "오늘 할 일"
+                currentActiveMenu === "오늘 할 일"
                   ? "bg-black text-white font-semibold shadow-xs"
                   : "text-gray-700 hover:bg-gray-100"
               }`}
@@ -56,14 +95,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   src={homeIcon}
                   alt=""
                   className={`h-4 w-4 ${
-                    activeMenu === "오늘 할 일" ? "filter invert" : "opacity-70"
+                    currentActiveMenu === "오늘 할 일"
+                      ? "filter invert"
+                      : "opacity-70"
                   }`}
                 />
                 오늘 할 일
               </span>
               <span
                 className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                  activeMenu === "오늘 할 일"
+                  currentActiveMenu === "오늘 할 일"
                     ? "bg-white/20 text-white"
                     : "bg-gray-100 text-gray-600"
                 }`}
@@ -75,9 +116,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* 통합 캘린더 */}
             <button
               type="button"
-              onClick={() => onNavigate?.("통합 캘린더")}
+              onClick={() => handleMenuClick("통합 캘린더")}
               className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-xs font-medium transition cursor-pointer ${
-                activeMenu === "통합 캘린더"
+                currentActiveMenu === "통합 캘린더"
                   ? "bg-black text-white font-semibold shadow-xs"
                   : "text-gray-700 hover:bg-gray-100"
               }`}
@@ -86,7 +127,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 src={calendarIcon}
                 alt=""
                 className={`h-4 w-4 ${
-                  activeMenu === "통합 캘린더" ? "filter invert" : "opacity-70"
+                  currentActiveMenu === "통합 캘린더"
+                    ? "filter invert"
+                    : "opacity-70"
                 }`}
               />
               통합 캘린더
@@ -95,9 +138,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* 활동 */}
             <button
               type="button"
-              onClick={() => onNavigate?.("활동")}
+              onClick={() => handleMenuClick("활동")}
               className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-xs font-medium transition cursor-pointer ${
-                activeMenu === "활동"
+                currentActiveMenu === "활동"
                   ? "bg-black text-white font-semibold shadow-xs"
                   : "text-gray-700 hover:bg-gray-100"
               }`}
@@ -106,7 +149,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 src={bookIcon}
                 alt=""
                 className={`h-4 w-4 ${
-                  activeMenu === "활동" ? "filter invert" : "opacity-70"
+                  currentActiveMenu === "활동" ? "filter invert" : "opacity-70"
                 }`}
               />
               활동
@@ -119,11 +162,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             학습
           </p>
           <div className="space-y-1">
+            {/* 정리글 아카이브 */}
             <button
               type="button"
-              onClick={() => onNavigate?.("정리글 아카이브")}
+              onClick={() => handleMenuClick("정리글 아카이브")}
               className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-xs font-medium transition cursor-pointer ${
-                activeMenu === "정리글 아카이브"
+                currentActiveMenu === "정리글 아카이브"
                   ? "bg-black text-white font-semibold shadow-xs"
                   : "text-gray-700 hover:bg-gray-100"
               }`}
@@ -132,7 +176,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 src={bookIcon}
                 alt=""
                 className={`h-4 w-4 ${
-                  activeMenu === "정리글 아카이브"
+                  currentActiveMenu === "정리글 아카이브"
                     ? "filter invert"
                     : "opacity-70"
                 }`}
@@ -140,11 +184,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               정리글 아카이브
             </button>
 
+            {/* 면접 질문 뱅크 */}
             <button
               type="button"
-              onClick={() => onNavigate?.("면접 질문 뱅크")}
+              onClick={() => handleMenuClick("면접 질문 뱅크")}
               className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-xs font-medium transition cursor-pointer ${
-                activeMenu === "면접 질문 뱅크"
+                currentActiveMenu === "면접 질문 뱅크"
                   ? "bg-black text-white font-semibold shadow-xs"
                   : "text-gray-700 hover:bg-gray-100"
               }`}
@@ -153,7 +198,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 src={micIcon}
                 alt=""
                 className={`h-4 w-4 ${
-                  activeMenu === "면접 질문 뱅크"
+                  currentActiveMenu === "면접 질문 뱅크"
                     ? "filter invert"
                     : "opacity-70"
                 }`}
@@ -161,11 +206,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               면접 질문 뱅크
             </button>
 
+            {/* 과제 · 역량맵 */}
             <button
               type="button"
-              onClick={() => onNavigate?.("과제 · 역량맵")}
+              onClick={() => handleMenuClick("과제 · 역량맵")}
               className={`flex w-full items-center justify-between rounded-xl px-2.5 py-2.5 text-xs font-medium transition cursor-pointer ${
-                activeMenu === "과제 · 역량맵"
+                currentActiveMenu === "과제 · 역량맵"
                   ? "bg-black text-white font-semibold shadow-xs"
                   : "text-gray-700 hover:bg-gray-100"
               }`}
@@ -175,7 +221,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   src={fileTextIcon}
                   alt=""
                   className={`h-4 w-4 ${
-                    activeMenu === "과제 · 역량맵"
+                    currentActiveMenu === "과제 · 역량맵"
                       ? "filter invert"
                       : "opacity-70"
                   }`}
@@ -184,7 +230,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </span>
               <span
                 className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                  activeMenu === "과제 · 역량맵"
+                  currentActiveMenu === "과제 · 역량맵"
                     ? "bg-white/20 text-white"
                     : "bg-gray-100 text-gray-600"
                 }`}
@@ -200,11 +246,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             기록
           </p>
           <div className="space-y-1">
+            {/* 업무일지 */}
             <button
               type="button"
-              onClick={() => onNavigate?.("업무일지")}
+              onClick={() => handleMenuClick("업무일지")}
               className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-xs font-medium transition cursor-pointer ${
-                activeMenu === "업무일지"
+                currentActiveMenu === "업무일지"
                   ? "bg-black text-white font-semibold shadow-xs"
                   : "text-gray-700 hover:bg-gray-100"
               }`}
@@ -213,17 +260,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 src={clipboardIcon}
                 alt=""
                 className={`h-4 w-4 ${
-                  activeMenu === "업무일지" ? "filter invert" : "opacity-70"
+                  currentActiveMenu === "업무일지"
+                    ? "filter invert"
+                    : "opacity-70"
                 }`}
               />
               업무일지
             </button>
 
+            {/* 주간 리포트 */}
             <button
               type="button"
-              onClick={() => onNavigate?.("주간 리포트")}
+              onClick={() => handleMenuClick("주간 리포트")}
               className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-xs font-medium transition cursor-pointer ${
-                activeMenu === "주간 리포트"
+                currentActiveMenu === "주간 리포트"
                   ? "bg-black text-white font-semibold shadow-xs"
                   : "text-gray-700 hover:bg-gray-100"
               }`}
@@ -232,7 +282,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 src={trendingUpIcon}
                 alt=""
                 className={`h-4 w-4 ${
-                  activeMenu === "주간 리포트" ? "filter invert" : "opacity-70"
+                  currentActiveMenu === "주간 리포트"
+                    ? "filter invert"
+                    : "opacity-70"
                 }`}
               />
               주간 리포트
@@ -245,11 +297,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             관리
           </p>
           <div className="space-y-1">
+            {/* 팀원 관리 */}
             <button
               type="button"
-              onClick={() => onNavigate?.("팀원 관리")}
+              onClick={() => handleMenuClick("팀원 관리")}
               className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-xs font-medium transition cursor-pointer ${
-                activeMenu === "팀원 관리"
+                currentActiveMenu === "팀원 관리"
                   ? "bg-black text-white font-semibold shadow-xs"
                   : "text-gray-700 hover:bg-gray-100"
               }`}
@@ -258,7 +311,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 src={usersIcon}
                 alt=""
                 className={`h-4 w-4 ${
-                  activeMenu === "팀원 관리" ? "filter invert" : "opacity-70"
+                  currentActiveMenu === "팀원 관리"
+                    ? "filter invert"
+                    : "opacity-70"
                 }`}
               />
               팀원 관리
@@ -290,3 +345,5 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </aside>
   );
 };
+
+export default Sidebar;

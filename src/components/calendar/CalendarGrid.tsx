@@ -1,128 +1,127 @@
-import React from "react";
+// src/components/calendar/CalendarGrid.tsx
 import type { CalendarEvent, ViewMode } from "../../types/calendar";
 
 interface CalendarGridProps {
   currentDate: Date;
   events: CalendarEvent[];
-  viewMode: ViewMode;
+  viewMode?: ViewMode;
   onSelectEvent: (event: CalendarEvent) => void;
 }
 
-export const CalendarGrid: React.FC<CalendarGridProps> = ({
+export function CalendarGrid({
   currentDate,
   events,
-  viewMode,
   onSelectEvent,
-}) => {
-  const daysOfWeek = ["일", "월", "화", "수", "목", "금", "토"];
-
+}: CalendarGridProps) {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
-  const formatDateStr = (d: Date) => {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  };
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
 
-  const firstDayOfMonth = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startDayOfWeek = firstDay.getDay();
+  const totalDays = lastDay.getDate();
 
-  const monthDays: (Date | null)[] = [];
-  for (let i = 0; i < firstDayOfMonth; i++) monthDays.push(null);
-  for (let d = 1; d <= daysInMonth; d++) {
-    monthDays.push(new Date(year, month, d));
+  const calendarDays: Array<{
+    dateStr: string;
+    dayNum: number;
+    isCurrentMonth: boolean;
+    isSunday: boolean;
+  }> = [];
+
+  const prevMonthLastDay = new Date(year, month, 0).getDate();
+  for (let i = startDayOfWeek - 1; i >= 0; i--) {
+    const prevDate = new Date(year, month - 1, prevMonthLastDay - i);
+    calendarDays.push({
+      dateStr: prevDate.toISOString().split("T")[0],
+      dayNum: prevMonthLastDay - i,
+      isCurrentMonth: false,
+      isSunday: calendarDays.length % 7 === 0,
+    });
   }
 
-  const startOfWeek = new Date(currentDate);
-  startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+  for (let d = 1; d <= totalDays; d++) {
+    calendarDays.push({
+      dateStr: `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`,
+      dayNum: d,
+      isCurrentMonth: true,
+      isSunday: calendarDays.length % 7 === 0,
+    });
+  }
 
-  const weekDays: Date[] = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(startOfWeek);
-    d.setDate(startOfWeek.getDate() + i);
-    return d;
-  });
-
-  const displayDays = viewMode === "주간" ? weekDays : monthDays;
-
-  const getEventsForDate = (dateObj: Date) => {
-    const targetStr = formatDateStr(dateObj);
-    return events.filter((e) => e.date === targetStr);
-  };
-
-  const getBadgeStyle = (type: CalendarEvent["type"]) => {
-    switch (type) {
-      case "마감":
-        return "bg-red-50 text-red-600 hover:bg-red-100";
-      case "회의":
-        return "bg-blue-50 text-blue-600 hover:bg-blue-100";
-      case "활동":
-        return "bg-emerald-50 text-emerald-600 hover:bg-emerald-100";
-      case "개인 일정":
-        return "bg-purple-50 text-purple-600 hover:bg-purple-100";
-      default:
-        return "bg-gray-100 text-gray-700 hover:bg-gray-200";
-    }
-  };
-
-  const todayStr = formatDateStr(new Date());
+  const remainingSlots = (7 - (calendarDays.length % 7)) % 7;
+  for (let i = 1; i <= remainingSlots; i++) {
+    const nextDate = new Date(year, month + 1, i);
+    calendarDays.push({
+      dateStr: nextDate.toISOString().split("T")[0],
+      dayNum: i,
+      isCurrentMonth: false,
+      isSunday: calendarDays.length % 7 === 0,
+    });
+  }
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden select-none">
-      <div className="grid grid-cols-7 border-b border-gray-100 text-center text-xs font-semibold text-gray-400 py-2">
-        {daysOfWeek.map((day, idx) => (
-          <div key={day} className={idx === 0 ? "text-red-400" : ""}>
-            {day}
-          </div>
-        ))}
+    <div className="flex flex-1 flex-col overflow-y-auto min-h-0 mt-4 pr-1 font-pretendard">
+      {/* 요일 헤더 (스크롤 시 상단 고정) */}
+      <div className="grid grid-cols-7 border-b border-gray-100 pb-2 text-center text-xs font-semibold text-gray-400 sticky top-0 bg-white z-10">
+        <span className="text-red-500">일</span>
+        <span>월</span>
+        <span>화</span>
+        <span>수</span>
+        <span>목</span>
+        <span>금</span>
+        <span>토</span>
       </div>
 
-      <div
-        className={`grid flex-1 grid-cols-7 gap-px bg-gray-100 ${
-          viewMode === "주간" ? "grid-rows-1" : "grid-rows-5"
-        }`}
-      >
-        {displayDays.map((dateObj, idx) => {
-          if (!dateObj) {
-            return <div key={`empty-${idx}`} className="bg-white p-2" />;
-          }
-
-          const dayEvents = getEventsForDate(dateObj);
-          const dateStr = formatDateStr(dateObj);
-          const isToday = dateStr === todayStr;
+      {/* 날짜 그리드 (셀 최소 높이 min-h-[115px] 지정으로 6주차 세로 스크롤 보장) */}
+      <div className="grid grid-cols-7 divide-x divide-y divide-gray-100 border-b border-gray-100">
+        {calendarDays.map((day, idx) => {
+          const dayEvents = events.filter((e) => e.date === day.dateStr);
 
           return (
             <div
-              key={dateStr}
-              className="flex flex-col bg-white p-2 transition hover:bg-gray-50/50"
+              key={idx}
+              className={`min-h-[115px] p-2 flex flex-col justify-between hover:bg-gray-50/50 transition ${
+                !day.isCurrentMonth ? "bg-gray-50/30 text-gray-300" : ""
+              }`}
             >
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex justify-between items-center">
                 <span
-                  className={`flex h-5 w-5 items-center justify-center rounded-full text-xs font-semibold ${
-                    isToday
-                      ? "bg-black text-white"
-                      : idx % 7 === 0
-                        ? "text-red-500"
+                  className={`text-xs font-medium ${
+                    !day.isCurrentMonth
+                      ? "text-gray-300"
+                      : day.isSunday
+                        ? "text-red-500 font-bold"
                         : "text-gray-700"
                   }`}
                 >
-                  {dateObj.getDate()}
+                  {day.dayNum}
                 </span>
               </div>
 
-              <div className="space-y-1 overflow-y-auto max-h-28">
+              <div className="space-y-1 mt-1 flex-1 overflow-hidden">
                 {dayEvents.map((evt) => (
-                  <button
+                  <div
                     key={evt.id}
-                    type="button"
                     onClick={() => onSelectEvent(evt)}
-                    className={`flex w-full items-center justify-between rounded-lg px-2 py-1 text-[10px] font-medium transition cursor-pointer ${getBadgeStyle(
-                      evt.type,
-                    )}`}
+                    className="cursor-pointer truncate rounded-lg px-2 py-1 text-[11px] font-semibold transition"
+                    style={{
+                      backgroundColor:
+                        evt.type === "마감"
+                          ? "#FEE2E2"
+                          : evt.type === "회의"
+                            ? "#DBEAFE"
+                            : "#D1FAE5",
+                      color:
+                        evt.type === "마감"
+                          ? "#DC2626"
+                          : evt.type === "회의"
+                            ? "#2563EB"
+                            : "#059669",
+                    }}
                   >
-                    <span className="truncate">{evt.title}</span>
-                  </button>
+                    {evt.title}
+                  </div>
                 ))}
               </div>
             </div>
@@ -131,4 +130,4 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
       </div>
     </div>
   );
-};
+}

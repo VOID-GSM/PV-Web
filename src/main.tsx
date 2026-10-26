@@ -10,7 +10,6 @@ import App from "./App.tsx";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    {/* App 전체를 BrowserRouter로 감싼다 */}
     <BrowserRouter>
       <App />
     </BrowserRouter>

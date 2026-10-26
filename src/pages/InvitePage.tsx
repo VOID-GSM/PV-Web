@@ -1,4 +1,6 @@
-import { useState } from "react";
+// src/pages/InvitePage.tsx
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom"; // 1. useNavigate 추가
 import logoWhite from "../assets/images/logo-white.png";
 import linkIcon from "../assets/icons/link.svg";
 import alertIcon from "../assets/icons/alert.svg";
@@ -10,9 +12,20 @@ import {
 } from "../constants/invite";
 import { MOCK_INVITE_INFO } from "../mocks/invite";
 import { SelectionChip } from "../components/invite/SelectionChip";
+import type { CalendarEvent } from "../types/calendar";
 
-function InvitePage() {
-  // 피드백 반영: 초기 선택값 비워두기 (이름, 기수, 전공)
+export interface InvitePageProps {
+  events?: CalendarEvent[];
+  activeMenu?: string;
+  onNavigate?: (menu: string) => void;
+  onOpenAddModal?: () => void;
+  onAddEvent?: (newEvent: CalendarEvent) => void;
+}
+
+const InvitePage: React.FC<InvitePageProps> = () => {
+  const navigate = useNavigate(); // 2. navigate 선언
+
+  // 초기 선택값 비워두기 (이름, 기수, 전공)
   const [name, setName] = useState("");
   const [generation, setGeneration] = useState("");
   const [departments, setDepartments] = useState<string[]>([]);
@@ -59,11 +72,12 @@ function InvitePage() {
       return;
     }
 
-    // TODO: 백엔드 API 연동
+    // 3. 유효성 검사 통과 시 오늘 할 일 페이지(/today)로 이동
+    navigate("/today");
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#f7f7f7] overflow-hidden">
+    <div className="min-h-screen w-full bg-[#f7f7f7] overflow-hidden font-pretendard">
       <div className="flex min-h-screen w-full">
         {/* =========================
             LEFT SECTION
@@ -241,7 +255,7 @@ function InvitePage() {
             <button
               type="button"
               onClick={handleSubmit}
-              className="mt-6 flex h-[46px] w-full items-center justify-center gap-2 rounded-[7px] bg-black text-[13px] font-medium text-white transition hover:bg-[#222] active:scale-[0.99]"
+              className="mt-6 flex h-[46px] w-full items-center justify-center gap-2 rounded-[7px] bg-black text-[13px] font-medium text-white transition hover:bg-[#222] active:scale-[0.99] cursor-pointer"
             >
               입장하기
               <span className="text-[17px]">→</span>
@@ -264,6 +278,6 @@ function InvitePage() {
       </div>
     </div>
   );
-}
+};
 
 export default InvitePage;
