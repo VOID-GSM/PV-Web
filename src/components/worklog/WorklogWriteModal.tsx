@@ -15,9 +15,7 @@ const MAX_LENGTH = 2000;
 
 type WorklogWriteModalProps = {
   onClose: () => void;
-  // 올리기를 눌렀을 때 작성한 내용을 넘겨받는 함수
   onSubmit: (data: NewWorklog) => void;
-  // 오른쪽 카드에서 미리 고른 값 (처음 값으로 쓴다)
   initialTemplates: string[];
   initialBoards: string[];
   initialPublic: boolean;
@@ -34,7 +32,6 @@ export default function WorklogWriteModal({
   const [isPublic, setIsPublic] = useState(initialPublic);
   const [selectedBoards, setSelectedBoards] = useState<string[]>(initialBoards);
   const [checkedTemplates, setCheckedTemplates] = useState<string[]>(initialTemplates);
-  // 템플릿마다 입력한 내용
   const [contents, setContents] = useState<Record<string, string>>({});
 
   const toggleBoard = (boardName: string) => {
@@ -72,13 +69,11 @@ export default function WorklogWriteModal({
     return { date, boards: selectedBoards, isPublic: publicFlag, contents: filled };
   };
 
-  // 비공개로 저장: 토글과 상관없이 비공개로
   const handleSavePrivate = () => {
     onSubmit(buildData(false));
     onClose();
   };
 
-  // 일지 올리기: 토글 값 그대로
   const handleSubmit = () => {
     onSubmit(buildData(isPublic));
     onClose();
@@ -108,7 +103,7 @@ export default function WorklogWriteModal({
 
         {/* ===== 몸통 ===== */}
         <div className="flex flex-col gap-5 px-6 py-5">
-          {/* 날짜 + 공개 범위 (좁은 화면에선 세로로) */}
+          {/* 날짜 + 공개 범위 */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <p className="text-xs font-medium">날짜</p>
@@ -146,23 +141,30 @@ export default function WorklogWriteModal({
               <p className="text-xs font-medium">보드 태그</p>
               <p className="text-[11px] text-neutral-400">복수 선택</p>
             </div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {BOARDS.map((board) => {
-                const isSelected = selectedBoards.includes(board.name);
-                return (
-                  <button
-                    key={board.name}
-                    onClick={() => toggleBoard(board.name)}
-                    className={`rounded-full border px-3 py-1.5 text-xs ${
-                      isSelected ? "border-black font-semibold" : "border-neutral-200 text-neutral-500"
-                    }`}
-                  >
-                    {isSelected && "✓ "}
-                    {board.name}
-                  </button>
-                );
-              })}
-            </div>
+            {/* ★ 보드가 없으면 안내 문구 */}
+            {BOARDS.length === 0 ? (
+              <p className="mt-2 rounded border border-dashed py-4 text-center text-xs text-neutral-400">
+                등록된 보드가 없습니다
+              </p>
+            ) : (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {BOARDS.map((board) => {
+                  const isSelected = selectedBoards.includes(board.name);
+                  return (
+                    <button
+                      key={board.name}
+                      onClick={() => toggleBoard(board.name)}
+                      className={`rounded-full border px-3 py-1.5 text-xs ${
+                        isSelected ? "border-black font-semibold" : "border-neutral-200 text-neutral-500"
+                      }`}
+                    >
+                      {isSelected && "✓ "}
+                      {board.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* 템플릿 체크 */}

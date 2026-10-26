@@ -90,22 +90,29 @@ export default function WorklogQuickWrite({ onSubmit }: WorklogQuickWriteProps) 
 
         {/* 보드 태그 */}
         <p className="mt-4 text-xs text-neutral-500">보드 태그</p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {BOARDS.map((board) => (
-            <button
-              key={board.name}
-              onClick={() => toggleBoard(board.name)}
-              className={`flex items-center gap-1.5 rounded border px-2 py-1 text-xs ${
-                selectedBoards.includes(board.name)
-                  ? "border-black font-semibold"
-                  : "border-neutral-200 text-neutral-500"
-              }`}
-            >
-              <span className={`h-2 w-2 rounded-full ${board.dotColor}`} />
-              {board.name}
-            </button>
-          ))}
-        </div>
+        {/* ★ 보드가 없으면 안내 문구, 있으면 태그 버튼들 */}
+        {BOARDS.length === 0 ? (
+          <p className="mt-2 rounded border border-dashed py-4 text-center text-xs text-neutral-400">
+            등록된 보드가 없습니다
+          </p>
+        ) : (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {BOARDS.map((board) => (
+              <button
+                key={board.name}
+                onClick={() => toggleBoard(board.name)}
+                className={`flex items-center gap-1.5 rounded border px-2 py-1 text-xs ${
+                  selectedBoards.includes(board.name)
+                    ? "border-black font-semibold"
+                    : "border-neutral-200 text-neutral-500"
+                }`}
+              >
+                <span className={`h-2 w-2 rounded-full ${board.dotColor}`} />
+                {board.name}
+              </button>
+            ))}
+          </div>
+        )}
 
         <button
           onClick={() => setIsModalOpen(true)}

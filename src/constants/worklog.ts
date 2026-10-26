@@ -3,13 +3,15 @@
 // 지금 로그인한 나 (서버 연결 전이라 고정 값)
 export const ME = "동키";
 
-// 보드 목록. name: 이름, dotColor: 이름 앞 작은 점 색
-export const BOARDS = [
-  { name: "빛가람 경진대회", dotColor: "bg-blue-600" },
-  { name: "안끊겨 프로젝트", dotColor: "bg-green-600" },
-  { name: "React 심화", dotColor: "bg-blue-400" },
-  { name: "포폴 피드백", dotColor: "bg-teal-500" },
-];
+// 보드 하나의 모양. name: 이름, dotColor: 이름 앞 작은 점 색
+export type Board = {
+  name: string;
+  dotColor: string;
+};
+
+// 보드 목록. 실제로는 캘린더에서 만든 보드를 받아와야 해서 빈 상태로 시작한다
+// Board[]: 빈 배열이어도 안에 Board 모양이 들어간다는 걸 TypeScript에게 알려준다
+export const BOARDS: Board[] = [];
 
 // 일지 템플릿 항목 3개
 export const TEMPLATES = ["오늘 한 일", "내일 할 일", "막힌 점"];
@@ -37,13 +39,12 @@ export type Worklog = {
   time: string;
   boards: string[];
   isPublic: boolean;
-  // 템플릿 이름 → 내용. 예: { "오늘 한 일": "기획서 작성" }
+  // 템플릿 이름 → 내용
   contents: Record<string, string>;
   comments: WorklogComment[];
 };
 
 // 작성 창에서 "올리기"를 눌렀을 때 넘겨주는 값
-// (id, 작성자, 시간, 댓글은 페이지가 채운다)
 export type NewWorklog = {
   date: string;
   boards: string[];
