@@ -6,9 +6,10 @@ import {
   submissionColor,
   type Member,
 } from "../../constants/admin";
+import alertIcon from "../../assets/icons/alert.svg";
+import moreIcon from "../../assets/icons/more.svg";
 
 type MemberTableProps = {
-  // 지금 탭에 보여줄 팀원들
   members: Member[];
   tabs: string[];
   activeTab: string;
@@ -40,10 +41,8 @@ export default function MemberTable({
   onIssueReentry,
   onToggleActive,
 }: MemberTableProps) {
-  // ··· 메뉴가 열린 팀원 번호 (null이면 닫힘)
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
 
-  // 메뉴에서 고르면 실행하고 메뉴를 닫는다
   const runAndClose = (action: () => void) => {
     action();
     setOpenMenuId(null);
@@ -51,7 +50,6 @@ export default function MemberTable({
 
   return (
     <section className="rounded-lg bg-white">
-      {/* 제목 + 탭 */}
       <div className="flex flex-wrap items-start justify-between gap-3 border-b px-5 py-4">
         <div>
           <h2 className="font-bold">팀원 {members.length}명</h2>
@@ -75,7 +73,6 @@ export default function MemberTable({
       {members.length === 0 ? (
         <p className="py-16 text-center text-sm text-neutral-400">해당하는 팀원이 없습니다</p>
       ) : (
-        // 좁은 화면에선 표만 가로 스크롤
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-sm">
             <thead className="text-[11px] text-neutral-400">
@@ -91,70 +88,77 @@ export default function MemberTable({
               </tr>
             </thead>
             <tbody>
-              {members.map((m) => (
-                <tr key={m.id} className={`border-t ${m.isActive ? "" : "text-neutral-400"}`}>
-                  <td className="px-5 py-3">
-                    <span className="flex items-center gap-2">
-                      <span
-                        className={`flex h-7 w-7 items-center justify-center rounded-full text-[11px] ${
-                          m.isActive ? "bg-black text-white" : "bg-neutral-200"
-                        }`}
-                      >
-                        {m.name.charAt(0)}
+              {members.map((m) => {
+                const isOverloaded = m.weeklyDeadlines >= OVERLOAD_THRESHOLD;
+                return (
+                  <tr key={m.id} className={`border-t ${m.isActive ? "" : "text-neutral-400"}`}>
+                    <td className="px-5 py-3">
+                      <span className="flex items-center gap-2">
+                        <span
+                          className={`flex h-7 w-7 items-center justify-center rounded-full text-[11px] ${
+                            m.isActive ? "bg-black text-white" : "bg-neutral-200"
+                          }`}
+                        >
+                          {m.name.charAt(0)}
+                        </span>
+                        {m.name}
+                        {m.name === ME && <span className="text-[10px] text-neutral-400">(나)</span>}
                       </span>
-                      {m.name}
-                      {m.name === ME && <span className="text-[10px] text-neutral-400">(나)</span>}
-                    </span>
-                  </td>
-                  <td className="py-3 text-xs">
-                    {m.generation} · {m.majors.join(", ")}
-                  </td>
-                  <td className="py-3">
-                    <span className="rounded-full border px-2 py-0.5 text-[11px]">
-                      {m.roles.length === 0 ? "팀원" : m.roles.join(" · ")}
-                    </span>
-                  </td>
-                  <td className="py-3">{m.boards}</td>
-                  <td className={`py-3 ${m.weeklyDeadlines >= OVERLOAD_THRESHOLD ? "text-red-500" : ""}`}>
-                    {m.weeklyDeadlines}건{m.weeklyDeadlines >= OVERLOAD_THRESHOLD && " ⚠"}
-                  </td>
-                  <td className="py-3">
-                    <RateBar rate={m.attendance} color={attendanceColor} />
-                  </td>
-                  <td className="py-3">
-                    <RateBar rate={m.submissionRate} color={submissionColor} />
-                  </td>
-                  <td className="relative py-3">
-                    {/* ··· 버튼 */}
-                    <button
-                      onClick={() => setOpenMenuId(openMenuId === m.id ? null : m.id)}
-                      className="rounded px-2 text-neutral-400 hover:bg-neutral-100"
-                    >
-                      ···
-                    </button>
-                    {/* 펼쳐지는 메뉴 */}
-                    {openMenuId === m.id && (
-                      <div className="absolute right-2 top-10 z-10 w-40 rounded-lg border bg-white py-1 text-left text-xs text-black shadow-lg">
-                        <button onClick={() => runAndClose(() => onEdit(m))} className="block w-full px-3 py-2 text-left hover:bg-neutral-50">
-                          정보 수정
-                        </button>
-                        <button
-                          onClick={() => runAndClose(() => onIssueReentry(m))}
-                          className="block w-full px-3 py-2 text-left hover:bg-neutral-50"
-                        >
-                          재입장 링크 발급
-                        </button>
-                        <button
-                          onClick={() => runAndClose(() => onToggleActive(m))}
-                          className={`block w-full px-3 py-2 text-left hover:bg-neutral-50 ${m.isActive ? "text-red-500" : ""}`}
-                        >
-                          {m.isActive ? "비활성화" : "다시 활성화"}
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="py-3 text-xs">
+                      {m.generation} · {m.majors.join(", ")}
+                    </td>
+                    <td className="py-3">
+                      <span className="rounded-full border px-2 py-0.5 text-[11px]">
+                        {m.roles.length === 0 ? "팀원" : m.roles.join(" · ")}
+                      </span>
+                    </td>
+                    <td className="py-3">{m.boards}</td>
+                    <td className="py-3">
+                      {/* 과부하면 빨간 글씨 + 경고 아이콘 */}
+                      <span className={`flex items-center gap-1 ${isOverloaded ? "text-red-500" : ""}`}>
+                        {m.weeklyDeadlines}건
+                        {isOverloaded && <img src={alertIcon} alt="과부하" className="h-3.5 w-3.5" />}
+                      </span>
+                    </td>
+                    <td className="py-3">
+                      <RateBar rate={m.attendance} color={attendanceColor} />
+                    </td>
+                    <td className="py-3">
+                      <RateBar rate={m.submissionRate} color={submissionColor} />
+                    </td>
+                    <td className="relative py-3">
+                      {/* 더보기 버튼 */}
+                      <button
+                        onClick={() => setOpenMenuId(openMenuId === m.id ? null : m.id)}
+                        className="rounded p-1 hover:bg-neutral-100"
+                        title="더보기"
+                      >
+                        <img src={moreIcon} alt="더보기" className="h-4 w-4 opacity-50" />
+                      </button>
+                      {openMenuId === m.id && (
+                        <div className="absolute right-2 top-10 z-10 w-40 rounded-lg border bg-white py-1 text-left text-xs text-black shadow-lg">
+                          <button onClick={() => runAndClose(() => onEdit(m))} className="block w-full px-3 py-2 text-left hover:bg-neutral-50">
+                            정보 수정
+                          </button>
+                          <button
+                            onClick={() => runAndClose(() => onIssueReentry(m))}
+                            className="block w-full px-3 py-2 text-left hover:bg-neutral-50"
+                          >
+                            재입장 링크 발급
+                          </button>
+                          <button
+                            onClick={() => runAndClose(() => onToggleActive(m))}
+                            className={`block w-full px-3 py-2 text-left hover:bg-neutral-50 ${m.isActive ? "text-red-500" : ""}`}
+                          >
+                            {m.isActive ? "비활성화" : "다시 활성화"}
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

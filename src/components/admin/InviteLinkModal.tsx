@@ -6,9 +6,10 @@ import {
   USAGE_OPTIONS,
   type InviteForm,
 } from "../../constants/admin";
+import linkIcon from "../../assets/icons/link.svg";
+import alertIcon from "../../assets/icons/alert.svg";
 
-// ★ 하나만 고르는 칩 묶음
-// InviteLinkModal "바깥"에 만들어서, 모달이 다시 그려져도 새로 만들어지지 않게 한다
+// 하나만 고르는 칩 묶음 (모달 바깥에 만들어서 다시 그려져도 새로 만들어지지 않게)
 type ChipGroupProps = {
   options: string[];
   value: string;
@@ -40,7 +41,6 @@ type InviteLinkModalProps = {
 };
 
 export default function InviteLinkModal({ generations, onCreate, onClose }: InviteLinkModalProps) {
-  // 처음엔 전부 선택 안 됨
   const [expiry, setExpiry] = useState("");
   const [usage, setUsage] = useState("");
   const [defaultGeneration, setDefaultGeneration] = useState("");
@@ -105,7 +105,6 @@ export default function InviteLinkModal({ generations, onCreate, onClose }: Invi
             />
           </div>
 
-          {/* 승인 모드 */}
           <div className="flex items-center justify-between gap-3 rounded bg-neutral-100 px-4 py-3">
             <div>
               <p className="text-sm font-medium">부장 승인 모드 켜기</p>
@@ -125,16 +124,23 @@ export default function InviteLinkModal({ generations, onCreate, onClose }: Invi
           <div>
             <p className="text-xs font-medium">생성될 링크 (미리보기)</p>
             <div className="mt-1 flex items-center justify-between rounded border px-3 py-2 text-sm text-neutral-400">
-              <span className="font-mono">🔗 {INVITE_BASE}••••••••</span>
+              <span className="flex items-center gap-2 font-mono">
+                <img src={linkIcon} alt="" className="h-3.5 w-3.5 opacity-50" />
+                {INVITE_BASE}••••••••
+              </span>
               <span className="rounded bg-neutral-100 px-2 py-0.5 text-[11px]">생성 후 표시</span>
             </div>
           </div>
 
-          <div className="rounded-lg border-l-4 border-amber-400 bg-amber-50 px-4 py-3">
-            <p className="text-sm font-semibold text-amber-700">⚠ 링크가 유출되면 바로 폐기하세요</p>
-            <p className="mt-1 text-xs text-neutral-600">
-              폐기하면 그 링크로는 더 이상 입장할 수 없고, 이미 입장한 사람에게는 영향이 없습니다.
-            </p>
+          {/* 유출 주의 */}
+          <div className="flex gap-2 rounded-lg border-l-4 border-amber-400 bg-amber-50 px-4 py-3">
+            <img src={alertIcon} alt="" className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-amber-700">링크가 유출되면 바로 폐기하세요</p>
+              <p className="mt-1 text-xs text-neutral-600">
+                폐기하면 그 링크로는 더 이상 입장할 수 없고, 이미 입장한 사람에게는 영향이 없습니다.
+              </p>
+            </div>
           </div>
         </div>
 

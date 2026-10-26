@@ -1,4 +1,7 @@
 import { INVITE_BASE, formatMonthDay, type InviteLink } from "../../constants/admin";
+import linkIcon from "../../assets/icons/link.svg";
+import clipboardIcon from "../../assets/icons/clipboard.svg";
+import plusIcon from "../../assets/icons/plus.svg";
 
 type InviteLinkCardProps = {
   links: InviteLink[];
@@ -21,8 +24,8 @@ export default function InviteLinkCard({
     <section className="rounded-lg bg-white p-5">
       <div className="flex items-center justify-between">
         <h2 className="font-bold">초대 링크</h2>
-        <button onClick={onNewLink} className="text-xs font-medium">
-          + 새 링크
+        <button onClick={onNewLink} className="flex items-center gap-1 text-xs font-medium">
+          <img src={plusIcon} alt="" className="h-3.5 w-3.5" />새 링크
         </button>
       </div>
 
@@ -35,9 +38,13 @@ export default function InviteLinkCard({
           {links.map((link) => (
             <li key={link.id} className="rounded-lg bg-neutral-50 p-3">
               <div className="flex items-center justify-between gap-2">
-                <span className="truncate font-mono text-xs">🔗 {INVITE_BASE + link.code}</span>
-                <button onClick={() => onCopy(link)} className="shrink-0 text-xs" title="복사">
-                  📋
+                <span className="flex min-w-0 items-center gap-2">
+                  <img src={linkIcon} alt="" className="h-3.5 w-3.5 shrink-0 opacity-50" />
+                  <span className="truncate font-mono text-xs">{INVITE_BASE + link.code}</span>
+                </span>
+                {/* 복사 버튼 */}
+                <button onClick={() => onCopy(link)} className="shrink-0 rounded p-1 hover:bg-neutral-200" title="복사">
+                  <img src={clipboardIcon} alt="복사" className="h-4 w-4" />
                 </button>
               </div>
               <div className="mt-3 flex items-center justify-between">
