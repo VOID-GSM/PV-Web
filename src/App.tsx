@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 
 import { MainPage } from "./pages/MainPage";
@@ -9,38 +9,196 @@ import ArticleEditorPage from "./pages/ArticleEditorPage";
 import WeeklyReportPage from "./pages/WeeklyReportPage";
 import InvitePage from "./pages/InvitePage";
 import SettingsPage from "./pages/SettingsPage";
-// ★ 업무일지 페이지
 import WorklogPage from "./pages/WorklogPage";
-// 회고 페이지
 import RetrospectivePage from "./pages/RetrospectivePage";
-// 면접 질문 뱅크 페이지
 import QuestionBankPage from "./pages/QuestionBankPage";
-// ★★ 과제 (AssignmentPage.tsx가 없으면 이 줄 삭제)
 import AssignmentPage from "./pages/AssignmentPage";
-// ★ 부장 대시보드(팀원 관리) 페이지
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 
 import SidebarLayout from "./components/layout/SidebarLayout";
 import { AddEventModal } from "./components/calendar/AddEventModal";
 import type { CalendarEvent } from "./types/calendar";
+import {
+  createCalendarEvent,
+  deleteCalendarEvent,
+  getBoards,
+  getCalendarEvents,
+  updateCalendarEvent,
+  type ApiBoard,
+} from "./api/calendarApi";
 
 export default function App() {
   const navigate = useNavigate();
 
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [boards, setBoards] = useState<ApiBoard[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-  const handleAddEvent = (newEvent: CalendarEvent) => {
-    setEvents((prev) => [...prev, newEvent]);
+  useEffect(() => {
+    let cancelled = false;
+
+    const now = new Date();
+    const from = `${now.getFullYear() - 1}-01-01`;
+    const to = `${now.getFullYear() + 1}-12-31`;
+
+    getBoards()
+      .then((data) => {
+        if (!cancelled) {
+          setBoards(data);
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          console.error("보드 목록 조회 실패:", error);
+        }
+      });
+
+    getCalendarEvents(from, to)
+      .then((data) => {
+        if (cancelled) return;
+
+        const loadedEvents: CalendarEvent[] = data.map((event) => ({
+          id: String(event.id),
+          title: event.title,
+          type: "개인 일정",
+          board: "",
+          date: event.startsAt.slice(0, 10),
+          endDate: event.endsAt.slice(0, 10),
+          time: event.allDay
+            ? undefined
+            : event.startsAt.slice(11, 16),
+          description: event.memo ?? "",
+          isMyEvent: true,
+        }));
+
+        setEvents(loadedEvents);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          console.error("캘린더 API 조회 실패:", error);
+          window.alert(
+            error instanceof Error
+              ? error.message
+              : "캘린더 데이터를 불러오지 못했습니다.",
+          );
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleAddEvent = async (newEvent: CalendarEvent) => {
+    try {
+      const startsAt = newEvent.time
+        ? `${newEvent.date}T${newEvent.time}:00`
+        : `${newEvent.date}T00:00:00`;
+
+      const endDate = newEvent.endDate || newEvent.date;
+      const endsAt = newEvent.time
+        ? `${endDate}T${newEvent.time}:00`
+        : `${endDate}T23:59:00`;
+
+      const created = await createCalendarEvent({
+        title: newEvent.title,
+        memo: newEvent.description ?? "",
+        startsAt,
+        endsAt,
+        allDay: !newEvent.time,
+      });
+
+      setEvents((prev) => [
+        ...prev,
+        { ...newEvent, id: String(created.id) },
+      ]);
+
+      setIsAddModalOpen(false);
+    } catch (error) {
+      console.error("일정 생성 실패:", error);
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : "일정을 저장하지 못했습니다.",
+      );
+    }
   };
 
-  // ★ 오늘 날짜 "2026-10-26" (한국 시간 기준)
-  // 오늘 날짜 "2026-10-26" (한국 시간 기준) - 한 번만 선언한다
-  // toISOString()은 UTC 기준이라 한국 오전 0~9시에 하루 전 날짜가 나와서 바꿨다
-  const todayStr = new Date().toLocaleDateString("sv-SE");
-  const todayTaskCount = events.filter((event) => event.date === todayStr).length;
+  const handleUpdateEvent = async (updatedEvent: CalendarEvent) => {
+    try {
+      const updated = await updateCalendarEvent(
+        Number(updatedEvent.id),
+        {
+          title: updatedEvent.title,
+          memo: updatedEvent.description ?? "",
+          startsAt: updatedEvent.time
+            ? `${updatedEvent.date}T${updatedEvent.time}:00`
+            : `${updatedEvent.date}T00:00:00`,
+          endsAt: `${updatedEvent.endDate || updatedEvent.date}T${updatedEvent.time || "23:59"}:00`,
+          allDay: !updatedEvent.time,
+        },
+      );
 
-  // 캘린더 화면 안에서 메뉴 이동이 필요할 때 쓰는 함수
+      setEvents((prev) =>
+        prev.map((event) =>
+          event.id === updatedEvent.id
+            ? {
+                ...updatedEvent,
+                id: String(updated.id),
+                title: updated.title,
+                date: updated.startsAt.slice(0, 10),
+                endDate: updated.endsAt.slice(0, 10),
+                time: updated.allDay
+                  ? undefined
+                  : updated.startsAt.slice(11, 16),
+                description:
+                  updated.memo ?? updatedEvent.description,
+              }
+            : event,
+        ),
+      );
+    } catch (error) {
+      console.error("일정 수정 실패:", error);
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : "일정을 수정하지 못했습니다.",
+      );
+    }
+  };
+
+  const handleDeleteEvent = async (eventId: string) => {
+    try {
+      await deleteCalendarEvent(Number(eventId));
+
+      setEvents((prev) =>
+        prev.filter((event) => event.id !== eventId),
+      );
+    } catch (error) {
+      console.error("일정 삭제 실패:", error);
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : "일정을 삭제하지 못했습니다.",
+      );
+    }
+  };
+
+  const handleToggleEvent = (eventId: string) => {
+    setEvents((prev) =>
+      prev.map((event) =>
+        event.id === eventId
+          ? { ...event, completed: !event.completed }
+          : event,
+      ),
+    );
+  };
+
+  const todayStr = new Date().toLocaleDateString("sv-SE");
+  const todayTaskCount = events.filter(
+    (event) => event.date === todayStr,
+  ).length;
+
   const handleNavigate = (menuName: string) => {
     switch (menuName) {
       case "오늘 할 일":
@@ -63,7 +221,6 @@ export default function App() {
       case "과제 · 역량맵":
         navigate("/assignments");
         break;
-      // ★ 팀원 관리 → /members
       case "팀원 관리":
         navigate("/members");
         break;
@@ -76,7 +233,6 @@ export default function App() {
       case "설정":
         navigate("/settings");
         break;
-      // ★ 업무일지
       case "업무일지":
         navigate("/worklog");
         break;
@@ -88,7 +244,6 @@ export default function App() {
   return (
     <>
       <Routes>
-        {/* 사이드바가 붙는 페이지들 */}
         <Route
           element={
             <SidebarLayout
@@ -101,7 +256,13 @@ export default function App() {
 
           <Route
             path="/today"
-            element={<MainPage events={events} onOpenAddModal={() => setIsAddModalOpen(true)} />}
+            element={
+              <MainPage
+                events={events}
+                onOpenAddModal={() => setIsAddModalOpen(true)}
+                onToggleEvent={handleToggleEvent}
+              />
+            }
           />
 
           <Route
@@ -109,10 +270,13 @@ export default function App() {
             element={
               <CalendarPage
                 events={events}
+                boards={boards}
                 activeMenu="통합 캘린더"
                 onNavigate={handleNavigate}
                 onOpenAddModal={() => setIsAddModalOpen(true)}
                 onAddEvent={handleAddEvent}
+                onDeleteEvent={handleDeleteEvent}
+                onUpdateEvent={handleUpdateEvent}
               />
             }
           />
@@ -122,22 +286,19 @@ export default function App() {
           <Route path="/archive" element={<ArchivePage />} />
           <Route path="/editor" element={<ArticleEditorPage />} />
           <Route path="/archive/editor" element={<ArticleEditorPage />} />
-          <Route path="/report" element={<Navigate to="/weekly-report" replace />} />
+          <Route
+            path="/report"
+            element={<Navigate to="/weekly-report" replace />}
+          />
           <Route path="/weekly-report" element={<WeeklyReportPage />} />
           <Route path="/settings" element={<SettingsPage />} />
-          {/* ★ 업무일지 */}
           <Route path="/worklog" element={<WorklogPage />} />
-          {/* 회고 (사이드바에 메뉴가 없어서 주소로 접근) */}
           <Route path="/retrospective" element={<RetrospectivePage />} />
-          {/* 면접 질문 뱅크 */}
           <Route path="/questions" element={<QuestionBankPage />} />
-          {/* ★★ 과제 (AssignmentPage.tsx가 없으면 아래 줄 삭제) */}
           <Route path="/assignments" element={<AssignmentPage />} />
-          {/* ★ 부장 대시보드(팀원 관리) */}
           <Route path="/members" element={<AdminDashboardPage />} />
         </Route>
 
-        {/* 사이드바 없이 보이는 페이지 (아직 팀원이 아닌 사람이 들어오는 화면) */}
         <Route path="/invite" element={<InvitePage />} />
         <Route path="/invite/:code" element={<InvitePage />} />
       </Routes>

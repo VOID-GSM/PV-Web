@@ -1,22 +1,62 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Header } from "../components/layout/Header";
 import type { CalendarEvent } from "../types/calendar";
+import { getHomeTodos, getHomeDashboard, type HomeTodoItem, type DashboardResponse } from "../api/homeApi";
 
 export interface MainPageProps {
   events?: CalendarEvent[];
   onNavigate?: (menu: string) => void;
   onOpenAddModal?: () => void;
+  onToggleEvent?: (eventId: string) => void;
 }
 
 export const MainPage: React.FC<MainPageProps> = ({
   events = [],
   onOpenAddModal,
+  onToggleEvent,
 }) => {
-  const todayStr = new Date().toISOString().split("T")[0];
+  const [apiTodos, setApiTodos] = useState<HomeTodoItem[]>([]);
+  const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getHomeTodos()
+      .then((response) => { if (!cancelled) setApiTodos(response.items ?? []); })
+      .catch((error: unknown) => console.error("오늘 할 일 API 조회 실패:", error));
+    getHomeDashboard()
+      .then((response) => { if (!cancelled) setDashboard(response); })
+      .catch((error: unknown) => console.error("홈 대시보드 API 조회 실패:", error));
+    return () => { cancelled = true; };
+  }, []);
 
-  const todayTasks = events.filter((e) => e.date === todayStr);
-  const upcomingDeadlines = events.filter((e) => e.type === "마감");
-  const activities = events.filter((e) => e.type === "활동");
+  const today = new Date();
+  const todayStr = today.toLocaleDateString("sv-SE");
+  const weekStart = new Date(today);
+  weekStart.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+  const weekEnd = new Date(today);
+  weekEnd.setDate(today.getDate() + ((7 - today.getDay()) % 7));
+  const weekStartStr = weekStart.toLocaleDateString("sv-SE");
+  const weekEndStr = weekEnd.toLocaleDateString("sv-SE");
+
+  const apiTodoEvents: CalendarEvent[] = apiTodos.map((todo) => ({
+    id: `todo:${todo.type}:${todo.targetId}`,
+    title: todo.targetName || todo.typeLabel,
+    type: todo.overdue ? "마감" : "활동",
+    board: todo.typeLabel || "할 일",
+    date: todo.dueAt?.slice(0, 10) || todayStr,
+    time: todo.dueAt?.slice(11, 16),
+    description: todo.description,
+    completed: false,
+  }));
+  const todayTasks = [
+    ...events.filter((event) => event.date === todayStr),
+    ...apiTodoEvents.filter((event) => event.date === todayStr),
+  ];
+  const upcomingDeadlines = events.filter(
+    (event) => event.type === "마감" && event.date >= todayStr && event.date <= weekEndStr,
+  );
+  const activities = events.filter(
+    (event) => event.type === "활동" && event.date >= weekStartStr && event.date <= weekEndStr,
+  );
 
   return (
     <div className="flex flex-1 flex-col h-full overflow-hidden bg-[#f7f7f8]">
@@ -80,7 +120,7 @@ export const MainPage: React.FC<MainPageProps> = ({
                 과제 · 역량맵
               </span>
               <div className="mt-4 flex items-baseline gap-2">
-                <span className="text-2xl font-extrabold text-gray-900">0</span>
+                <span className="text-2xl font-extrabold text-gray-900">{dashboard?.members.reduce((sum, member) => sum + member.dueAssignmentCount, 0) ?? 0}</span>
                 <span className="text-[11px] font-medium text-amber-600">
                   건
                 </span>
@@ -113,13 +153,24 @@ export const MainPage: React.FC<MainPageProps> = ({
                     key={task.id}
                     className="flex items-center justify-between rounded-2xl border border-gray-50 bg-gray-50/50 p-4"
                   >
-                    <div>
-                      <p className="text-xs font-bold text-gray-900">
-                        {task.title}
-                      </p>
-                      <p className="text-[11px] text-gray-400 mt-0.5">
-                        {task.board} · {task.date}
-                      </p>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <input
+                        type="checkbox"
+                        aria-label={`${task.title} 완료`}
+                        checked={Boolean(task.completed)}
+                        disabled={task.id.startsWith("todo:")}
+                        onChange={() => onToggleEvent?.(task.id)}
+                        title={task.id.startsWith("todo:") ? "이 할 일의 완료 처리 API는 현재 명세에 없습니다." : "완료 상태 변경"}
+                        className="h-4 w-4 shrink-0 cursor-pointer accent-black disabled:cursor-not-allowed disabled:opacity-40"
+                      />
+                      <div className="min-w-0">
+                        <p className={`text-xs font-bold text-gray-900 ${task.completed ? "line-through text-gray-400" : ""}`}>
+                          {task.title}
+                        </p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">
+                          {task.board} · {task.date}
+                        </p>
+                      </div>
                     </div>
                     <span className="rounded-lg bg-blue-100 px-2.5 py-1 text-[11px] font-bold text-blue-700">
                       {task.type}

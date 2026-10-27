@@ -12,23 +12,27 @@ interface AddEventModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddEvent?: (newEvent: CalendarEvent) => void;
+  initialEvent?: CalendarEvent | null;
+  onUpdateEvent?: (updatedEvent: CalendarEvent) => void;
 }
 
 export const AddEventModal: React.FC<AddEventModalProps> = ({
   isOpen,
   onClose,
   onAddEvent,
+  initialEvent = null,
+  onUpdateEvent,
 }) => {
   const [type, setType] = useState<"마감" | "회의" | "활동" | "개인 일정">(
-    "마감",
+    initialEvent?.type ?? "마감",
   );
-  const [title, setTitle] = useState("");
-  const [board, setBoard] = useState("");
+  const [title, setTitle] = useState(initialEvent?.title ?? "");
+  const [board, setBoard] = useState(initialEvent?.board ?? "");
   const [repeat, setRepeat] = useState("반복 없음");
-  const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [assignees, setAssignees] = useState<string[]>([]);
+  const [date, setDate] = useState(initialEvent?.date ?? "");
+  const [time, setTime] = useState(initialEvent?.time ?? "");
+  const [endDate, setEndDate] = useState(initialEvent?.endDate ?? "");
+  const [assignees, setAssignees] = useState<string[]>(initialEvent?.assignees ?? []);
   const [alerts, setAlerts] = useState<string[]>([]);
 
   // useEffect 대신 렌더링 단계에서 isOpen 상태 변화를 감지해 폼 초기화 (ESLint 에러 방지)
@@ -36,14 +40,14 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
   if (isOpen !== prevIsOpen) {
     setPrevIsOpen(isOpen);
     if (isOpen) {
-      setType("마감");
-      setTitle("");
-      setBoard("");
+      setType(initialEvent?.type ?? "마감");
+      setTitle(initialEvent?.title ?? "");
+      setBoard(initialEvent?.board ?? "");
       setRepeat("반복 없음");
-      setDate("");
-      setTime("");
-      setEndDate("");
-      setAssignees([]);
+      setDate(initialEvent?.date ?? "");
+      setTime(initialEvent?.time ?? "");
+      setEndDate(initialEvent?.endDate ?? "");
+      setAssignees(initialEvent?.assignees ?? []);
       setAlerts([]);
     }
   }
@@ -66,18 +70,20 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (onAddEvent && title.trim()) {
-      onAddEvent({
-        id: Date.now().toString(),
-        title,
-        type,
-        board: board || "일반 보드",
-        date: date || new Date().toISOString().split("T")[0],
-        time: time || "00:00",
-        assignees,
-        isMyEvent: true,
-      });
-    }
+    if (!title.trim() || !board.trim()) return;
+    const eventData: CalendarEvent = {
+      ...(initialEvent ?? { id: Date.now().toString() }),
+      title: title.trim(),
+      type,
+      board: board.trim(),
+      date: date || new Date().toLocaleDateString("sv-SE"),
+      time: time || "00:00",
+      endDate: endDate || undefined,
+      assignees,
+      isMyEvent: true,
+    };
+    if (initialEvent) onUpdateEvent?.(eventData);
+    else onAddEvent?.(eventData);
     onClose();
   };
 
@@ -86,7 +92,7 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
       <div className="relative w-full max-w-[560px] max-h-[92vh] overflow-y-auto rounded-3xl bg-white p-7 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
         <div className="flex items-start justify-between pb-4">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">일정 추가</h2>
+            <h2 className="text-xl font-bold text-gray-900">{initialEvent ? "일정 수정" : "일정 추가"}</h2>
             <p className="mt-1 text-xs text-gray-400">
               보드와 유형을 고르면 D-day 알림 단계가 자동으로 적용됩니다
             </p>
@@ -149,16 +155,14 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
               <label className="block font-bold text-gray-700 mb-1.5">
                 보드
               </label>
-              <select
+              <input
+                type="text"
                 value={board}
                 onChange={(e) => setBoard(e.target.value)}
+                required
+                placeholder="새 보드 이름 입력"
                 className="w-full rounded-xl border border-gray-200 p-3 outline-none focus:border-black bg-white font-medium"
-              >
-                <option value="">보드 선택</option>
-                <option value="빛가람 경진대회">빛가람 경진대회</option>
-                <option value="인공지능 프로젝트">인공지능 프로젝트</option>
-                <option value="개인 일정">개인 일정</option>
-              </select>
+              />
             </div>
 
             <div>

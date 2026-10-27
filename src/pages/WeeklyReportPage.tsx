@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Header } from "../components/layout/Header";
 import Dropdown from "../components/common/Dropdown";
+import { generateWeeklyReport, getWeeklyReport, type WeeklyReport } from "../api/reportApi";
 
 const periodOptions = ["기간: 최근 3개월", "기간: 최근 6개월", "기간: 전체"];
 
@@ -17,9 +18,30 @@ export default function WeeklyReportPage({
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
 
-  const [hasData] = useState(false);
+  const [hasData, setHasData] = useState(false);
+  const [report, setReport] = useState<WeeklyReport | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [reportNotice, setReportNotice] = useState("");
 
   const shareRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getWeeklyReport(new Date().toLocaleDateString("sv-SE"))
+      .then((data) => {
+        if (cancelled) return;
+        setReport(data);
+        setHasData(Boolean(data.content?.trim()));
+        setReportNotice("");
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setReport(null);
+        setHasData(false);
+        setReportNotice(error instanceof Error ? `기존 리포트를 불러오지 못했습니다: ${error.message}` : "기존 리포트를 불러오지 못했습니다.");
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -31,15 +53,37 @@ export default function WeeklyReportPage({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(window.location.href);
-    setCopySuccess(true);
-    setTimeout(() => setCopySuccess(false), 2000);
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopySuccess(true);
+      setReportNotice("현재 리포트 페이지 주소를 복사했습니다. 팀 전용 공유 링크는 API 연결 후 제공됩니다.");
+      window.setTimeout(() => setCopySuccess(false), 2000);
+    } catch {
+      setReportNotice("링크를 자동으로 복사하지 못했습니다. 브라우저 주소창에서 주소를 복사해 주세요.");
+    }
   };
 
   const handleDownloadPdf = () => {
-    alert("리포트를 PDF 파일로 다운로드합니다.");
     setIsShareModalOpen(false);
+    window.print();
+  };
+
+  const handleRegenerate = async () => {
+    if (isGenerating) return;
+    setIsGenerating(true);
+    setReportNotice("");
+    try {
+      const generated = await generateWeeklyReport(new Date().toLocaleDateString("sv-SE"));
+      setReport(generated);
+      setHasData(Boolean(generated.content?.trim()));
+      setReportNotice("주간 리포트를 생성했습니다.");
+    } catch (error) {
+      console.error("주간 리포트 생성 실패:", error);
+      setReportNotice(error instanceof Error ? error.message : "주간 리포트를 생성하지 못했습니다.");
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -74,7 +118,7 @@ export default function WeeklyReportPage({
         </div>
 
         <div className="flex items-center gap-2 text-xs font-semibold">
-          <button className="px-3.5 py-2 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition flex items-center gap-1.5">
+          <button type="button" onClick={handleRegenerate} className="px-3.5 py-2 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition flex items-center gap-1.5">
             <svg
               className="w-3.5 h-3.5 text-gray-500"
               fill="none"
@@ -138,7 +182,7 @@ export default function WeeklyReportPage({
                   <div className="flex flex-col text-left">
                     <span>PDF 다운로드</span>
                     <span className="text-[10px] font-normal text-gray-400">
-                      파일 형태로 저장합니다
+                      인쇄 창에서 PDF로 저장할 수 있습니다
                     </span>
                   </div>
                 </button>
@@ -173,8 +217,19 @@ export default function WeeklyReportPage({
         </div>
       </div>
 
+      {reportNotice && <div role="status" className="mx-8 mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-800">{reportNotice}</div>}
+
       {/* 대시보드 콘텐츠 */}
       <div className="flex-1 overflow-y-auto p-8 space-y-6">
+        {report?.content && (
+          <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-gray-900">서버에서 불러온 주간 리포트</h2>
+              <span className="text-[11px] text-gray-400">{report.weekStart} ~ {report.weekEnd}</span>
+            </div>
+            <div className="whitespace-pre-wrap text-sm leading-7 text-gray-700">{report.content}</div>
+          </section>
+        )}
         <div className="bg-[#191f28] text-white rounded-2xl p-6 shadow-sm space-y-3">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">

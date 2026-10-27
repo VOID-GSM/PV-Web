@@ -1,6 +1,6 @@
 // src/pages/InvitePage.tsx
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom"; // 1. useNavigate 추가
+import React, { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import logoWhite from "../assets/images/logo-white.png";
 import linkIcon from "../assets/icons/link.svg";
 import alertIcon from "../assets/icons/alert.svg";
@@ -10,7 +10,7 @@ import {
   DEPARTMENT_OPTIONS,
   FEATURE_LIST,
 } from "../constants/invite";
-import { MOCK_INVITE_INFO } from "../mocks/invite";
+import { getInvite, createJoinRequest, type InviteInfo } from "../api/authApi";
 import { SelectionChip } from "../components/invite/SelectionChip";
 import type { CalendarEvent } from "../types/calendar";
 
@@ -23,7 +23,27 @@ export interface InvitePageProps {
 }
 
 const InvitePage: React.FC<InvitePageProps> = () => {
-  const navigate = useNavigate(); // 2. navigate 선언
+  const navigate = useNavigate();
+  const { code } = useParams<{ code: string }>();
+  const [inviteInfo, setInviteInfo] = useState<InviteInfo | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!code) return;
+    let cancelled = false;
+    getInvite(code)
+      .then((info) => { if (!cancelled) setInviteInfo(info); })
+      .catch((error: unknown) => {
+        console.error("초대 정보 조회 실패:", error);
+        if (!cancelled) alert(error instanceof Error ? error.message : "초대 정보를 불러오지 못했습니다.");
+      });
+    return () => { cancelled = true; };
+  }, [code]);
+
+  const generationOptions = inviteInfo?.generations?.map((item) => `${item.number}기`) ?? GENERATION_OPTIONS;
+  const departmentOptions = inviteInfo?.majors?.map((major) => ({
+    FRONTEND: "Front-end", BACKEND: "Back-end", DEVOPS: "DevOps", DESIGN: "Design",
+  }[major])) ?? DEPARTMENT_OPTIONS;
 
   // 초기 선택값 비워두기 (이름, 기수, 전공)
   const [name, setName] = useState("");
@@ -57,23 +77,51 @@ const InvitePage: React.FC<InvitePageProps> = () => {
     }));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const nameError = name.trim() === "";
     const generationError = generation === "";
     const departmentsError = departments.length === 0;
-
-    setErrors({
-      name: nameError,
-      generation: generationError,
-      departments: departmentsError,
-    });
-
-    if (nameError || generationError || departmentsError) {
+    setErrors({ name: nameError, generation: generationError, departments: departmentsError });
+    if (nameError || generationError || departmentsError) return;
+    if (!code || !inviteInfo) {
+      alert("유효한 초대 링크로 접속해 주세요.");
       return;
     }
-
-    // 3. 유효성 검사 통과 시 오늘 할 일 페이지(/today)로 이동
-    navigate("/today");
+    const selectedGeneration = inviteInfo.generations.find((item) => `${item.number}기` === generation);
+    if (!selectedGeneration) {
+      alert("초대 링크에서 제공한 기수를 선택해 주세요.");
+      return;
+    }
+    const majorMap: Record<string, "FRONTEND" | "BACKEND" | "DEVOPS" | "DESIGN"> = {
+      "Front-end": "FRONTEND", "Back-end": "BACKEND", DevOps: "DEVOPS", Design: "DESIGN",
+    };
+    setIsSubmitting(true);
+    try {
+      const result = await createJoinRequest(code, {
+        name: name.trim(),
+        generationId: selectedGeneration.id,
+        majors: departments.map((department) => majorMap[department]).filter(
+          (major): major is "FRONTEND" | "BACKEND" | "DEVOPS" | "DESIGN" => Boolean(major),
+        ),
+      });
+      localStorage.setItem("pvweb:memberId", String(result.memberId));
+      if (result.accessToken) localStorage.setItem("pvweb:accessToken", result.accessToken);
+      if (result.refreshToken) localStorage.setItem("pvweb:refreshToken", result.refreshToken);
+      localStorage.setItem("pvweb:invite-profile:v1", JSON.stringify({
+        name: name.trim(), generation, departments, joinedAt: new Date().toISOString(),
+      }));
+      if (result.status === "JOINED") {
+        alert("팀 입장이 완료되었습니다.");
+        navigate("/today");
+      } else {
+        alert("가입 요청을 보냈습니다. 팀 관리자의 승인을 기다려 주세요.");
+      }
+    } catch (error) {
+      console.error("초대 가입 요청 실패:", error);
+      alert(error instanceof Error ? error.message : "가입 요청을 보내지 못했습니다.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -131,9 +179,8 @@ const InvitePage: React.FC<InvitePageProps> = () => {
               <img src={linkIcon} alt="" className="h-5 w-5" />
 
               <span>
-                {MOCK_INVITE_INFO.inviterRole} {MOCK_INVITE_INFO.inviterName}{" "}
-                님의 초대 · {MOCK_INVITE_INFO.expiresAt}까지 유효 ·{" "}
-                {MOCK_INVITE_INFO.remainingCount}회 남음
+                {inviteInfo?.teamName ?? "초대 링크 확인 중"} ·{" "}
+                {inviteInfo ? (inviteInfo.approvalRequired ? "관리자 승인 후 입장" : "바로 입장 가능") : "초대 정보를 불러오는 중입니다"}
               </span>
             </div>
           </div>
@@ -191,7 +238,7 @@ const InvitePage: React.FC<InvitePageProps> = () => {
               <label className="text-[12px] font-medium">기수</label>
 
               <div className="mt-3 flex gap-2">
-                {GENERATION_OPTIONS.map((item) => (
+                {generationOptions.map((item) => (
                   <SelectionChip
                     key={item}
                     label={item}
@@ -220,7 +267,7 @@ const InvitePage: React.FC<InvitePageProps> = () => {
               </div>
 
               <div className="mt-3 flex flex-wrap gap-2">
-                {DEPARTMENT_OPTIONS.map((department) => (
+                {departmentOptions.map((department) => (
                   <SelectionChip
                     key={department}
                     label={department}
@@ -254,7 +301,7 @@ const InvitePage: React.FC<InvitePageProps> = () => {
             {/* Enter Button */}
             <button
               type="button"
-              onClick={handleSubmit}
+              onClick={handleSubmit} disabled={isSubmitting || !code || !inviteInfo}
               className="mt-6 flex h-[46px] w-full items-center justify-center gap-2 rounded-[7px] bg-black text-[13px] font-medium text-white transition hover:bg-[#222] active:scale-[0.99] cursor-pointer"
             >
               입장하기
@@ -267,7 +314,22 @@ const InvitePage: React.FC<InvitePageProps> = () => {
 
               <button
                 type="button"
-                onClick={() => {}}
+                onClick={() => {
+                  const saved = localStorage.getItem("pvweb:invite-profile:v1");
+                  if (!saved) {
+                    window.alert("저장된 프로필이 없습니다. 초대 API 연결 후 재입장을 사용할 수 있습니다.");
+                    return;
+                  }
+                  try {
+                    const profile = JSON.parse(saved) as { name?: string; generation?: string; departments?: string[] };
+                    setName(profile.name ?? "");
+                    setGeneration(profile.generation ?? "");
+                    setDepartments(profile.departments ?? []);
+                    window.alert("이 브라우저에 저장된 프로필을 불러왔습니다. 입장하기를 눌러 계속하세요.");
+                  } catch {
+                    window.alert("저장된 프로필을 읽을 수 없습니다. 정보를 다시 입력해 주세요.");
+                  }
+                }}
                 className="font-medium text-[#555] underline underline-offset-2 cursor-pointer"
               >
                 재입장 코드 입력
