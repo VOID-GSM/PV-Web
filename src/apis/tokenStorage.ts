@@ -13,7 +13,6 @@ export const tokenStorage = {
   getRefresh: () => localStorage.getItem(REFRESH_KEY),
 
   // 서버에서 토큰을 받으면 둘 다 저장한다
-  // (재발급할 때마다 refreshToken도 새 값으로 바뀌어서 둘 다 갈아끼운다)
   set: (accessToken: string, refreshToken: string) => {
     localStorage.setItem(ACCESS_KEY, accessToken);
     localStorage.setItem(REFRESH_KEY, refreshToken);
@@ -26,6 +25,21 @@ export const tokenStorage = {
   },
 
   // 이 기기에 토큰이 있는지 = 입장한 상태인지
-  // !! : 값을 true/false로 바꾼다 (null → false, "abc" → true)
   hasToken: () => !!localStorage.getItem(ACCESS_KEY),
+
+  // 토큰 안에 적힌 "내 회원 번호" 꺼내기. 없거나 읽을 수 없으면 null
+  getMemberId: (): number | null => {
+    const token = localStorage.getItem(ACCESS_KEY);
+    if (!token) return null;
+    try {
+      // 토큰 = "머리.내용.서명" → 가운데(내용)만 꺼낸다
+      const payload = token.split(".")[1];
+      // 토큰은 - 와 _ 를 쓰는 모양이라 atob가 읽을 수 있게 + 와 / 로 바꾼다
+      const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+      // { "sub": "1", ... } 에서 sub(회원 번호)를 숫자로 꺼낸다
+      return Number(JSON.parse(json).sub);
+    } catch {
+      return null;
+    }
+  },
 };

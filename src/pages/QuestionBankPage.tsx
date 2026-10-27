@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Header } from "../components/layout/Header";
 import Dropdown from "../components/common/Dropdown";
+import Toast from "../components/common/Toast";
 import QuestionList from "../components/questionBank/QuestionList";
 import QuestionDetail from "../components/questionBank/QuestionDetail";
 import AnswerModal from "../components/questionBank/AnswerModal";
@@ -21,11 +22,61 @@ import {
   type PracticeRecord,
   type Question,
 } from "../constants/questionBank";
+// 서버 연동
+import { useAnswers, useCreateAnswer, useCreateQuestion, useQuestions } from "../hooks/useInterviews";
+import {
+  CATEGORY_LABEL,
+  MAJOR_LABEL,
+  type Answer as ServerAnswer,
+  type Question as ServerQuestion,
+} from "../apis/interviews";
+import { getErrorMessage } from "../apis/client";
+import { tokenStorage } from "../apis/tokenStorage";
+
+// ─────────────────────────────────────────────
+// 서버 모양 → 화면 모양 번역 함수들 (컴포넌트 바깥에 둔다)
+// ─────────────────────────────────────────────
+
+// 표에서 "글자"로 "서버 값" 찾기 (예: "기술" → "TECH")
+function findKey<K extends string>(labels: Record<K, string>, label: string): K | undefined {
+  return (Object.keys(labels) as K[]).find((key) => labels[key] === label);
+}
+
+// 서버 질문 → 화면 질문
+function toPageQuestion(q: ServerQuestion): Question {
+  const created = new Date(q.createdAt);
+  return {
+    id: q.id,
+    title: q.content,
+    // 전공이 없으면 공통 질문
+    major: q.major ? MAJOR_LABEL[q.major] : "공통",
+    category: CATEGORY_LABEL[q.category],
+    // 만든 날짜로 "10월 4주차" 만들기
+    week: `${created.getMonth() + 1}월 ${Math.ceil(created.getDate() / 7)}주차`,
+  };
+}
+
+// 서버 답변 → 화면 답변
+// 화면 부품은 author === ME 로 "내 답변"을 알아보니까, 내 번호와 같으면 ME로 바꿔 준다
+function toPageAnswer(a: ServerAnswer, questionId: number, myId: number | null): Answer {
+  const isMine = a.memberId === myId;
+  return {
+    id: a.id,
+    questionId,
+    author: isMine ? ME : a.memberName,
+    // 서버가 기수를 안 알려줘서, 내 것만 내 기수로 표시
+    generation: isMine ? MY_GENERATION : "기수 미확인",
+    date: formatDate(new Date(a.createdAt)),
+    content: a.content,
+    // 추천 기능은 서버에 없어서 빈 배열
+    likedBy: [],
+  };
+}
+
+type ToastState = { id: number; message: string; type: "success" | "info" };
 
 export default function QuestionBankPage() {
-  // 데이터: 처음엔 전부 비어 있음
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [answers, setAnswers] = useState<Answer[]>([]);
+  // 모의면접 기록은 서버 API가 없어서 아직 화면에만 저장
   const [practiceRecords, setPracticeRecords] = useState<PracticeRecord[]>([]);
 
   // 화면 상태
@@ -35,9 +86,23 @@ export default function QuestionBankPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [isAnswerModalOpen, setIsAnswerModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [toast, setToast] = useState<ToastState | null>(null);
 
   // 모의면접 세션 (null이면 진행 중 아님)
   const [session, setSession] = useState<{ questions: Question[]; categories: string[] } | null>(null);
+
+  // ★ 토스트 번호는 "이전 번호 + 1"로 만든다 (Date.now()는 검사기가 막아서)
+  const showToast = (message: string, type: "success" | "info" = "success") => {
+    setToast((prev) => ({ id: (prev?.id ?? 0) + 1, message, type }));
+  };
+  const closeToast = useCallback(() => setToast(null), []);
+
+  // 토큰에서 꺼낸 내 회원 번호
+  const myId = tokenStorage.getMemberId();
+
+  // 서버에서 질문 목록 불러오기 (전체를 받아서 화면에서 필터한다)
+  const questionsQuery = useQuestions();
+  const questions = (questionsQuery.data ?? []).map(toPageQuestion);
 
   // "전체"나 빈 값이면 필터 안 함
   const majorFilter = major === "" || major === "전체" ? "" : major;
@@ -52,55 +117,68 @@ export default function QuestionBankPage() {
 
   // 선택된 질문 (필터에 걸려서 안 보이면 선택 안 된 걸로)
   const selectedQuestion = filteredQuestions.find((q) => q.id === selectedId) ?? null;
-  const selectedAnswers = selectedQuestion ? answers.filter((a) => a.questionId === selectedQuestion.id) : [];
 
-  // 질문 추가
+  // 선택한 질문의 답변만 서버에서 불러오기
+  const answersQuery = useAnswers(selectedQuestion?.id ?? null);
+  const answers = selectedQuestion
+    ? (answersQuery.data ?? []).map((a) => toPageAnswer(a, selectedQuestion.id, myId))
+    : [];
+  const selectedAnswers = answers;
+
+  // 서버로 보내는 도구들
+  const createQuestionMutation = useCreateQuestion();
+  const createAnswerMutation = useCreateAnswer();
+
+  // 질문 추가 → 서버에 등록
   const handleAddQuestion = (data: { title: string; major: string; category: string }) => {
-    const now = new Date();
-    // 이번 달 몇 번째 주인지 (1~7일: 1주차, 8~14일: 2주차 ...)
-    const week = `${now.getMonth() + 1}월 ${Math.ceil(now.getDate() / 7)}주차`;
-    const newQuestion: Question = { id: now.getTime(), week, ...data };
-    setQuestions([newQuestion, ...questions]);
-    setSelectedId(newQuestion.id);
-  };
-
-  // 답변 저장 (있으면 수정, 없으면 새로)
-  const handleSaveAnswer = (questionId: number, content: string) => {
-    const today = formatDate(new Date());
-    const mine = answers.find((a) => a.questionId === questionId && a.author === ME);
-    if (mine) {
-      setAnswers(answers.map((a) => (a.id === mine.id ? { ...a, content, date: today } : a)));
-    } else {
-      setAnswers([
-        { id: Date.now(), questionId, author: ME, generation: MY_GENERATION, date: today, content, likedBy: [] },
-        ...answers,
-      ]);
+    // 화면 글자 → 서버 값 ("기술" → "TECH")
+    const categoryKey = findKey(CATEGORY_LABEL, data.category);
+    if (!categoryKey) {
+      showToast(`'${data.category}' 카테고리는 서버에서 지원하지 않습니다`, "info");
+      return;
     }
-  };
-
-  // 내 답변 삭제
-  const handleDeleteAnswer = (questionId: number) => {
-    setAnswers(answers.filter((a) => !(a.questionId === questionId && a.author === ME)));
-  };
-
-  // ★ 누르기/취소
-  const handleToggleLike = (answerId: number) => {
-    setAnswers(
-      answers.map((a) =>
-        a.id === answerId
-          ? {
-              ...a,
-              likedBy: a.likedBy.includes(ME) ? a.likedBy.filter((n) => n !== ME) : [...a.likedBy, ME],
-            }
-          : a
-      )
+    createQuestionMutation.mutate(
+      {
+        content: data.title,
+        // "공통"이면 표에 없어서 undefined → 공통 질문으로 등록된다
+        major: findKey(MAJOR_LABEL, data.major),
+        category: categoryKey,
+      },
+      {
+        onSuccess: () => showToast("질문을 등록했습니다"),
+        onError: (error) => showToast(getErrorMessage(error), "info"),
+      }
     );
+  };
+
+  // 답변 저장 → 서버에 작성 (한 질문에 1인 1답변)
+  const handleSaveAnswer = (questionId: number, content: string) => {
+    const alreadyMine = questionId === selectedQuestion?.id && answers.some((a) => a.author === ME);
+    if (alreadyMine) {
+      showToast("답변 수정은 서버 연결을 준비 중입니다", "info");
+      return;
+    }
+    createAnswerMutation.mutate(
+      { questionId, content },
+      {
+        onSuccess: () => showToast("답변을 저장했습니다"),
+        // 이미 답변했으면 서버가 409를 보내서 "이미 처리된 요청" 안내가 뜬다
+        onError: (error) => showToast(getErrorMessage(error), "info"),
+      }
+    );
+  };
+
+  // 서버에 아직 없는 기능들
+  const handleDeleteAnswer = () => {
+    showToast("답변 삭제는 서버 연결을 준비 중입니다", "info");
+  };
+  const handleToggleLike = () => {
+    showToast("추천 기능은 서버 연결을 준비 중입니다", "info");
   };
 
   // 모의면접 시작: 고른 카테고리의 질문을 섞어서 최대 10개
   const handleStartMock = (categories: string[]) => {
     const pool = questionsByMajor.filter((q) => categories.includes(q.category));
-    // Math.random() - 0.5 로 정렬하면 순서가 무작위로 섞인다
     const shuffled = [...pool].sort(() => Math.random() - 0.5).slice(0, MAX_SESSION_QUESTIONS);
     setSession({ questions: shuffled, categories });
   };
@@ -122,7 +200,7 @@ export default function QuestionBankPage() {
   const myAnswers = answers.filter((a) => a.author === ME);
   const findQuestion = (id: number) => questions.find((q) => q.id === id);
 
-  // 기수별 묶음 (예: { "10기": [...], "9기": [...] })
+  // 기수별 묶음
   const generations = [...new Set(answers.map((a) => a.generation))].sort();
 
   // 오른쪽 칸 (질문 목록 탭에서 사용)
@@ -138,7 +216,7 @@ export default function QuestionBankPage() {
     if (activeTab === "내 답변") {
       return myAnswers.length === 0 ? (
         <p className="rounded-lg border border-dashed bg-white py-16 text-center text-sm text-neutral-400">
-          아직 작성한 답변이 없습니다
+          질문 목록에서 질문을 선택하면 그 질문에 쓴 내 답변이 보입니다
         </p>
       ) : (
         <ul className="flex flex-col gap-3">
@@ -229,10 +307,7 @@ export default function QuestionBankPage() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <Header
-        title="면접 질문 뱅크"
-        subtitle={`매주 공통 질문이 자동 누적됩니다 · 질문 ${questions.length}개 · 답변 ${answers.length}개`}
-      />
+      <Header title="면접 질문 뱅크" subtitle={`매주 공통 질문이 자동 누적됩니다 · 질문 ${questions.length}개`} />
 
       <div className="p-6">
         {/* 탭 + 필터 + 질문 추가 */}
@@ -264,14 +339,24 @@ export default function QuestionBankPage() {
             </div>
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="rounded border bg-white px-3 py-2 text-sm font-medium"
+              disabled={createQuestionMutation.isPending}
+              className="rounded border bg-white px-3 py-2 text-sm font-medium disabled:opacity-40"
             >
-              + 질문 추가
+              {createQuestionMutation.isPending ? "등록 중..." : "+ 질문 추가"}
             </button>
           </div>
         </div>
 
-        {renderTabContent()}
+        {/* 불러오는 중 / 실패 / 성공 */}
+        {questionsQuery.isPending ? (
+          <p className="rounded-lg bg-white py-16 text-center text-sm text-neutral-400">질문을 불러오는 중...</p>
+        ) : questionsQuery.isError ? (
+          <p className="rounded-lg bg-white py-16 text-center text-sm text-red-500">
+            {getErrorMessage(questionsQuery.error)}
+          </p>
+        ) : (
+          renderTabContent()
+        )}
       </div>
 
       {/* 모달들 */}
@@ -282,7 +367,7 @@ export default function QuestionBankPage() {
           question={selectedQuestion}
           answers={selectedAnswers}
           onSave={(content) => handleSaveAnswer(selectedQuestion.id, content)}
-          onDelete={() => handleDeleteAnswer(selectedQuestion.id)}
+          onDelete={handleDeleteAnswer}
           onClose={() => setIsAnswerModalOpen(false)}
         />
       )}
@@ -297,6 +382,8 @@ export default function QuestionBankPage() {
           onExit={() => setSession(null)}
         />
       )}
+
+      {toast && <Toast key={toast.id} message={toast.message} type={toast.type} onClose={closeToast} />}
     </div>
   );
 }
