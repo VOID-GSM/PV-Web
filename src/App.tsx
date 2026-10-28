@@ -14,6 +14,7 @@ import RetrospectivePage from "./pages/RetrospectivePage";
 import QuestionBankPage from "./pages/QuestionBankPage";
 import AssignmentPage from "./pages/AssignmentPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
+import { apiRequest } from "./api/client";
 
 import SidebarLayout from "./components/layout/SidebarLayout";
 import { AddEventModal } from "./components/calendar/AddEventModal";
@@ -37,21 +38,22 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
 
-    const now = new Date();
-    const from = `${now.getFullYear() - 1}-01-01`;
-    const to = `${now.getFullYear() + 1}-12-31`;
+    const formatDate = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
 
-    getBoards()
-      .then((data) => {
-        if (!cancelled) {
-          setBoards(data);
-        }
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          console.error("보드 목록 조회 실패:", error);
-        }
-      });
+    const now = new Date();
+    const fromDate = new Date(now);
+    const toDate = new Date(now);
+
+    fromDate.setDate(fromDate.getDate() - 45);
+    toDate.setDate(toDate.getDate() + 45);
+
+    const from = formatDate(fromDate);
+    const to = formatDate(toDate);
 
     getCalendarEvents(from, to)
       .then((data) => {
@@ -64,9 +66,7 @@ export default function App() {
           board: "",
           date: event.startsAt.slice(0, 10),
           endDate: event.endsAt.slice(0, 10),
-          time: event.allDay
-            ? undefined
-            : event.startsAt.slice(11, 16),
+          time: event.allDay ? undefined : event.startsAt.slice(11, 16),
           description: event.memo ?? "",
           isMyEvent: true,
         }));
@@ -76,11 +76,24 @@ export default function App() {
       .catch((error: unknown) => {
         if (!cancelled) {
           console.error("캘린더 API 조회 실패:", error);
-          window.alert(
-            error instanceof Error
-              ? error.message
-              : "캘린더 데이터를 불러오지 못했습니다.",
-          );
+        }
+      });
+
+    apiRequest<{ roles: string[] }>("/members/me")
+      .then((member) => {
+        if (cancelled) return;
+
+        if (member.roles?.includes("LEADER")) {
+          return getBoards().then((data) => {
+            if (!cancelled) setBoards(data);
+          });
+        }
+
+        setBoards([]);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          console.error("회원 정보 또는 보드 조회 실패:", error);
         }
       });
 
@@ -108,36 +121,28 @@ export default function App() {
         allDay: !newEvent.time,
       });
 
-      setEvents((prev) => [
-        ...prev,
-        { ...newEvent, id: String(created.id) },
-      ]);
+      setEvents((prev) => [...prev, { ...newEvent, id: String(created.id) }]);
 
       setIsAddModalOpen(false);
     } catch (error) {
       console.error("일정 생성 실패:", error);
       window.alert(
-        error instanceof Error
-          ? error.message
-          : "일정을 저장하지 못했습니다.",
+        error instanceof Error ? error.message : "일정을 저장하지 못했습니다.",
       );
     }
   };
 
   const handleUpdateEvent = async (updatedEvent: CalendarEvent) => {
     try {
-      const updated = await updateCalendarEvent(
-        Number(updatedEvent.id),
-        {
-          title: updatedEvent.title,
-          memo: updatedEvent.description ?? "",
-          startsAt: updatedEvent.time
-            ? `${updatedEvent.date}T${updatedEvent.time}:00`
-            : `${updatedEvent.date}T00:00:00`,
-          endsAt: `${updatedEvent.endDate || updatedEvent.date}T${updatedEvent.time || "23:59"}:00`,
-          allDay: !updatedEvent.time,
-        },
-      );
+      const updated = await updateCalendarEvent(Number(updatedEvent.id), {
+        title: updatedEvent.title,
+        memo: updatedEvent.description ?? "",
+        startsAt: updatedEvent.time
+          ? `${updatedEvent.date}T${updatedEvent.time}:00`
+          : `${updatedEvent.date}T00:00:00`,
+        endsAt: `${updatedEvent.endDate || updatedEvent.date}T${updatedEvent.time || "23:59"}:00`,
+        allDay: !updatedEvent.time,
+      });
 
       setEvents((prev) =>
         prev.map((event) =>
@@ -151,8 +156,7 @@ export default function App() {
                 time: updated.allDay
                   ? undefined
                   : updated.startsAt.slice(11, 16),
-                description:
-                  updated.memo ?? updatedEvent.description,
+                description: updated.memo ?? updatedEvent.description,
               }
             : event,
         ),
@@ -160,9 +164,7 @@ export default function App() {
     } catch (error) {
       console.error("일정 수정 실패:", error);
       window.alert(
-        error instanceof Error
-          ? error.message
-          : "일정을 수정하지 못했습니다.",
+        error instanceof Error ? error.message : "일정을 수정하지 못했습니다.",
       );
     }
   };
@@ -171,15 +173,11 @@ export default function App() {
     try {
       await deleteCalendarEvent(Number(eventId));
 
-      setEvents((prev) =>
-        prev.filter((event) => event.id !== eventId),
-      );
+      setEvents((prev) => prev.filter((event) => event.id !== eventId));
     } catch (error) {
       console.error("일정 삭제 실패:", error);
       window.alert(
-        error instanceof Error
-          ? error.message
-          : "일정을 삭제하지 못했습니다.",
+        error instanceof Error ? error.message : "일정을 삭제하지 못했습니다.",
       );
     }
   };
