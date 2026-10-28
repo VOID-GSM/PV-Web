@@ -3,6 +3,8 @@ import { useState } from "react";
 import ProfileCard from "../components/settings/ProfileCard";
 import ReentryCodeCard from "../components/settings/ReentryCodeCard";
 import NotificationCard from "../components/settings/NotificationCard";
+// ★ 디스코드 연동 카드
+import DiscordCard from "../components/settings/DiscordCard";
 import SettingsNav from "../components/settings/SettingsNav";
 import NotionImportModal from "../components/settings/NotionImportModal";
 
@@ -23,8 +25,11 @@ export default function SettingsPage() {
           <ReentryCodeCard />
         </main>
 
-        <aside className="w-80 self-start">
+        {/* ★ 오른쪽 칸: 카드를 세로로 쌓는다 (flex-col), 카드 사이 간격 (gap-4) */}
+        <aside className="flex w-80 flex-col gap-4 self-start">
           <NotificationCard />
+          {/* ★ 알림 카드 바로 아래에 디스코드 연동 카드 */}
+          <DiscordCard />
         </aside>
       </div>
 
