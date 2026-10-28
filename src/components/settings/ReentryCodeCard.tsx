@@ -1,5 +1,7 @@
 import { useCallback, useState } from "react";
 import Toast from "../common/Toast";
+// ★ 공통 확인 창
+import ConfirmModal from "../common/ConfirmModal";
 // 서버 연동
 import { useIssueReEntryCode, useMyReEntryCode } from "../../hooks/useReEntry";
 import { useMyProfile } from "../../hooks/useMembers";
@@ -9,9 +11,7 @@ import alertIcon from "../../assets/icons/alert.svg";
 
 type ToastState = { id: number; message: string; type: "success" | "info" };
 
-// ★ 코드를 가릴 때: 하이픈(-)은 남기고 나머지 글자를 ●로 바꾼다
-// 예) "TF-9K3M-2P7X" → "●●-●●●●-●●●●"
-// [^-]: "하이픈이 아닌 글자", g: 전부 다
+// 코드를 가릴 때: 하이픈(-)은 남기고 나머지 글자를 ●로 바꾼다
 const maskCode = (code: string) => code.replace(/[^-]/g, "●");
 
 export default function ReentryCodeCard() {
@@ -24,12 +24,16 @@ export default function ReentryCodeCard() {
   // 코드를 보여줄지 (기본은 가림)
   const [isVisible, setIsVisible] = useState(false);
   const [copied, setCopied] = useState(false);
+  // ★ 재발급 확인 창이 열려 있는지
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
 
   const showToast = (message: string, type: "success" | "info" = "success") => {
     setToast((prev) => ({ id: (prev?.id ?? 0) + 1, message, type }));
   };
   const closeToast = useCallback(() => setToast(null), []);
+  // ★ 확인 창 닫기 (ConfirmModal이 Esc 감지에 쓰니까 매번 새로 만들지 않게 기억해 둔다)
+  const closeConfirm = useCallback(() => setIsConfirmOpen(false), []);
 
   const code = codeQuery.data?.code;
   const myId = profileQuery.data?.memberId;
@@ -40,23 +44,19 @@ export default function ReentryCodeCard() {
     try {
       await navigator.clipboard.writeText(code);
       setCopied(true);
-      // 2초 뒤에 "복사됨" → "복사"로 되돌린다
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // 브라우저가 복사를 막으면(권한 없음 등) 안내
       showToast("복사하지 못했습니다. 코드를 직접 선택해서 복사해 주세요", "info");
     }
   };
 
-  // 재발급
-  const handleReissue = () => {
+  // ★ 확인 창에서 "재발급"을 눌렀을 때 실제로 서버에 보낸다
+  const handleConfirmReissue = () => {
+    setIsConfirmOpen(false);
     if (myId === undefined) return;
-    // 실수로 누르는 걸 막으려고 한 번 더 확인한다
-    if (!window.confirm("재입장 코드를 재발급할까요? 다른 곳에 저장해 둔 코드도 새 코드로 바꿔주세요.")) return;
     issueMutation.mutate(myId, {
       onSuccess: () => {
         showToast("새 재입장 코드를 발급했습니다");
-        // 새 코드를 확인할 수 있게 보여준다
         setIsVisible(true);
       },
       // 부장이 아니면 403 → "권한이 없습니다"
@@ -93,7 +93,6 @@ export default function ReentryCodeCard() {
 
       {/* 검은 코드 상자 */}
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-black px-6 py-5">
-        {/* break-all: 코드가 길면 상자 안에서 줄바꿈 */}
         <span className="min-w-0 break-all text-2xl font-bold tracking-wide text-white">{codeText}</span>
         <div className="flex shrink-0 gap-2">
           <button
@@ -111,8 +110,8 @@ export default function ReentryCodeCard() {
             {copied ? "복사됨" : "복사"}
           </button>
           <button
-            onClick={handleReissue}
-            // 내 번호를 아직 모르거나 재발급 중이면 못 누른다
+            // ★ 바로 보내지 않고 확인 창만 연다
+            onClick={() => setIsConfirmOpen(true)}
             disabled={myId === undefined || issueMutation.isPending}
             className="rounded bg-neutral-800 px-3 py-1.5 text-xs text-white disabled:opacity-40"
           >
@@ -126,6 +125,17 @@ export default function ReentryCodeCard() {
       <p className="mt-2 rounded border border-dashed py-6 text-center text-xs text-neutral-400">
         접속 기기 목록은 서버 연결을 준비 중입니다
       </p>
+
+      {/* ★ 재발급 확인 창 */}
+      {isConfirmOpen && (
+        <ConfirmModal
+          title="재입장 코드를 재발급할까요?"
+          message="새 코드가 만들어집니다. 다른 곳에 저장해 둔 코드도 새 코드로 바꿔주세요."
+          confirmLabel="재발급"
+          onConfirm={handleConfirmReissue}
+          onCancel={closeConfirm}
+        />
+      )}
 
       {toast && <Toast key={toast.id} message={toast.message} type={toast.type} onClose={closeToast} />}
     </section>
