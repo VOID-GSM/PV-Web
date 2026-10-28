@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import Toast from "../common/Toast";
-// ★ 공통 확인 창
+// 공통 확인 창
 import ConfirmModal from "../common/ConfirmModal";
 // 서버 연동
 import { useIssueReEntryCode, useMyReEntryCode } from "../../hooks/useReEntry";
@@ -11,8 +11,8 @@ import alertIcon from "../../assets/icons/alert.svg";
 
 type ToastState = { id: number; message: string; type: "success" | "info" };
 
-// 코드를 가릴 때: 하이픈(-)은 남기고 나머지 글자를 ●로 바꾼다
-const maskCode = (code: string) => code.replace(/[^-]/g, "●");
+// ★ 코드를 가릴 때는 길이와 상관없이 항상 이 모양으로 (코드가 몇 글자인지도 안 드러나게)
+const MASKED_CODE = "●●●● ●●●● ●●●●";
 
 export default function ReentryCodeCard() {
   // 서버에서 내 재입장 코드 불러오기
@@ -24,7 +24,7 @@ export default function ReentryCodeCard() {
   // 코드를 보여줄지 (기본은 가림)
   const [isVisible, setIsVisible] = useState(false);
   const [copied, setCopied] = useState(false);
-  // ★ 재발급 확인 창이 열려 있는지
+  // 재발급 확인 창이 열려 있는지
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
 
@@ -32,13 +32,13 @@ export default function ReentryCodeCard() {
     setToast((prev) => ({ id: (prev?.id ?? 0) + 1, message, type }));
   };
   const closeToast = useCallback(() => setToast(null), []);
-  // ★ 확인 창 닫기 (ConfirmModal이 Esc 감지에 쓰니까 매번 새로 만들지 않게 기억해 둔다)
+  // 확인 창 닫기 (ConfirmModal이 Esc 감지에 쓰니까 매번 새로 만들지 않게 기억해 둔다)
   const closeConfirm = useCallback(() => setIsConfirmOpen(false), []);
 
   const code = codeQuery.data?.code;
   const myId = profileQuery.data?.memberId;
 
-  // 복사
+  // 복사 (가려져 있어도 진짜 코드가 복사된다)
   const handleCopy = async () => {
     if (!code) return;
     try {
@@ -50,7 +50,7 @@ export default function ReentryCodeCard() {
     }
   };
 
-  // ★ 확인 창에서 "재발급"을 눌렀을 때 실제로 서버에 보낸다
+  // 확인 창에서 "재발급"을 눌렀을 때 실제로 서버에 보낸다
   const handleConfirmReissue = () => {
     setIsConfirmOpen(false);
     if (myId === undefined) return;
@@ -72,7 +72,7 @@ export default function ReentryCodeCard() {
       : code
         ? isVisible
           ? code
-          : maskCode(code)
+          : MASKED_CODE
         : "발급된 코드가 없습니다";
 
   return (
@@ -110,7 +110,7 @@ export default function ReentryCodeCard() {
             {copied ? "복사됨" : "복사"}
           </button>
           <button
-            // ★ 바로 보내지 않고 확인 창만 연다
+            // 바로 보내지 않고 확인 창만 연다
             onClick={() => setIsConfirmOpen(true)}
             disabled={myId === undefined || issueMutation.isPending}
             className="rounded bg-neutral-800 px-3 py-1.5 text-xs text-white disabled:opacity-40"
@@ -126,7 +126,7 @@ export default function ReentryCodeCard() {
         접속 기기 목록은 서버 연결을 준비 중입니다
       </p>
 
-      {/* ★ 재발급 확인 창 */}
+      {/* 재발급 확인 창 */}
       {isConfirmOpen && (
         <ConfirmModal
           title="재입장 코드를 재발급할까요?"
