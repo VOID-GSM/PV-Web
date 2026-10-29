@@ -1,8 +1,20 @@
 // src/pages/ActivityDetailPage.tsx
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { getActivities, getActivity, getActivitySessions, getActivityMembers, getTopicCandidates, voteTopicCandidate, cancelTopicVote } from "../api/activityApi";
-import { getPendingAbsences, approveAbsence, rejectAbsence } from "../api/attendanceApi";
+import {
+  getActivities,
+  getActivity,
+  getActivitySessions,
+  getActivityMembers,
+  getTopicCandidates,
+  voteTopicCandidate,
+  cancelTopicVote,
+} from "../api/activityApi";
+import {
+  getPendingAbsences,
+  approveAbsence,
+  rejectAbsence,
+} from "../api/attendanceApi";
 import { createComment } from "../api/commentApi";
 import { createPost, getPost, getPosts } from "../api/postApi";
 import { Header } from "../components/layout/Header";
@@ -82,11 +94,16 @@ export default function ActivityDetailPage() {
       getActivities()
         .then((activities) => {
           if (cancelled) return;
-          if (activities.length > 0) navigate(`/activity/${activities[0].id}`, { replace: true });
+          if (activities.length > 0)
+            navigate(`/activity/${activities[0].id}`, { replace: true });
           else setActivityTitle("등록된 활동이 없습니다");
         })
-        .catch((error: unknown) => console.error("활동 목록 조회 실패:", error));
-      return () => { cancelled = true; };
+        .catch((error: unknown) =>
+          console.error("활동 목록 조회 실패:", error),
+        );
+      return () => {
+        cancelled = true;
+      };
     }
 
     const activityId = Number(id);
@@ -103,9 +120,15 @@ export default function ActivityDetailPage() {
       .then(async ([detail, apiSessions, apiMembers, absences]) => {
         if (cancelled) return;
         setActivityTitle(detail.summary.name);
-        setActivitySchedule(detail.summary.statusLabel || detail.summary.status || "일정 미정");
-        setActivityPeriod(`${detail.summary.startDate} ~ ${detail.summary.endDate}`);
-        setActivityRule(detail.topicModeLabel || detail.topicMode || "규칙 미정");
+        setActivitySchedule(
+          detail.summary.statusLabel || detail.summary.status || "일정 미정",
+        );
+        setActivityPeriod(
+          `${detail.summary.startDate} ~ ${detail.summary.endDate}`,
+        );
+        setActivityRule(
+          detail.topicModeLabel || detail.topicMode || "규칙 미정",
+        );
         setMembers(apiMembers.map((member) => member.name));
         const mappedSessions: SessionItem[] = apiSessions.map((session) => ({
           id: String(session.id),
@@ -113,51 +136,83 @@ export default function ActivityDetailPage() {
           date: session.sessionDate ?? "",
           title: session.topic || "주제 미정",
           description: "",
-          status: session.status === "DONE" ? "완료" : session.status === "CANCELLED" ? "휴강" : "진행 예정",
+          status:
+            session.status === "DONE"
+              ? "완료"
+              : session.status === "CANCELLED"
+                ? "휴강"
+                : "진행 예정",
         }));
         setSessions(mappedSessions);
-        const postSummaries = await getPosts({ activityId, validRange: false }, 0, 50).catch((error: unknown) => {
+        const postSummaries = await getPosts(
+          { activityId, validRange: false },
+          0,
+          50,
+        ).catch((error: unknown) => {
           console.error("활동 정리글 조회 실패:", error);
           return { content: [] };
         });
-        const mappedPosts = await Promise.all(postSummaries.content.map(async (summary) => {
-          try {
-            const post = await getPost(summary.id);
-            return {
-              id: String(post.id),
-              session: `회차 ${apiSessions.find((session) => session.id === post.sessionId)?.sessionNo ?? ""}`,
-              author: String(post.authorId),
-              date: (post.createdAt || "").slice(0, 10),
-              title: post.title,
-              content: post.content,
-              feedbacks: [],
-            };
-          } catch {
-            return {
-              id: String(summary.id), session: "회차 미지정", author: String(summary.authorId),
-              date: (summary.createdAt || "").slice(0, 10), title: summary.title, content: "", feedbacks: [],
-            };
-          }
-        }));
+        const mappedPosts = await Promise.all(
+          postSummaries.content.map(async (summary) => {
+            try {
+              const post = await getPost(summary.id);
+              return {
+                id: String(post.id),
+                session: `회차 ${apiSessions.find((session) => session.id === post.sessionId)?.sessionNo ?? ""}`,
+                author: String(post.authorId),
+                date: (post.createdAt || "").slice(0, 10),
+                title: post.title,
+                content: post.content,
+                feedbacks: [],
+              };
+            } catch {
+              return {
+                id: String(summary.id),
+                session: "회차 미지정",
+                author: String(summary.authorId),
+                date: (summary.createdAt || "").slice(0, 10),
+                title: summary.title,
+                content: "",
+                feedbacks: [],
+              };
+            }
+          }),
+        );
         setArticles(mappedPosts);
-        setAbsenceRequests(absences.filter((absence) => absence.activityId === activityId && absence.status === "REQUESTED").map((absence) => ({
-          id: String(absence.id),
-          name: `팀원 ${absence.memberId}`,
-          session: `${apiSessions.find((session) => session.id === absence.sessionId)?.sessionNo ?? ""}회차`,
-          reason: absence.reason,
-        })));
+        setAbsenceRequests(
+          absences
+            .filter(
+              (absence) =>
+                absence.activityId === activityId &&
+                absence.status === "REQUESTED",
+            )
+            .map((absence) => ({
+              id: String(absence.id),
+              name: `팀원 ${absence.memberId}`,
+              session: `${apiSessions.find((session) => session.id === absence.sessionId)?.sessionNo ?? ""}회차`,
+              reason: absence.reason,
+            })),
+        );
         if (apiSessions[0]) {
-          const candidates = await getTopicCandidates(activityId, apiSessions[0].id).catch((error: unknown) => {
+          const candidates = await getTopicCandidates(
+            activityId,
+            apiSessions[0].id,
+          ).catch((error: unknown) => {
             console.error("주제 후보 조회 실패:", error);
             return [];
           });
-          if (!cancelled) setVotes(candidates.map((candidate) => ({
-            id: String(candidate.id),
-            text: candidate.title,
-            votes: candidate.voteCount,
-            voted: candidate.voted,
-          })));
-          const votedIndex = candidates.findIndex((candidate) => candidate.voted);
+          if (!cancelled)
+            setVotes(
+              candidates.map((candidate) => ({
+                id: String(candidate.id),
+                text: candidate.title,
+                votes: candidate.voteCount,
+                voted: candidate.voted,
+              })),
+            );
+          const votedIndex = candidates.findIndex(
+            (candidate) => candidate.voted,
+          );
           setSelectedVoteOption(votedIndex >= 0 ? votedIndex : null);
         } else {
           setVotes([]);
@@ -167,7 +222,9 @@ export default function ActivityDetailPage() {
         console.error("활동 상세 API 조회 실패:", error);
         if (!cancelled) setActivityTitle("활동 정보를 불러오지 못했습니다");
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [id, navigate]);
 
   const handleApproveAbsence = async (id: string) => {
@@ -176,7 +233,11 @@ export default function ActivityDetailPage() {
       setAbsenceRequests((prev) => prev.filter((item) => item.id !== id));
     } catch (error) {
       console.error("결석 요청 승인 실패:", error);
-      alert(error instanceof Error ? error.message : "결석 요청을 승인하지 못했습니다.");
+      alert(
+        error instanceof Error
+          ? error.message
+          : "결석 요청을 승인하지 못했습니다.",
+      );
     }
   };
 
@@ -188,12 +249,16 @@ export default function ActivityDetailPage() {
       setAbsenceRequests((prev) => prev.filter((item) => item.id !== id));
     } catch (error) {
       console.error("결석 요청 거절 실패:", error);
-      alert(error instanceof Error ? error.message : "결석 요청을 거절하지 못했습니다.");
+      alert(
+        error instanceof Error
+          ? error.message
+          : "결석 요청을 거절하지 못했습니다.",
+      );
     }
   };
 
   const handleAddFeedback = async (articleId: string, feedbackText: string) => {
-    if (!/^\\d+$/.test(articleId)) return;
+    if (!/^\d+$/.test(articleId)) return;
     try {
       const comment = await createComment({
         targetType: "NOTE",
@@ -211,7 +276,9 @@ export default function ActivityDetailPage() {
                     id: String(comment.id),
                     author: `회원 ${comment.authorId}`,
                     text: comment.content,
-                    date: (comment.createdAt || "").slice(0, 16).replace("T", " "),
+                    date: (comment.createdAt || "")
+                      .slice(0, 16)
+                      .replace("T", " "),
                   },
                 ],
               }
@@ -220,7 +287,11 @@ export default function ActivityDetailPage() {
       );
     } catch (error) {
       console.error("정리글 피드백 작성 실패:", error);
-      alert(error instanceof Error ? error.message : "피드백을 저장하지 못했습니다.");
+      alert(
+        error instanceof Error
+          ? error.message
+          : "피드백을 저장하지 못했습니다.",
+      );
     }
   };
 
@@ -233,24 +304,40 @@ export default function ActivityDetailPage() {
     try {
       if (candidate.voted) {
         await cancelTopicVote(activityId, sessionId, Number(candidateId));
-        setVotes((items) => items.map((item) => item.id === candidateId ? { ...item, voted: false, votes: Math.max(0, item.votes - 1) } : item));
+        setVotes((items) =>
+          items.map((item) =>
+            item.id === candidateId
+              ? { ...item, voted: false, votes: Math.max(0, item.votes - 1) }
+              : item,
+          ),
+        );
         setSelectedVoteOption(null);
       } else {
         if (votes.some((item) => item.voted)) {
           const current = votes.find((item) => item.voted);
-          if (current) await cancelTopicVote(activityId, sessionId, Number(current.id));
+          if (current)
+            await cancelTopicVote(activityId, sessionId, Number(current.id));
         }
         await voteTopicCandidate(activityId, sessionId, Number(candidateId));
-        setVotes((items) => items.map((item) => ({
-          ...item,
-          voted: item.id === candidateId,
-          votes: item.id === candidateId ? item.votes + 1 : item.voted ? Math.max(0, item.votes - 1) : item.votes,
-        })));
+        setVotes((items) =>
+          items.map((item) => ({
+            ...item,
+            voted: item.id === candidateId,
+            votes:
+              item.id === candidateId
+                ? item.votes + 1
+                : item.voted
+                  ? Math.max(0, item.votes - 1)
+                  : item.votes,
+          })),
+        );
         setSelectedVoteOption(index);
       }
     } catch (error) {
       console.error("주제 투표 실패:", error);
-      alert(error instanceof Error ? error.message : "투표를 저장하지 못했습니다.");
+      alert(
+        error instanceof Error ? error.message : "투표를 저장하지 못했습니다.",
+      );
     }
   };
 
@@ -656,26 +743,37 @@ export default function ActivityDetailPage() {
         onClose={() => setIsCreateArticleOpen(false)}
         mode="article"
         onSubmitSuccess={async (data) => {
-          const sessionNo = Number(data.session.match(/^\\d+/)?.[0]);
-          const session = sessions.find((item) => Number(item.sessionNum.match(/^\\d+/)?.[0]) === sessionNo);
+          const sessionNo = Number(data.session.match(/^\d+/)?.[0]);
+          const session = sessions.find(
+            (item) => Number(item.sessionNum.match(/^\d+/)?.[0]) === sessionNo,
+          );
           try {
             const post = await createPost({
               title: data.title.trim(),
               content: data.content,
               sessionId: session ? Number(session.id) : undefined,
             });
-            setArticles((current) => [{
-              id: String(post.id),
-              session: session?.sessionNum ?? "회차 미지정",
-              author: String(post.authorId),
-              date: (post.createdAt || new Date().toLocaleDateString("sv-SE")).slice(0, 10),
-              title: post.title,
-              content: post.content,
-              feedbacks: [],
-            }, ...current]);
+            setArticles((current) => [
+              {
+                id: String(post.id),
+                session: session?.sessionNum ?? "회차 미지정",
+                author: String(post.authorId),
+                date: (
+                  post.createdAt || new Date().toLocaleDateString("sv-SE")
+                ).slice(0, 10),
+                title: post.title,
+                content: post.content,
+                feedbacks: [],
+              },
+              ...current,
+            ]);
           } catch (error) {
             console.error("활동 정리글 생성 실패:", error);
-            alert(error instanceof Error ? error.message : "정리글을 생성하지 못했습니다.");
+            alert(
+              error instanceof Error
+                ? error.message
+                : "정리글을 생성하지 못했습니다.",
+            );
           }
         }}
       />

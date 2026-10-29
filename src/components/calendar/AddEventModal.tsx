@@ -32,7 +32,9 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
   const [date, setDate] = useState(initialEvent?.date ?? "");
   const [time, setTime] = useState(initialEvent?.time ?? "");
   const [endDate, setEndDate] = useState(initialEvent?.endDate ?? "");
-  const [assignees, setAssignees] = useState<string[]>(initialEvent?.assignees ?? []);
+  const [assignees, setAssignees] = useState<string[]>(
+    initialEvent?.assignees ?? [],
+  );
   const [alerts, setAlerts] = useState<string[]>([]);
 
   // useEffect 대신 렌더링 단계에서 isOpen 상태 변화를 감지해 폼 초기화 (ESLint 에러 방지)
@@ -77,7 +79,7 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
       type,
       board: board.trim(),
       date: date || new Date().toLocaleDateString("sv-SE"),
-      time: time || "00:00",
+      time: time || undefined,
       endDate: endDate || undefined,
       assignees,
       isMyEvent: true,
@@ -92,7 +94,9 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
       <div className="relative w-full max-w-[560px] max-h-[92vh] overflow-y-auto rounded-3xl bg-white p-7 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
         <div className="flex items-start justify-between pb-4">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">{initialEvent ? "일정 수정" : "일정 추가"}</h2>
+            <h2 className="text-xl font-bold text-gray-900">
+              {initialEvent ? "일정 수정" : "일정 추가"}
+            </h2>
             <p className="mt-1 text-xs text-gray-400">
               보드와 유형을 고르면 D-day 알림 단계가 자동으로 적용됩니다
             </p>

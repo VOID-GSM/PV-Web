@@ -10,12 +10,19 @@ import fileTextIcon from "../../assets/icons/file-text.svg";
 import clipboardIcon from "../../assets/icons/clipboard.svg";
 import micIcon from "../../assets/icons/mic.svg";
 
-import CreateActivityModal, { type ActivityFormData } from "../modals/CreateActivityModal";
+import CreateActivityModal, {
+  type ActivityFormData,
+} from "../modals/CreateActivityModal";
 import { createActivity } from "../../api/activityApi";
 import { createPost } from "../../api/postApi";
 import CreateNoticeModal from "../modals/CreateNoticeModal";
 import CreateArticleModal from "../modals/CreateArticleModal";
-import { getNotifications, markAllNotificationsRead, markNotificationRead, type ApiNotification } from "../../api/notificationApi";
+import {
+  getNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  type ApiNotification,
+} from "../../api/notificationApi";
 
 interface HeaderProps {
   title: string;
@@ -54,18 +61,28 @@ export const Header: React.FC<HeaderProps> = ({
   useEffect(() => {
     let cancelled = false;
     getNotifications()
-      .then((response) => { if (!cancelled) setNotifications(response.items ?? []); })
+      .then((response) => {
+        if (!cancelled) setNotifications(response.items ?? []);
+      })
       .catch((error: unknown) => console.error("알림 조회 실패:", error));
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleMarkAllRead = async () => {
     try {
       await markAllNotificationsRead();
-      setNotifications((items) => items.map((item) => ({ ...item, read: true })));
+      setNotifications((items) =>
+        items.map((item) => ({ ...item, read: true })),
+      );
     } catch (error) {
       console.error("알림 전체 읽음 처리 실패:", error);
-      alert(error instanceof Error ? error.message : "알림을 읽음 처리하지 못했습니다.");
+      alert(
+        error instanceof Error
+          ? error.message
+          : "알림을 읽음 처리하지 못했습니다.",
+      );
     }
   };
 
@@ -73,25 +90,51 @@ export const Header: React.FC<HeaderProps> = ({
     if (notification.read) return;
     try {
       await markNotificationRead(notification.id);
-      setNotifications((items) => items.map((item) => item.id === notification.id ? { ...item, read: true } : item));
+      setNotifications((items) =>
+        items.map((item) =>
+          item.id === notification.id ? { ...item, read: true } : item,
+        ),
+      );
     } catch (error) {
       console.error("알림 읽음 처리 실패:", error);
-      alert(error instanceof Error ? error.message : "알림을 읽음 처리하지 못했습니다.");
+      alert(
+        error instanceof Error
+          ? error.message
+          : "알림을 읽음 처리하지 못했습니다.",
+      );
     }
   };
 
   const handleCreateActivity = async (form: ActivityFormData) => {
-    const majorMap: Record<string, "FRONTEND" | "BACKEND" | "DEVOPS" | "DESIGN"> = {
-      "Front-end": "FRONTEND", "Back-end": "BACKEND", DevOps: "DEVOPS", Design: "DESIGN",
+    const majorMap: Record<
+      string,
+      "FRONTEND" | "BACKEND" | "DEVOPS" | "DESIGN"
+    > = {
+      "Front-end": "FRONTEND",
+      "Back-end": "BACKEND",
+      DevOps: "DEVOPS",
+      Design: "DESIGN",
     };
-    const type = form.type === "면접 준비" ? "INTERVIEW" : form.type === "포폴 피드백" ? "PORTFOLIO" : "STUDY";
+    const type =
+      form.type === "면접 준비"
+        ? "INTERVIEW"
+        : form.type === "포폴 피드백"
+          ? "PORTFOLIO"
+          : "STUDY";
     const weekdayMap: Record<string, string> = {
-      월요일: "MONDAY", 화요일: "TUESDAY", 수요일: "WEDNESDAY", 목요일: "THURSDAY",
-      금요일: "FRIDAY", 토요일: "SATURDAY", 일요일: "SUNDAY",
+      월요일: "MONDAY",
+      화요일: "TUESDAY",
+      수요일: "WEDNESDAY",
+      목요일: "THURSDAY",
+      금요일: "FRIDAY",
+      토요일: "SATURDAY",
+      일요일: "SUNDAY",
     };
-    const weekday = Object.keys(weekdayMap).find((day) => form.repeatRule.includes(day));
-    const repeatTime = form.repeatRule.match(/\\d{1,2}:\\d{2}/)?.[0];
-    const topicOpenDaysBefore = Number(form.voteTime.match(/\\d+/)?.[0] ?? 3);
+    const weekday = Object.keys(weekdayMap).find((day) =>
+      form.repeatRule.includes(day),
+    );
+    const repeatTime = form.repeatRule.match(/\d{1,2}:\d{2}/)?.[0];
+    const topicOpenDaysBefore = Number(form.voteTime.match(/\d+/)?.[0] ?? 3);
     try {
       await createActivity({
         type,
@@ -99,19 +142,27 @@ export const Header: React.FC<HeaderProps> = ({
         capacity: Number(form.memberCount),
         startDate: form.startDate,
         endDate: form.endDate,
-        targetMajors: form.departments.map((major) => majorMap[major]).filter(
-          (major): major is "FRONTEND" | "BACKEND" | "DEVOPS" | "DESIGN" => Boolean(major),
-        ),
-        recruitMode: form.confirmMode === "스터디장 승인" ? "APPROVAL" : "FIRST_COME",
+        targetMajors: form.departments
+          .map((major) => majorMap[major])
+          .filter(
+            (major): major is "FRONTEND" | "BACKEND" | "DEVOPS" | "DESIGN" =>
+              Boolean(major),
+          ),
+        recruitMode:
+          form.confirmMode === "스터디장 승인" ? "APPROVAL" : "FIRST_COME",
         topicMode: form.topicMode === "투표형" ? "VOTE" : "ASSIGNED",
         repeatDayOfWeek: weekday ? weekdayMap[weekday] : undefined,
         repeatTime,
-        topicOpenDaysBefore: Number.isFinite(topicOpenDaysBefore) ? topicOpenDaysBefore : 3,
+        topicOpenDaysBefore: Number.isFinite(topicOpenDaysBefore)
+          ? topicOpenDaysBefore
+          : 3,
       });
       alert("활동을 생성했습니다. 활동 페이지를 새로고침해 주세요.");
     } catch (error) {
       console.error("활동 생성 실패:", error);
-      alert(error instanceof Error ? error.message : "활동을 생성하지 못했습니다.");
+      alert(
+        error instanceof Error ? error.message : "활동을 생성하지 못했습니다.",
+      );
     }
   };
 
@@ -200,7 +251,9 @@ export const Header: React.FC<HeaderProps> = ({
                 ) : (
                   <div className="max-h-72 overflow-y-auto py-2">
                     {notifications
-                      .filter((item) => activeNoticeTab !== "안 읽음" || !item.read)
+                      .filter(
+                        (item) => activeNoticeTab !== "안 읽음" || !item.read,
+                      )
                       .map((item) => (
                         <button
                           key={item.id}
@@ -208,8 +261,14 @@ export const Header: React.FC<HeaderProps> = ({
                           onClick={() => handleReadNotification(item)}
                           className={`block w-full rounded-xl px-3 py-3 text-left hover:bg-gray-50 ${item.read ? "opacity-60" : "bg-blue-50/50"}`}
                         >
-                          <span className="block text-xs font-semibold text-gray-800">{item.title || "새 알림"}</span>
-                          <span className="mt-1 block text-[10px] text-gray-400">{item.createdAt ? new Date(item.createdAt).toLocaleString("ko-KR") : ""}</span>
+                          <span className="block text-xs font-semibold text-gray-800">
+                            {item.title || "새 알림"}
+                          </span>
+                          <span className="mt-1 block text-[10px] text-gray-400">
+                            {item.createdAt
+                              ? new Date(item.createdAt).toLocaleString("ko-KR")
+                              : ""}
+                          </span>
                         </button>
                       ))}
                   </div>
@@ -398,15 +457,24 @@ export const Header: React.FC<HeaderProps> = ({
         mode={articleModalMode}
         onSubmitSuccess={async (data) => {
           if (data.mode !== "article") {
-            alert("이 유형은 추가 필수 정보가 필요해 해당 화면에서 작성해 주세요.");
+            alert(
+              "이 유형은 추가 필수 정보가 필요해 해당 화면에서 작성해 주세요.",
+            );
             return;
           }
           try {
-            await createPost({ title: data.title.trim(), content: data.content });
+            await createPost({
+              title: data.title.trim(),
+              content: data.content,
+            });
             alert("정리글을 저장했습니다.");
           } catch (error) {
             console.error("정리글 생성 실패:", error);
-            alert(error instanceof Error ? error.message : "정리글을 저장하지 못했습니다.");
+            alert(
+              error instanceof Error
+                ? error.message
+                : "정리글을 저장하지 못했습니다.",
+            );
           }
         }}
       />

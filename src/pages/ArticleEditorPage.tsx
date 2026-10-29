@@ -105,7 +105,7 @@ export default function ArticleEditorPage() {
   };
 
   useEffect(() => {
-    if (!editId || !/^\\d+$/.test(editId)) return;
+    if (!editId || !/^\d+$/.test(editId)) return;
     let cancelled = false;
     getPost(Number(editId))
       .then(async (post) => {
@@ -228,7 +228,7 @@ export default function ArticleEditorPage() {
     setIsSaving(true);
     try {
       const response =
-        editId && /^\\d+$/.test(editId)
+        editId && /^\d+$/.test(editId)
           ? await updatePost(Number(editId), { title: title.trim(), content })
           : await createPost({
               title: title.trim(),

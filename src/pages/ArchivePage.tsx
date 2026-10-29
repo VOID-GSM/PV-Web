@@ -162,7 +162,7 @@ export default function ArchivePage() {
     if (
       !newComment.trim() ||
       !selectedArticleId ||
-      !/^\\d+$/.test(selectedArticleId)
+      !/^\d+$/.test(selectedArticleId)
     )
       return;
     try {
@@ -191,7 +191,7 @@ export default function ArchivePage() {
 
   const handleDeleteArticle = async (articleId: string) => {
     if (!window.confirm("이 정리글을 삭제할까요?")) return;
-    if (!/^\\d+$/.test(articleId)) {
+    if (!/^\d+$/.test(articleId)) {
       alert("서버에 저장된 정리글 ID가 올바르지 않습니다.");
       return;
     }

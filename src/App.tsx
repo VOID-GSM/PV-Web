@@ -111,7 +111,7 @@ export default function App() {
       const endDate = newEvent.endDate || newEvent.date;
       const endsAt = newEvent.time
         ? `${endDate}T${newEvent.time}:00`
-        : `${endDate}T23:59:00`;
+        : `${endDate}T23:59:59`;
 
       const created = await createCalendarEvent({
         title: newEvent.title,
