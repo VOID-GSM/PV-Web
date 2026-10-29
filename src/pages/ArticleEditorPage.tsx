@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import Dropdown from "../components/common/Dropdown";
 import { ArrowLeftIcon } from "../components/icons/ArrowLeftIcon";
 import MarkdownPreview from "../components/common/MarkdownPreview";
+import { uploadImage } from "../api/fileApi";
 import {
   clearArticleDraft,
   getArticleDraft,
@@ -21,9 +22,10 @@ import {
 
 const defaultRoundOptions = ["회차 선택", "1회차", "2회차", "3회차", "4회차"];
 const memberOptions = ["지정할 팀원 선택", "등록된 팀원 없음"];
-
 export default function ArticleEditorPage() {
   const navigate = useNavigate();
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const editId = new URLSearchParams(window.location.search).get("edit");
 
   const [initialDraft] = useState(() => getArticleDraft());
@@ -77,6 +79,61 @@ export default function ArticleEditorPage() {
       cancelled = true;
     };
   }, []);
+
+  const handleImageUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("이미지 파일만 업로드할 수 있습니다.");
+      return;
+    }
+
+    // 실제 프로젝트의 회원 ID 조회 방식에 맞게 연결해야 합니다.
+    const memberIdValue = localStorage.getItem("memberId");
+    const memberId = Number(memberIdValue);
+
+    if (!memberIdValue || !Number.isSafeInteger(memberId) || memberId <= 0) {
+      alert("회원 정보를 확인할 수 없습니다.");
+      return;
+    }
+
+    setIsUploadingImage(true);
+
+    try {
+      const fileId = await uploadImage(file, memberId);
+      const textarea = contentRef.current;
+
+      if (!textarea) return;
+
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const markdown = `![${file.name}](file:${fileId})`;
+      const nextContent =
+        content.slice(0, start) + markdown + content.slice(end);
+
+      setContent(nextContent);
+
+      requestAnimationFrame(() => {
+        textarea.focus();
+        const cursor = start + markdown.length;
+        textarea.setSelectionRange(cursor, cursor);
+      });
+    } catch (error) {
+      console.error("이미지 업로드 실패:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "이미지를 업로드하지 못했습니다.",
+      );
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
 
   const handleActivityChange = async (name: string) => {
     setActivity(name);
@@ -427,16 +484,10 @@ export default function ArticleEditorPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    const url = window.prompt(
-                      "이미지 주소를 입력하세요 (https://로 시작)",
-                    );
-                    if (url && /^https?:\/\//i.test(url))
-                      applyMarkdown("![", `](${url})`);
-                    else if (url)
-                      alert("http:// 또는 https:// 주소를 입력해주세요.");
-                  }}
-                  className="p-1 hover:bg-gray-200 rounded text-xs"
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={isUploadingImage}
+                  className="p-1 hover:bg-gray-200 rounded text-xs disabled:opacity-50"
+                  title="이미지 파일 업로드"
                 >
                   <svg
                     className="w-3.5 h-3.5"
@@ -451,7 +502,15 @@ export default function ArticleEditorPage() {
                       d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                     />
                   </svg>
+                  {isUploadingImage && <span>업로드 중...</span>}
                 </button>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageUpload}
+                />
               </div>
               <span className="text-[10px] text-gray-400 font-mono">
                 Markdown

@@ -1,73 +1,134 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { getFile } from "../../api/fileApi";
+
+interface UploadedImageProps {
+  fileId: number;
+  alt: string;
+}
+
+function UploadedImage({ fileId, alt }: UploadedImageProps) {
+  const [imageUrl, setImageUrl] = useState("");
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getFile(fileId)
+      .then((file) => {
+        if (isMounted) {
+          setImageUrl(file.downloadUrl);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setHasError(true);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [fileId]);
+
+  if (hasError) {
+    return (
+      <span className="text-sm text-gray-400">
+        이미지를 불러오지 못했습니다.
+      </span>
+    );
+  }
+
+  if (!imageUrl) {
+    return (
+      <span className="text-sm text-gray-400">이미지를 불러오는 중...</span>
+    );
+  }
+
+  return (
+    <img
+      src={imageUrl}
+      alt={alt}
+      loading="lazy"
+      className="my-2 max-h-80 max-w-full rounded-lg object-contain"
+    />
+  );
+}
 
 function renderInline(text: string): ReactNode[] {
   const pattern =
-    /!\[[^\]]*\]\(https?:\/\/[^\s)]+\)|\*\*[^*]+\*\*|__[^_]+__|~~[^~]+~~|\*[^*\n]+\*|_[^_\n]+_|`[^`]+`|\[[^\]]+\]\(https?:\/\/[^\s)]+\)/g;
+    /!\[([^\]]*)\]\((file:\d+|https?:\/\/[^\s)]+)\)|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|\*\*(.+?)\*\*|__(.+?)__|~~(.+?)~~|\*([^*\n]+)\*|_([^_\n]+)_|`([^`\n]+)`/g;
 
-  const parts = text.split(pattern).filter((part) => part.length > 0);
+  const nodes: ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
 
-  return parts.map((part, index) => {
-    const image = part.match(/^!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)$/);
-
-    if (image) {
-      return (
-        <img
-          key={index}
-          src={image[2]}
-          alt={image[1]}
-          loading="lazy"
-          className="my-2 max-h-80 max-w-full rounded-lg object-contain"
-        />
-      );
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push(text.slice(lastIndex, match.index));
     }
 
-    if (
-      (part.startsWith("**") && part.endsWith("**")) ||
-      (part.startsWith("__") && part.endsWith("__"))
-    ) {
-      return <strong key={index}>{part.slice(2, -2)}</strong>;
-    }
+    const key = nodes.length;
 
-    if (
-      (part.startsWith("*") && part.endsWith("*")) ||
-      (part.startsWith("_") && part.endsWith("_"))
-    ) {
-      return <em key={index}>{part.slice(1, -1)}</em>;
-    }
+    if (match[1] !== undefined) {
+      const alt = match[1];
+      const imageSource = match[2];
 
-    if (part.startsWith("~~") && part.endsWith("~~")) {
-      return <del key={index}>{part.slice(2, -2)}</del>;
-    }
+      if (imageSource.startsWith("file:")) {
+        const fileId = Number(imageSource.slice(5));
 
-    if (part.startsWith("`") && part.endsWith("`")) {
-      return (
-        <code
-          key={index}
-          className="rounded bg-gray-100 px-1 py-0.5 font-mono text-[0.95em]"
-        >
-          {part.slice(1, -1)}
-        </code>
-      );
-    }
-
-    const link = part.match(/^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/);
-
-    if (link) {
-      return (
+        if (Number.isSafeInteger(fileId) && fileId > 0) {
+          nodes.push(<UploadedImage key={key} fileId={fileId} alt={alt} />);
+        } else {
+          nodes.push(`[${alt}](${imageSource})`);
+        }
+      } else {
+        nodes.push(
+          <img
+            key={key}
+            src={imageSource}
+            alt={alt}
+            loading="lazy"
+            className="my-2 max-h-80 max-w-full rounded-lg object-contain"
+          />,
+        );
+      }
+    } else if (match[3] !== undefined) {
+      nodes.push(
         <a
-          key={index}
-          href={link[2]}
+          key={key}
+          href={match[4]}
           target="_blank"
           rel="noreferrer"
           className="text-blue-600 underline underline-offset-2"
         >
-          {link[1]}
-        </a>
+          {match[3]}
+        </a>,
+      );
+    } else if (match[5] !== undefined || match[6] !== undefined) {
+      nodes.push(<strong key={key}>{match[5] ?? match[6]}</strong>);
+    } else if (match[7] !== undefined) {
+      nodes.push(<del key={key}>{match[7]}</del>);
+    } else if (match[8] !== undefined || match[9] !== undefined) {
+      nodes.push(<em key={key}>{match[8] ?? match[9]}</em>);
+    } else if (match[10] !== undefined) {
+      nodes.push(
+        <code
+          key={key}
+          className="rounded bg-gray-100 px-1 py-0.5 font-mono text-[0.95em]"
+        >
+          {match[10]}
+        </code>,
       );
     }
 
-    return <span key={index}>{part}</span>;
-  });
+    lastIndex = pattern.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    nodes.push(text.slice(lastIndex));
+  }
+
+  return nodes;
 }
 
 interface MarkdownPreviewProps {
@@ -85,7 +146,6 @@ export default function MarkdownPreview({
   let paragraph: string[] = [];
   let listItems: string[] = [];
   let listType: "ul" | "ol" | null = null;
-
   let codeLines: string[] = [];
   let isInsideCodeBlock = false;
 
@@ -175,7 +235,6 @@ export default function MarkdownPreview({
       flushList();
 
       const level = heading[1].length;
-
       const headingClass =
         level === 1
           ? "mb-3 text-2xl font-bold"
