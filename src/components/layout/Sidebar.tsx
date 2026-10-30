@@ -26,7 +26,8 @@ const MENU_TO_PATH: Record<string, string> = {
   활동: "/activity",
   "정리글 아카이브": "/archive",
   "주간 리포트": "/weekly-report",
-  "팀원 관리": "/settings",
+  // ★ 팀원 관리 페이지(부장 대시보드)로 연결 (전: /settings)
+  "팀원 관리": "/members",
 };
 
 const PATH_TO_MENU: Record<string, string> = {
@@ -35,7 +36,8 @@ const PATH_TO_MENU: Record<string, string> = {
   "/activity": "활동",
   "/archive": "정리글 아카이브",
   "/weekly-report": "주간 리포트",
-  "/settings": "팀원 관리",
+  // ★ /members 주소면 팀원 관리에 불 (전: /settings)
+  "/members": "팀원 관리",
 };
 
 export const Sidebar: React.FC<SidebarProps> = ({
