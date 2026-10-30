@@ -1,13 +1,14 @@
-import { formatDday, formatDeadline, getDaysLeft, getRecipients, type Assignment, type Submission } from "../../constants/assignment";
+import { formatDday, formatDeadline, getDaysLeft, type Assignment } from "../../constants/assignment";
 
 type OngoingAssignmentsProps = {
-  // 마감 전이고 임시 저장이 아닌 과제들
+  // 마감 전 과제들
   assignments: Assignment[];
-  submissions: Submission[];
+  // ★ 과제 번호 → 제출한 사람 수 (서버가 알려준 값. 내가 낸 과제만 있다)
+  submittedCounts: Record<number, number>;
   onSelect: (assignmentId: number) => void;
 };
 
-export default function OngoingAssignments({ assignments, submissions, onSelect }: OngoingAssignmentsProps) {
+export default function OngoingAssignments({ assignments, submittedCounts, onSelect }: OngoingAssignmentsProps) {
   return (
     <section className="rounded-lg bg-white p-5">
       <div className="flex items-center justify-between">
@@ -22,11 +23,8 @@ export default function OngoingAssignments({ assignments, submissions, onSelect 
       ) : (
         <ul className="mt-4 flex flex-col gap-2">
           {assignments.map((a) => {
-            const recipients = getRecipients(a.targets, a.personalTargets);
-            const submitted = submissions.filter((s) => s.assignmentId === a.id).length;
             const days = getDaysLeft(a.deadline);
-            // 제출 비율 (받는 사람이 없으면 0)
-            const percent = recipients.length === 0 ? 0 : (submitted / recipients.length) * 100;
+            const submitted = submittedCounts[a.id];
             return (
               <li key={a.id}>
                 <button onClick={() => onSelect(a.id)} className="w-full rounded-lg bg-neutral-50 p-3 text-left">
@@ -42,15 +40,9 @@ export default function OngoingAssignments({ assignments, submissions, onSelect 
                   </div>
                   <p className="mt-1 text-[11px] text-neutral-400">
                     출제 {a.author} · 마감 {formatDeadline(a.deadline)}
+                    {/* 내가 낸 과제면 제출 인원도 */}
+                    {submitted !== undefined && ` · ${submitted}명 제출`}
                   </p>
-                  <div className="mt-2 flex items-center gap-2">
-                    <div className="h-1.5 flex-1 rounded bg-neutral-200">
-                      <div className="h-1.5 rounded bg-green-600" style={{ width: `${percent}%` }} />
-                    </div>
-                    <span className="text-[11px] text-neutral-500">
-                      {submitted}/{recipients.length} 제출
-                    </span>
-                  </div>
                 </button>
               </li>
             );

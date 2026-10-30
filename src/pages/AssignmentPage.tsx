@@ -1,13 +1,11 @@
-// ★ useCallback: 함수를 한 번만 만들어 두고 재사용하게 해주는 기능
 import { useCallback, useState } from "react";
 import { Header } from "../components/layout/Header";
 import Dropdown from "../components/common/Dropdown";
-// ★ 직접 만든 토스트
 import Toast from "../components/common/Toast";
 import ReminderBanner from "../components/assignment/ReminderBanner";
 import CompetencyMap from "../components/assignment/CompetencyMap";
 import OngoingAssignments from "../components/assignment/OngoingAssignments";
-import RecipientStatusList from "../components/assignment/RecipientStatusList";
+import RecipientStatusList, { type RecipientRow } from "../components/assignment/RecipientStatusList";
 import AssignmentCreateModal from "../components/assignment/AssignmentCreateModal";
 import AssignmentList from "../components/assignment/AssignmentList";
 import SubmissionReview, { type ReviewAction } from "../components/assignment/SubmissionReview";
@@ -18,167 +16,324 @@ import {
   MAJORS,
   ME,
   MEMBERS,
+  SUBMIT_TYPES,
   TARGET_ALL,
+  TARGET_PERSONAL,
   getDaysLeft,
-  getRecipients,
-  nowString,
   type Assignment,
   type AssignmentForm,
   type Skill,
   type Submission,
+  type SubmissionStatus,
 } from "../constants/assignment";
+// ★ 서버 연동
+import {
+  useAssignments,
+  useCreateAssignment,
+  useCreateSkill,
+  useMySkills,
+  usePassSubmission,
+  useRequestResubmission,
+  useResubmitAssignment,
+  useSaveMyScores,
+  useSkills,
+  useSubmissionStatus,
+  useSubmitAssignment,
+} from "../hooks/useAssignments";
+import type {
+  AssignmentSummary,
+  SubmissionStatus as ServerSubmissionStatus,
+  SubmissionStatusSummary,
+  TargetType,
+} from "../apis/assignments";
+import { MAJOR_LABEL, type Major } from "../apis/interviews";
+import { getErrorMessage } from "../apis/client";
 
-// ★ 토스트 하나의 모양. id는 같은 메시지라도 새로 띄우기 위한 번호
+// ─────────────────────────────────────────────
+// 서버 모양 → 화면 모양 번역 함수들 (컴포넌트 바깥)
+// ─────────────────────────────────────────────
+
+// 표에서 "글자"로 "서버 값" 찾기 (예: "Front-end" → "FRONTEND")
+function findKey<K extends string>(labels: Record<K, string>, label: string): K | undefined {
+  return (Object.keys(labels) as K[]).find((key) => labels[key] === label);
+}
+
+// 세계 시각 → 한국 시각 입력칸 모양 "2026-10-30T18:00"
+function toLocalInput(iso: string): string {
+  const d = new Date(iso);
+  return `${d.toLocaleDateString("sv-SE")}T${d.toTimeString().slice(0, 5)}`;
+}
+
+// 세계 시각 → "10-30 22:05"
+function toShortDateTime(iso: string): string {
+  const d = new Date(iso);
+  return `${d.toLocaleDateString("sv-SE").slice(5)} ${d.toTimeString().slice(0, 5)}`;
+}
+
+// 서버 대상 종류 → 화면 대상 칩 (목록에는 어떤 전공인지가 없어서 MAJOR는 "전공 대상")
+function toTargets(targetType: TargetType): string[] {
+  if (targetType === "ALL") return [TARGET_ALL];
+  if (targetType === "MEMBER") return [TARGET_PERSONAL];
+  return ["전공 대상"];
+}
+
+// 서버 제출 상태 + 지각 여부 → 화면 배지 글자
+function toPageStatus(status: ServerSubmissionStatus, late: boolean): SubmissionStatus {
+  if (status === "PASSED") return "통과";
+  if (status === "RESUBMIT_REQUESTED") return "재제출 요청";
+  return late ? "지각 제출" : "제출";
+}
+
+// 서버 과제(목록용) → 화면 과제
+function toPageAssignment(a: AssignmentSummary): Assignment {
+  return {
+    id: a.id,
+    title: a.title,
+    // 목록 응답에는 설명이 없다
+    description: "",
+    skillId: null,
+    deadline: toLocalInput(a.deadline),
+    targets: toTargets(a.targetType),
+    personalTargets: [],
+    // 서버가 제출 형식을 제한하지 않아서 전부 보여준다
+    submitTypes: SUBMIT_TYPES,
+    remind: false,
+    author: a.authorName,
+    isDraft: false,
+  };
+}
+
+// 받은 과제의 "내 제출 상태" → 화면 제출물 (내 제출물 탭 배지용). 안 냈으면 null
+function toMySubmission(a: AssignmentSummary): Submission | null {
+  if (!a.mySubmissionStatus) return null;
+  return {
+    id: -a.id,
+    assignmentId: a.id,
+    author: ME,
+    type: "",
+    content: "",
+    submittedAt: "",
+    status: toPageStatus(a.mySubmissionStatus, a.myLate ?? false),
+    // 목록 응답에는 피드백이 없다 (백엔드 확인 후 연결)
+    feedbacks: [],
+  };
+}
+
+// 서버 제출 현황 → 받는 사람 줄들
+function toRows(status: SubmissionStatusSummary | undefined): RecipientRow[] {
+  return (status?.items ?? []).map((item) => ({
+    memberId: item.memberId,
+    name: item.memberName,
+    status: item.status ? toPageStatus(item.status, item.late) : "미제출",
+    submittedAt: item.submittedAt ? toShortDateTime(item.submittedAt) : null,
+    submissionId: item.submissionId,
+  }));
+}
+
+// 같은 번호의 과제가 두 목록에 다 있으면 하나만 남긴다
+function uniqueById(list: AssignmentSummary[]): AssignmentSummary[] {
+  const map = new Map<number, AssignmentSummary>();
+  list.forEach((a) => map.set(a.id, a));
+  return [...map.values()];
+}
+
 type ToastState = { id: number; message: string; type: "success" | "info" };
 
 export default function AssignmentPage() {
-  // 데이터: 처음엔 전부 비어 있음
-  const [skills, setSkills] = useState<Skill[]>([]);
-  const [myScores, setMyScores] = useState<Record<number, number>>({});
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  // ★ 서버 데이터
+  const receivedQuery = useAssignments("RECEIVED");
+  const createdQuery = useAssignments("CREATED");
+  const skillsQuery = useSkills();
+  const mySkillsQuery = useMySkills();
+
+  // ★ 서버로 보내는 도구들
+  const createAssignment = useCreateAssignment();
+  const submitAssignment = useSubmitAssignment();
+  const resubmitAssignment = useResubmitAssignment();
+  const passSubmission = usePassSubmission();
+  const requestResubmission = useRequestResubmission();
+  const createSkill = useCreateSkill();
+  const saveScores = useSaveMyScores();
 
   // 화면 상태
   const [activeTab, setActiveTab] = useState("역량 맵");
   const [generation, setGeneration] = useState("");
   const [major, setMajor] = useState("");
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<number | null>(null);
-
-  // 출제 창
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [initialSkillId, setInitialSkillId] = useState<number | null>(null);
-  const [editingDraft, setEditingDraft] = useState<Assignment | null>(null);
-
-  // ★ 지금 떠 있는 토스트 (null이면 없음)
+  // ★ 이번에 화면에서 제출한 제출물 번호 (재제출할 때 필요. 과제 번호 → 제출물 번호)
+  const [mySubmissionIds, setMySubmissionIds] = useState<Record<number, number>>({});
   const [toast, setToast] = useState<ToastState | null>(null);
 
-  // ★ 토스트 띄우기
   const showToast = (message: string, type: "success" | "info" = "info") => {
-    setToast({ id: Date.now(), message, type });
+    setToast((prev) => ({ id: (prev?.id ?? 0) + 1, message, type }));
   };
-
-  // ★ 토스트 닫기. useCallback으로 감싸서 매번 새 함수가 만들어지지 않게 한다
-  // (Toast 안의 타이머가 화면이 다시 그려질 때마다 처음부터 다시 시작되는 걸 막는다)
   const closeToast = useCallback(() => setToast(null), []);
+
+  // ===== 과제 =====
+  const received = receivedQuery.data?.content ?? [];
+  const created = createdQuery.data?.content ?? [];
+  const assignments = uniqueById([...created, ...received]).map(toPageAssignment);
+  const myAssignments = received.map(toPageAssignment);
+  const mySubmissions = received.map(toMySubmission).filter((s): s is Submission => s !== null);
+
+  // 내가 낸 과제의 제출 인원 (서버가 알려준 값)
+  const submittedCounts: Record<number, number> = Object.fromEntries(
+    created.map((a) => [a.id, a.submissionCount ?? 0])
+  );
+
+  const ongoingAssignments = assignments.filter((a) => getDaysLeft(a.deadline) >= 0);
+  const summaryAssignment =
+    assignments.find((a) => a.id === selectedAssignmentId) ?? ongoingAssignments[0] ?? null;
+
+  // ★ 제출 현황: 제출 현황 탭에서 고른 과제 / 역량맵 탭 오른쪽 요약 과제
+  const statusQuery = useSubmissionStatus(selectedAssignmentId, activeTab === "제출 현황");
+  const summaryStatusQuery = useSubmissionStatus(summaryAssignment?.id ?? null, activeTab === "역량 맵");
+
+  // ===== 역량 =====
+  const pageSkills: Skill[] = (skillsQuery.data ?? [])
+    .filter((s) => s.active)
+    .map((s) => ({ id: s.id, name: s.name, major: MAJOR_LABEL[s.major] }));
+  const myScores: Record<number, number> = Object.fromEntries(
+    (mySkillsQuery.data?.skills ?? [])
+      .filter((s) => s.selfScore !== null)
+      .map((s) => [s.skillId, s.selfScore as number])
+  );
 
   const majorFilter = major === "" || major === "전체" ? "" : major;
   const generationFilter = generation === "" || generation === "전체" ? "" : generation;
-
-  const visibleSkills = skills.filter((s) => majorFilter === "" || s.major === majorFilter);
+  const visibleSkills = pageSkills.filter((s) => majorFilter === "" || s.major === majorFilter);
   const visibleMembers = MEMBERS.filter(
     (m) =>
       (generationFilter === "" || m.generation === generationFilter) &&
       (majorFilter === "" || m.majors.includes(majorFilter))
   );
 
-  const publishedAssignments = assignments.filter((a) => !a.isDraft);
-  const ongoingAssignments = publishedAssignments.filter((a) => getDaysLeft(a.deadline) >= 0);
-
   const remindedMajors = MAJORS.filter((m) => majorFilter === "" || m === majorFilter).filter(
-    (m) => !publishedAssignments.some((a) => a.targets.includes(TARGET_ALL) || a.targets.includes(m))
+    (m) => !assignments.some((a) => a.targets.includes(TARGET_ALL) || a.targets.includes(m))
   );
-
-  const myAssignments = publishedAssignments.filter((a) =>
-    getRecipients(a.targets, a.personalTargets).some((m) => m.name === ME)
-  );
-
-  const summaryAssignment =
-    publishedAssignments.find((a) => a.id === selectedAssignmentId) ?? ongoingAssignments[0] ?? null;
 
   // ===== 이벤트 처리 =====
 
   const openCreate = (skillId: number | null = null) => {
     setInitialSkillId(skillId);
-    setEditingDraft(null);
     setIsCreateOpen(true);
   };
 
-  const handleAddSkill = (name: string, skillMajor: string) => {
-    setSkills([...skills, { id: Date.now(), name, major: skillMajor }]);
-    // ★
-    showToast(`역량 항목 '${name}'을(를) 추가했습니다`, "success");
-  };
-
-  const handleScoreChange = (skillId: number) => {
-    const current = myScores[skillId] ?? 0;
-    setMyScores({ ...myScores, [skillId]: (current % 5) + 1 });
-  };
-
-  const handleSubmitAssignment = (form: AssignmentForm, isDraft: boolean) => {
-    if (editingDraft) {
-      setAssignments(assignments.map((a) => (a.id === editingDraft.id ? { ...a, ...form, isDraft } : a)));
-    } else {
-      setAssignments([{ id: Date.now(), author: ME, isDraft, ...form }, ...assignments]);
-    }
-    // ★
-    showToast(isDraft ? "임시 저장했습니다" : "과제를 출제했습니다", "success");
-  };
-
-  const handleSubmitWork = (assignmentId: number, type: string, content: string) => {
-    const assignment = assignments.find((a) => a.id === assignmentId);
-    const isLate = assignment ? getDaysLeft(assignment.deadline) < 0 : false;
-    const status = isLate ? "지각 제출" : "제출";
-    const mine = submissions.find((s) => s.assignmentId === assignmentId && s.author === ME);
-    if (mine) {
-      setSubmissions(
-        submissions.map((s) => (s.id === mine.id ? { ...s, type, content, status, submittedAt: nowString() } : s))
-      );
-    } else {
-      setSubmissions([
-        { id: Date.now(), assignmentId, author: ME, type, content, submittedAt: nowString(), status, feedbacks: [] },
-        ...submissions,
-      ]);
-    }
-    // ★
-    showToast(isLate ? "지각 제출되었습니다" : "과제를 제출했습니다", "success");
-  };
-
-  const handleReview = (submissionId: number, action: ReviewAction, feedback: string) => {
-    const target = submissions.find((s) => s.id === submissionId);
-    if (!target) return;
-
-    setSubmissions(
-      submissions.map((s) =>
-        s.id === submissionId
-          ? {
-              ...s,
-              status: action === "보류" ? s.status : action,
-              feedbacks: feedback
-                ? [...s.feedbacks, { id: Date.now(), author: ME, content: feedback, date: nowString() }]
-                : s.feedbacks,
-            }
-          : s
-      )
-    );
-
-    if (action === "통과" && target.author === ME) {
-      const skillId = assignments.find((a) => a.id === target.assignmentId)?.skillId;
-      if (skillId !== null && skillId !== undefined) {
-        setMyScores({ ...myScores, [skillId]: Math.min(5, (myScores[skillId] ?? 0) + 1) });
+  // 역량 항목 추가 (부장만)
+  const handleAddSkill = (name: string, skillMajorLabel: string) => {
+    const skillMajor = findKey(MAJOR_LABEL, skillMajorLabel);
+    if (!skillMajor) return;
+    createSkill.mutate(
+      { major: skillMajor, name },
+      {
+        onSuccess: () => showToast(`역량 항목 '${name}'을(를) 추가했습니다`, "success"),
+        onError: (error) => showToast(getErrorMessage(error)),
       }
-    }
-
-    // ★ 동작별 안내
-    const messages: Record<ReviewAction, string> = {
-      통과: `${target.author} 님의 제출물을 통과 처리했습니다`,
-      "재제출 요청": `${target.author} 님에게 재제출을 요청했습니다`,
-      보류: "피드백을 남겼습니다",
-    };
-    showToast(messages[action], "success");
+    );
   };
 
-  // ★ 미제출자에게 알림: alert 대신 토스트
-  const handleRemind = (assignmentId: number) => {
-    const a = assignments.find((x) => x.id === assignmentId);
-    if (!a) return;
-    const unsubmitted = getRecipients(a.targets, a.personalTargets).filter(
-      (m) => !submissions.some((s) => s.assignmentId === a.id && s.author === m.name)
-    );
-    if (unsubmitted.length === 0) {
-      showToast("모든 팀원이 제출했습니다", "success");
-    } else {
-      showToast(`미제출자 ${unsubmitted.length}명(${unsubmitted.map((m) => m.name).join(", ")})에게 알림을 보냈습니다`);
+  // 내 점수 칸을 누르면 1→2→…→5→1
+  const handleScoreChange = (skillId: number) => {
+    const next = ((myScores[skillId] ?? 0) % 5) + 1;
+    saveScores.mutate([{ skillId, score: next }], {
+      onError: (error) => showToast(getErrorMessage(error)),
+    });
+  };
+
+  // 출제 → 서버
+  const handleSubmitAssignment = (form: AssignmentForm, isDraft: boolean) => {
+    if (isDraft) {
+      showToast("임시 저장은 서버 연결을 준비 중입니다");
+      return;
     }
+    if (form.targets.includes(TARGET_PERSONAL)) {
+      showToast("개인 지정 출제는 팀원 연동 후 지원됩니다. 전체나 전공으로 출제해 주세요");
+      return;
+    }
+    const isAll = form.targets.includes(TARGET_ALL);
+    const targetMajors = form.targets
+      .map((t) => findKey(MAJOR_LABEL, t))
+      .filter((m): m is Major => m !== undefined);
+
+    createAssignment.mutate(
+      {
+        title: form.title,
+        description: form.description,
+        deadline: new Date(form.deadline).toISOString(),
+        targetType: isAll ? "ALL" : "MAJOR",
+        targetMajors: isAll ? [] : targetMajors,
+        targetMemberIds: [],
+        fileKeys: [],
+        // ★ 이제 역량 항목이 서버 번호라서 그대로 보낸다
+        skillIds: form.skillId !== null ? [form.skillId] : [],
+      },
+      {
+        onSuccess: () => showToast("과제를 출제했습니다", "success"),
+        onError: (error) => showToast(getErrorMessage(error)),
+      }
+    );
+  };
+
+  // 제출 / 재제출 → 서버
+  const handleSubmitWork = (assignmentId: number, type: string, content: string) => {
+    if (type === "파일 첨부") {
+      showToast("파일 제출은 준비 중입니다. 텍스트나 GitHub 링크로 제출해 주세요");
+      return;
+    }
+    if (type === "GitHub 링크" && !content.startsWith("https://github.com/")) {
+      showToast("GitHub 링크는 https://github.com/ 으로 시작해야 합니다");
+      return;
+    }
+    const body = type === "GitHub 링크" ? { githubUrl: content } : { content };
+
+    // 재제출 요청을 받은 과제면 재제출(PATCH)
+    const mine = received.find((a) => a.id === assignmentId);
+    if (mine?.mySubmissionStatus === "RESUBMIT_REQUESTED") {
+      const submissionId = mySubmissionIds[assignmentId];
+      if (submissionId === undefined) {
+        showToast("재제출은 서버 연결을 확인 중입니다");
+        return;
+      }
+      resubmitAssignment.mutate(
+        { assignmentId, submissionId, body },
+        {
+          onSuccess: () => showToast("다시 제출했습니다", "success"),
+          onError: (error) => showToast(getErrorMessage(error)),
+        }
+      );
+      return;
+    }
+
+    submitAssignment.mutate(
+      { assignmentId, body },
+      {
+        onSuccess: (submission) => {
+          // 재제출 때 쓰려고 제출물 번호를 기억해 둔다
+          setMySubmissionIds((prev) => ({ ...prev, [assignmentId]: submission.id }));
+          showToast(submission.late ? "지각 제출되었습니다" : "과제를 제출했습니다", "success");
+        },
+        onError: (error) => showToast(getErrorMessage(error)),
+      }
+    );
+  };
+
+  // 통과 / 재제출 요청 → 서버
+  const handleReview = (submissionId: number, action: ReviewAction, feedback: string) => {
+    if (selectedAssignmentId === null) return;
+    const variables = { assignmentId: selectedAssignmentId, submissionId, comment: feedback };
+    const options = {
+      onSuccess: () => showToast(action === "통과" ? "통과 처리했습니다" : "재제출을 요청했습니다", "success" as const),
+      onError: (error: unknown) => showToast(getErrorMessage(error)),
+    };
+    if (action === "통과") passSubmission.mutate(variables, options);
+    else requestResubmission.mutate(variables, options);
+  };
+
+  // 미제출자 알림 (서버 API가 없다)
+  const handleRemind = () => {
+    showToast("미제출자 알림은 서버 연결을 준비 중입니다");
   };
 
   const goToStatus = (assignmentId: number) => {
@@ -186,45 +341,36 @@ export default function AssignmentPage() {
     setActiveTab("제출 현황");
   };
 
+  // 제출 현황 불러오는 중 / 실패 문구
+  const statusMessage = statusQuery.isPending
+    ? "제출 현황을 불러오는 중..."
+    : statusQuery.isError
+      ? `${getErrorMessage(statusQuery.error)} (제출 현황은 출제자·부장만 볼 수 있습니다)`
+      : null;
+
   // ===== 탭별 본문 =====
   const renderTab = () => {
     if (activeTab === "과제 목록") {
-      return (
-        <AssignmentList
-          assignments={assignments}
-          skills={skills}
-          submissions={submissions}
-          onOpenStatus={goToStatus}
-          onEditDraft={(draft) => {
-            setEditingDraft(draft);
-            setInitialSkillId(null);
-            setIsCreateOpen(true);
-          }}
-        />
-      );
+      return <AssignmentList assignments={assignments} submittedCounts={submittedCounts} onOpenStatus={goToStatus} />;
     }
     if (activeTab === "제출 현황") {
       return (
         <SubmissionReview
-          assignments={publishedAssignments}
-          skills={skills}
-          submissions={submissions}
-          myScores={myScores}
+          assignments={assignments}
           selectedAssignmentId={selectedAssignmentId}
           onSelectAssignment={setSelectedAssignmentId}
+          rows={toRows(statusQuery.data)}
+          total={statusQuery.data?.total ?? 0}
+          submittedCount={statusQuery.data?.submittedCount ?? 0}
+          statusMessage={selectedAssignmentId === null ? null : statusMessage}
           onReview={handleReview}
+          reviewPending={passSubmission.isPending || requestResubmission.isPending}
           onRemind={handleRemind}
         />
       );
     }
     if (activeTab === "내 제출물") {
-      return (
-        <MySubmissions
-          assignments={myAssignments}
-          submissions={submissions.filter((s) => s.author === ME)}
-          onSubmit={handleSubmitWork}
-        />
-      );
+      return <MySubmissions assignments={myAssignments} submissions={mySubmissions} onSubmit={handleSubmitWork} />;
     }
 
     return (
@@ -240,18 +386,22 @@ export default function AssignmentPage() {
           />
         </div>
         <aside className="flex w-full shrink-0 flex-col gap-4 self-start lg:w-80">
-          <OngoingAssignments assignments={ongoingAssignments} submissions={submissions} onSelect={goToStatus} />
+          <OngoingAssignments
+            assignments={ongoingAssignments}
+            submittedCounts={submittedCounts}
+            onSelect={goToStatus}
+          />
           <section className="rounded-lg bg-white p-5">
-            <h2 className="font-bold">
-              제출 현황{summaryAssignment ? ` · ${summaryAssignment.title}` : ""}
-            </h2>
+            <h2 className="font-bold">제출 현황{summaryAssignment ? ` · ${summaryAssignment.title}` : ""}</h2>
             <div className="mt-3">
-              {summaryAssignment ? (
-                <RecipientStatusList assignment={summaryAssignment} submissions={submissions} />
-              ) : (
+              {!summaryAssignment ? (
                 <p className="rounded border border-dashed py-8 text-center text-xs text-neutral-400">
                   진행 중인 과제가 없습니다
                 </p>
+              ) : summaryStatusQuery.isError ? (
+                <p className="py-6 text-center text-xs text-neutral-400">제출 현황은 출제자·부장만 볼 수 있습니다</p>
+              ) : (
+                <RecipientStatusList rows={toRows(summaryStatusQuery.data)} />
               )}
             </div>
           </section>
@@ -259,6 +409,9 @@ export default function AssignmentPage() {
       </div>
     );
   };
+
+  const isLoading = receivedQuery.isPending || createdQuery.isPending;
+  const loadError = receivedQuery.error ?? createdQuery.error;
 
   return (
     <div className="flex min-h-full flex-col">
@@ -293,30 +446,36 @@ export default function AssignmentPage() {
             </div>
             <button
               onClick={() => openCreate()}
-              className="rounded bg-black px-4 py-2 text-sm font-semibold text-white"
+              disabled={createAssignment.isPending}
+              className="rounded bg-black px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
             >
-              + 과제 출제
+              {createAssignment.isPending ? "출제 중..." : "+ 과제 출제"}
             </button>
           </div>
         </div>
 
         <ReminderBanner majors={remindedMajors} onCreate={() => openCreate()} />
 
-        {renderTab()}
+        {isLoading ? (
+          <p className="rounded-lg bg-white py-16 text-center text-sm text-neutral-400">과제를 불러오는 중...</p>
+        ) : loadError ? (
+          <p className="rounded-lg bg-white py-16 text-center text-sm text-red-500">{getErrorMessage(loadError)}</p>
+        ) : (
+          renderTab()
+        )}
       </div>
 
       {isCreateOpen && (
         <AssignmentCreateModal
-          skills={skills}
+          skills={pageSkills}
           initialSkillId={initialSkillId}
-          editing={editingDraft}
+          editing={null}
           remindedMajors={remindedMajors}
           onSubmit={handleSubmitAssignment}
           onClose={() => setIsCreateOpen(false)}
         />
       )}
 
-      {/* ★ 토스트. key가 바뀌면 새로 떠서 타이머도 처음부터 다시 시작한다 */}
       {toast && <Toast key={toast.id} message={toast.message} type={toast.type} onClose={closeToast} />}
     </div>
   );
