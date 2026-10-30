@@ -3,6 +3,7 @@ import { useState } from "react";
 import ProfileCard from "../components/settings/ProfileCard";
 import ReentryCodeCard from "../components/settings/ReentryCodeCard";
 import NotificationCard from "../components/settings/NotificationCard";
+import DiscordCard from "../components/settings/DiscordCard";
 import NotionImportModal from "../components/settings/NotionImportModal";
 // 노션 가져오기 버튼에 쓸 아이콘
 import uploadIcon from "../assets/icons/upload.svg";
@@ -13,19 +14,19 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-neutral-100 p-6">
-      {/* 왼쪽 설정 메뉴를 없애고 2칸으로 */}
+      {/* 왼쪽 설정 메뉴 없이 2칸 */}
       {/* 좁은 화면: 세로로 쌓기 / lg(1024px) 이상: 가로로 나란히 */}
       <div className="flex flex-col gap-4 lg:flex-row">
         {/* 왼쪽(넓은 칸): 내 프로필 + 기기·재입장 코드 */}
-        {/* min-w-0: 내용이 길어도 칸이 넘치지 않게 */}
         <main className="flex min-w-0 flex-1 flex-col gap-4">
           <ProfileCard />
           <ReentryCodeCard />
         </main>
 
-        {/* 오른쪽(좁은 칸): 알림 + 노션 가져오기 */}
+        {/* 오른쪽(좁은 칸): 알림 + 디스코드 연동 + 노션 가져오기 */}
         <aside className="flex w-full flex-col gap-4 self-start lg:w-80">
           <NotificationCard />
+          <DiscordCard />
 
           {/* 노션 가져오기 카드 (왼쪽 메뉴에 있던 버튼을 여기로 옮겼다) */}
           <section className="rounded-lg bg-white p-6">
