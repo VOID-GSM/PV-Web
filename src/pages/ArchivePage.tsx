@@ -2,18 +2,11 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Dropdown from "../components/common/Dropdown";
-
-interface Article {
-  id: number;
-  title: string;
-  activity: string;
-  round: string;
-  tag: string;
-  date: string;
-  author: string;
-  commentsCount: number;
-  content: string;
-}
+import MarkdownPreview from "../components/common/MarkdownPreview";
+import { getArticles, saveArticles } from "../utils/articles";
+import type { Article } from "../types/article";
+import { deletePost, getPost, getPosts } from "../api/postApi";
+import { createComment, getComments } from "../api/commentApi";
 
 interface Comment {
   id: number;
@@ -39,15 +32,114 @@ export default function ArchivePage() {
     "all" | "my" | "compare" | "feedback"
   >("all");
 
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedActivity, setSelectedActivity] = useState("활동 선택");
   const [selectedPeriod, setSelectedPeriod] = useState("기간 선택");
 
-  const [articles] = useState<Article[]>([]);
+  const [articles, setArticles] = useState<Article[]>(() => getArticles());
+  const [selectedArticleId, setSelectedArticleId] = useState<string | null>(
+    null,
+  );
+  const selectedArticle =
+    articles.find((article) => article.id === selectedArticleId) ?? null;
+  const filteredArticles = articles.filter((article) =>
+    `${article.title} ${article.content} ${article.activity} ${(article.tags ?? []).join(" ")}`
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase().trim()),
+  );
   const [commentList, setCommentList] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const noticeRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPosts({}, 0, 50)
+      .then(async (response) => {
+        const summaries = response.content ?? [];
+        const loaded = await Promise.all(
+          summaries.map(async (summary): Promise<Article> => {
+            try {
+              const post = await getPost(summary.id);
+              return {
+                id: String(post.id),
+                title: post.title,
+                activity: post.activityId
+                  ? `활동 ${post.activityId}`
+                  : "활동 미지정",
+                round: post.sessionId ? `${post.sessionId}회차` : "회차 미지정",
+                tags: [],
+                date: (post.createdAt || summary.createdAt || "").slice(0, 10),
+                author: String(post.authorId),
+                commentsCount: 0,
+                content: post.content,
+                feedbackOption: "none",
+              };
+            } catch {
+              return {
+                id: String(summary.id),
+                title: summary.title,
+                activity: summary.activityId
+                  ? `활동 ${summary.activityId}`
+                  : "활동 미지정",
+                round: summary.sessionId
+                  ? `${summary.sessionId}회차`
+                  : "회차 미지정",
+                tags: [],
+                date: (summary.createdAt || "").slice(0, 10),
+                author: String(summary.authorId),
+                commentsCount: 0,
+                content: "",
+                feedbackOption: "none",
+              };
+            }
+          }),
+        );
+        if (!cancelled) {
+          setArticles(loaded);
+          saveArticles(loaded);
+        }
+      })
+      .catch((error: unknown) => {
+        console.error("정리글 목록 조회 실패:", error);
+        if (!cancelled)
+          alert(
+            error instanceof Error
+              ? error.message
+              : "정리글을 불러오지 못했습니다.",
+          );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedArticleId || !/^\d+$/.test(selectedArticleId)) {
+      return;
+    }
+    let cancelled = false;
+    getComments("NOTE", Number(selectedArticleId))
+      .then((comments) => {
+        if (!cancelled)
+          setCommentList(
+            comments.map((comment) => ({
+              id: comment.id,
+              author: `회원 ${comment.authorId}`,
+              date: (comment.createdAt || "").slice(0, 16).replace("T", " "),
+              text: comment.content,
+            })),
+          );
+      })
+      .catch((error: unknown) => {
+        console.error("정리글 댓글 조회 실패:", error);
+        if (!cancelled) setCommentList([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedArticleId]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -65,17 +157,60 @@ export default function ArchivePage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleAddComment = (e: React.FormEvent) => {
+  const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newComment.trim()) return;
-    const added: Comment = {
-      id: Date.now(),
-      author: "동키",
-      date: "방금 전",
-      text: newComment.trim(),
-    };
-    setCommentList((prev) => [...prev, added]);
-    setNewComment("");
+    if (
+      !newComment.trim() ||
+      !selectedArticleId ||
+      !/^\d+$/.test(selectedArticleId)
+    )
+      return;
+    try {
+      const created = await createComment({
+        targetType: "NOTE",
+        targetId: Number(selectedArticleId),
+        content: newComment.trim(),
+      });
+      setCommentList((prev) => [
+        ...prev,
+        {
+          id: created.id,
+          author: `회원 ${created.authorId}`,
+          date: (created.createdAt || "").slice(0, 16).replace("T", " "),
+          text: created.content,
+        },
+      ]);
+      setNewComment("");
+    } catch (error) {
+      console.error("정리글 댓글 작성 실패:", error);
+      alert(
+        error instanceof Error ? error.message : "댓글을 작성하지 못했습니다.",
+      );
+    }
+  };
+
+  const handleDeleteArticle = async (articleId: string) => {
+    if (!window.confirm("이 정리글을 삭제할까요?")) return;
+    if (!/^\d+$/.test(articleId)) {
+      alert("서버에 저장된 정리글 ID가 올바르지 않습니다.");
+      return;
+    }
+    try {
+      await deletePost(Number(articleId));
+      const nextArticles = articles.filter(
+        (article) => article.id !== articleId,
+      );
+      saveArticles(nextArticles);
+      setArticles(nextArticles);
+      setSelectedArticleId(null);
+    } catch (error) {
+      console.error("정리글 삭제 실패:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "정리글을 삭제하지 못했습니다.",
+      );
+    }
   };
 
   return (
@@ -95,6 +230,8 @@ export default function ArchivePage() {
           <div className="relative w-64">
             <input
               type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="정리글 · 질문 · 팀원 검색"
               className="w-full pl-8 pr-3 py-1.5 bg-gray-100/80 rounded-lg text-xs focus:outline-none focus:bg-white border border-transparent focus:border-gray-300 transition"
             />
@@ -469,57 +606,143 @@ export default function ArchivePage() {
             </span>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center justify-center text-center">
-            <div className="space-y-3">
-              <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mx-auto text-gray-400">
+          <div className="flex-1 overflow-y-auto p-3">
+            {filteredArticles.length === 0 ? (
+              <div className="flex h-full flex-col items-center justify-center text-center">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-400">
+                  <svg
+                    className="h-5 w-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a2 2 0 01.707.293l5.414 5.414a2 2 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                </div>
+                <p className="text-xs font-medium text-gray-400">
+                  {searchTerm
+                    ? "검색 결과가 없습니다."
+                    : "작성된 정리글이 없습니다."}
+                </p>
+                <button
+                  onClick={() => navigate("/editor")}
+                  className="mt-3 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-200"
+                >
+                  + 첫 정리글 작성하기
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {filteredArticles.map((article) => (
+                  <button
+                    key={article.id}
+                    type="button"
+                    onClick={() => setSelectedArticleId(article.id)}
+                    className={`w-full rounded-xl border p-3 text-left transition ${selectedArticleId === article.id ? "border-black bg-gray-50" : "border-gray-100 hover:border-gray-300 hover:bg-gray-50"}`}
+                  >
+                    <span className="block truncate text-xs font-bold text-gray-900">
+                      {article.title}
+                    </span>
+                    <span className="mt-1 block text-[10px] text-gray-400">
+                      {article.activity} · {article.round}
+                    </span>
+                    <span className="mt-2 block text-[10px] text-gray-400">
+                      {article.date} · {article.author}
+                    </span>
+                    {article.tags?.length > 0 && (
+                      <span className="mt-2 flex flex-wrap gap-1">
+                        {article.tags.slice(0, 3).map((tag) => (
+                          <span
+                            key={tag}
+                            className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500"
+                          >
+                            #{tag}
+                          </span>
+                        ))}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex-1 bg-white rounded-2xl border border-gray-200 flex flex-col overflow-hidden shadow-sm">
+          {selectedArticle ? (
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="mb-5 flex items-start justify-between gap-4 border-b border-gray-100 pb-4">
+                <div className="min-w-0">
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    {selectedArticle.tags?.map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-md bg-gray-100 px-2 py-1 text-[10px] font-semibold text-gray-600"
+                      >
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
+                  <h2 className="text-xl font-extrabold text-gray-900">
+                    {selectedArticle.title}
+                  </h2>
+                  <p className="mt-2 text-[11px] text-gray-400">
+                    {selectedArticle.author} · {selectedArticle.date} ·{" "}
+                    {selectedArticle.activity} · {selectedArticle.round}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate(
+                        `/editor?edit=${encodeURIComponent(selectedArticle.id)}`,
+                      )
+                    }
+                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                  >
+                    수정
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteArticle(selectedArticle.id)}
+                    className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                  >
+                    삭제
+                  </button>
+                </div>
+              </div>
+              <MarkdownPreview content={selectedArticle.content} />
+            </div>
+          ) : (
+            <div className="flex flex-1 flex-col items-center justify-center space-y-3 p-8 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full border border-gray-100 bg-gray-50 text-gray-300">
                 <svg
-                  className="w-5 h-5"
+                  className="h-6 w-6"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
+                  aria-hidden="true"
                 >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18h9c1.746 0 3.332.477 4.5 1.253v-13C19.832 5.477 18.246 5 16.5 5S13.168 5.477 12 6.253"
                   />
                 </svg>
               </div>
-              <p className="text-xs font-medium text-gray-400">
-                작성된 정리글이 없습니다.
+              <p className="text-xs font-semibold text-gray-400">
+                왼쪽 목록에서 정리글을 선택해 주세요.
               </p>
-              <button
-                onClick={() => navigate("/editor")}
-                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold transition"
-              >
-                + 첫 정리글 작성하기
-              </button>
             </div>
-          </div>
-        </div>
-
-        <div className="flex-1 bg-white rounded-2xl border border-gray-200 flex flex-col overflow-hidden shadow-sm">
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-8 space-y-3">
-            <div className="w-12 h-12 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-300">
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                />
-              </svg>
-            </div>
-            <p className="text-xs font-semibold text-gray-400">
-              왼쪽 목록에서 정리글을 선택해 주세요.
-            </p>
-          </div>
+          )}
         </div>
 
         <div className="w-80 bg-white rounded-2xl border border-gray-200 flex flex-col shrink-0 overflow-hidden shadow-sm">
@@ -529,10 +752,27 @@ export default function ArchivePage() {
             </span>
           </div>
 
-          <div className="p-4 flex-1 overflow-y-auto flex flex-col items-center justify-center text-center">
-            <p className="text-xs text-gray-400 font-medium">
-              피드백 내역이 없습니다.
-            </p>
+          <div className="p-4 flex-1 overflow-y-auto">
+            {commentList.length === 0 ? (
+              <div className="flex h-full items-center justify-center text-center">
+                <p className="text-xs text-gray-400 font-medium">
+                  피드백 내역이 없습니다.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {commentList.map((comment) => (
+                  <div key={comment.id} className="rounded-xl bg-gray-50 p-3">
+                    <p className="text-[10px] font-semibold text-gray-500">
+                      {comment.author} · {comment.date}
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap text-xs text-gray-800">
+                      {comment.text}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <form
