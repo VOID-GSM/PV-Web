@@ -94,7 +94,8 @@ export default function ArticleEditorPage() {
     }
 
     // 실제 프로젝트의 회원 ID 조회 방식에 맞게 연결해야 합니다.
-    const memberIdValue = localStorage.getItem("memberId");
+
+    const memberIdValue = localStorage.getItem("pvweb:memberId");
     const memberId = Number(memberIdValue);
 
     if (!memberIdValue || !Number.isSafeInteger(memberId) || memberId <= 0) {
