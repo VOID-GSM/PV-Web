@@ -3,10 +3,10 @@
 export const ME = "동키";
 export const MAJORS = ["Front-end", "Back-end", "DevOps", "Design"];
 
-// 역할 목록 (한 사람이 여러 개 가질 수 있다. 아무것도 없으면 "팀원")
-export const ROLE_OPTIONS = ["부장", "스터디장", "출제자", "활동장"];
+// ★ 역할 칩 (서버 역할 LEADER·MANAGER·SENIOR의 화면 글자. 아무것도 없으면 "팀원")
+export const ROLE_OPTIONS = ["부장", "운영진", "선배"];
 
-// 처음 기수 목록 (부장이 추가할 수 있다)
+// 처음 기수 목록 (서버 연결 후에는 팀원 목록에서 계산한다)
 export const INITIAL_GENERATIONS = ["9기", "10기"];
 
 // 초대 링크 옵션
@@ -14,8 +14,9 @@ export const EXPIRY_OPTIONS = ["1일", "7일", "30일", "만료 없음"];
 export const USAGE_OPTIONS = ["1회", "5회", "15회", "무제한"];
 export const ENTRY_GENERATION_ANY = "입장 시 선택";
 
-export const INVITE_BASE = "void.gsm/join/";
-export const REENTRY_BASE = "void.gsm/reentry/";
+// ★ 실제로 들어갈 수 있는 주소 (지금 사이트 주소 + 초대·재입장 화면 경로)
+export const INVITE_BASE = `${window.location.origin}/invite/`;
+export const REENTRY_BASE = `${window.location.origin}/re-entry/`;
 
 // 팀원
 export type Member = {
@@ -33,7 +34,7 @@ export type Member = {
   submissionRate: number | null;
 };
 
-// 처음 팀원 목록. 서버 연결 전이라 나만 있다
+// 처음 팀원 목록 (서버 연결 전 퍼블리싱용)
 export const INITIAL_MEMBERS: Member[] = [
   {
     id: 1,
