@@ -10,13 +10,7 @@ interface RightPanelProps {
 }
 
 export const RightPanel: React.FC<RightPanelProps> = ({
-  boardFilters = [
-    { id: "1", name: "빛가람 경진대회", color: "#3b82f6", checked: true },
-    { id: "2", name: "안끊겨 프로젝트", color: "#10b981", checked: true },
-    { id: "3", name: "9기 → 10기 과제", color: "#8b5cf6", checked: true },
-    { id: "4", name: "포폴 피드백 모임", color: "#14b8a6", checked: true },
-    { id: "5", name: "개인 일정", color: "#ec4899", checked: false },
-  ],
+  boardFilters = [],
   milestones = [],
   onToggleFilter,
   onAddMilestone,
@@ -55,6 +49,11 @@ export const RightPanel: React.FC<RightPanelProps> = ({
       <div className="rounded-3xl bg-white p-5 shadow-xs">
         <h3 className="text-xs font-bold text-gray-900 mb-3">보드 필터</h3>
         <div className="space-y-2.5">
+          {boardFilters.length === 0 && (
+            <p className="text-[11px] leading-relaxed text-gray-400">
+              일정을 추가하면 해당 보드가 여기에 표시됩니다.
+            </p>
+          )}
           {boardFilters.map((filter) => (
             <label
               key={filter.id}
