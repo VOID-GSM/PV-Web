@@ -1,6 +1,5 @@
-// src/pages/InvitePage.tsx
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom"; // 1. useNavigate 추가
+import React, { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import logoWhite from "../assets/images/logo-white.png";
 import linkIcon from "../assets/icons/link.svg";
 import alertIcon from "../assets/icons/alert.svg";
@@ -10,7 +9,12 @@ import {
   DEPARTMENT_OPTIONS,
   FEATURE_LIST,
 } from "../constants/invite";
-import { MOCK_INVITE_INFO } from "../mocks/invite";
+import {
+  getInvite,
+  createJoinRequest,
+  reEntryLink,
+  type InviteInfo,
+} from "../api/authApi";
 import { SelectionChip } from "../components/invite/SelectionChip";
 import type { CalendarEvent } from "../types/calendar";
 
@@ -23,9 +27,16 @@ export interface InvitePageProps {
 }
 
 const InvitePage: React.FC<InvitePageProps> = () => {
-  const navigate = useNavigate(); // 2. navigate 선언
+  const navigate = useNavigate();
+  const { code } = useParams<{ code: string }>();
 
-  // 초기 선택값 비워두기 (이름, 기수, 전공)
+  const [inviteInfo, setInviteInfo] = useState<InviteInfo | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [isReEntryOpen, setIsReEntryOpen] = useState(false);
+  const [reEntryCode, setReEntryCode] = useState("");
+  const [isReEntering, setIsReEntering] = useState(false);
+
   const [name, setName] = useState("");
   const [generation, setGeneration] = useState("");
   const [departments, setDepartments] = useState<string[]>([]);
@@ -36,12 +47,50 @@ const InvitePage: React.FC<InvitePageProps> = () => {
     departments: false,
   });
 
+  useEffect(() => {
+    if (!code) return;
+
+    let cancelled = false;
+
+    getInvite(code)
+      .then((info) => {
+        if (!cancelled) setInviteInfo(info);
+      })
+      .catch((error: unknown) => {
+        console.error("초대 정보 조회 실패:", error);
+
+        if (!cancelled) {
+          alert(
+            error instanceof Error
+              ? error.message
+              : "초대 정보를 불러오지 못했습니다.",
+          );
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [code]);
+
+  const generationOptions =
+    inviteInfo?.generations?.map((item) => `${item.number}기`) ??
+    GENERATION_OPTIONS;
+
+  const departmentOptions =
+    inviteInfo?.majors?.map(
+      (major) =>
+        ({
+          FRONTEND: "Front-end",
+          BACKEND: "Back-end",
+          DEVOPS: "DevOps",
+          DESIGN: "Design",
+        })[major],
+    ) ?? DEPARTMENT_OPTIONS;
+
   const toggleGeneration = (item: string) => {
     setGeneration((prev) => (prev === item ? "" : item));
-    setErrors((prev) => ({
-      ...prev,
-      generation: false,
-    }));
+    setErrors((prev) => ({ ...prev, generation: false }));
   };
 
   const toggleDepartment = (department: string) => {
@@ -51,13 +100,10 @@ const InvitePage: React.FC<InvitePageProps> = () => {
         : [...prev, department],
     );
 
-    setErrors((prev) => ({
-      ...prev,
-      departments: false,
-    }));
+    setErrors((prev) => ({ ...prev, departments: false }));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const nameError = name.trim() === "";
     const generationError = generation === "";
     const departmentsError = departments.length === 0;
@@ -68,22 +114,131 @@ const InvitePage: React.FC<InvitePageProps> = () => {
       departments: departmentsError,
     });
 
-    if (nameError || generationError || departmentsError) {
+    if (nameError || generationError || departmentsError) return;
+
+    if (!code || !inviteInfo) {
+      alert("유효한 초대 링크로 접속해 주세요.");
       return;
     }
 
-    // 3. 유효성 검사 통과 시 오늘 할 일 페이지(/today)로 이동
-    navigate("/today");
+    const selectedGeneration = inviteInfo.generations.find(
+      (item) => `${item.number}기` === generation,
+    );
+
+    if (!selectedGeneration) {
+      alert("초대 링크에서 제공한 기수를 선택해 주세요.");
+      return;
+    }
+
+    const majorMap: Record<
+      string,
+      "FRONTEND" | "BACKEND" | "DEVOPS" | "DESIGN"
+    > = {
+      "Front-end": "FRONTEND",
+      "Back-end": "BACKEND",
+      DevOps: "DEVOPS",
+      Design: "DESIGN",
+    };
+
+    setIsSubmitting(true);
+
+    try {
+      const result = await createJoinRequest(code, {
+        name: name.trim(),
+        generationId: selectedGeneration.id,
+        majors: departments
+          .map((department) => majorMap[department])
+          .filter(
+            (major): major is "FRONTEND" | "BACKEND" | "DEVOPS" | "DESIGN" =>
+              Boolean(major),
+          ),
+      });
+
+      localStorage.setItem("pvweb:memberId", String(result.memberId));
+
+      if (result.accessToken) {
+        localStorage.setItem("pvweb:accessToken", result.accessToken);
+      }
+
+      if (result.refreshToken) {
+        localStorage.setItem("pvweb:refreshToken", result.refreshToken);
+      }
+
+      localStorage.setItem(
+        "pvweb:invite-profile:v1",
+        JSON.stringify({
+          name: name.trim(),
+          generation,
+          departments,
+          joinedAt: new Date().toISOString(),
+        }),
+      );
+
+      if (result.status === "JOINED") {
+        alert("팀 입장이 완료되었습니다.");
+        navigate("/today");
+      } else {
+        alert("가입 요청을 보냈습니다. 팀 관리자의 승인을 기다려 주세요.");
+      }
+    } catch (error) {
+      console.error("초대 가입 요청 실패:", error);
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "가입 요청을 보내지 못했습니다.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleReEntry = async () => {
+    const code = reEntryCode.trim();
+
+    if (!code) {
+      alert("재입장 코드를 입력해 주세요.");
+      return;
+    }
+
+    setIsReEntering(true);
+
+    try {
+      const result = await reEntryLink(code);
+      localStorage.setItem("pvweb:memberId", String(result.memberId));
+
+      if (result.accessToken) {
+        localStorage.setItem("pvweb:accessToken", result.accessToken);
+      }
+
+      if (result.refreshToken) {
+        localStorage.setItem("pvweb:refreshToken", result.refreshToken);
+      }
+
+      if (result.status === "JOINED") {
+        setIsReEntryOpen(false);
+        alert("재입장이 완료되었습니다.");
+        navigate("/today");
+      } else {
+        alert("재입장 요청을 보냈습니다. 팀 관리자의 승인을 기다려 주세요.");
+      }
+    } catch (error) {
+      console.error("재입장 실패:", error);
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "재입장에 실패했습니다. 코드를 확인해 주세요.",
+      );
+    } finally {
+      setIsReEntering(false);
+    }
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#f7f7f7] overflow-hidden font-pretendard">
+    <div className="min-h-screen w-full overflow-hidden bg-[#f7f7f7] font-pretendard">
       <div className="flex min-h-screen w-full">
-        {/* =========================
-            LEFT SECTION
-        ========================= */}
         <section className="relative flex min-h-screen w-[41%] min-w-[560px] flex-col bg-black px-[6.5%] py-[5.5%] text-white">
-          {/* Logo */}
           <div className="mb-[5%]">
             <img
               src={logoWhite}
@@ -92,7 +247,6 @@ const InvitePage: React.FC<InvitePageProps> = () => {
             />
           </div>
 
-          {/* Main text */}
           <div>
             <h1 className="text-[42px] font-bold leading-[1.35] tracking-[-0.04em]">
               까먹지 않게,
@@ -107,7 +261,6 @@ const InvitePage: React.FC<InvitePageProps> = () => {
             </p>
           </div>
 
-          {/* Features list */}
           <div className="mt-[7%] space-y-7">
             {FEATURE_LIST.map((feature, idx) => (
               <div key={idx} className="flex items-center gap-4">
@@ -125,34 +278,32 @@ const InvitePage: React.FC<InvitePageProps> = () => {
             ))}
           </div>
 
-          {/* Invite info */}
           <div className="absolute bottom-[6%] left-[6.5%] right-[6.5%] rounded-[10px] bg-[#181818] px-5 py-4">
             <div className="flex items-center gap-3 text-[13px] text-[#777]">
               <img src={linkIcon} alt="" className="h-5 w-5" />
 
               <span>
-                {MOCK_INVITE_INFO.inviterRole} {MOCK_INVITE_INFO.inviterName}{" "}
-                님의 초대 · {MOCK_INVITE_INFO.expiresAt}까지 유효 ·{" "}
-                {MOCK_INVITE_INFO.remainingCount}회 남음
+                {inviteInfo?.teamName ?? "초대 링크 확인 중"} ·{" "}
+                {inviteInfo
+                  ? inviteInfo.approvalRequired
+                    ? "관리자 승인 후 입장"
+                    : "바로 입장 가능"
+                  : "초대 정보를 불러오는 중입니다"}
               </span>
             </div>
           </div>
         </section>
 
-        {/* =========================
-            RIGHT SECTION
-        ========================= */}
         <section className="relative flex min-h-screen flex-1 items-center justify-center bg-[#f7f7f7]">
-          {/* Profile card */}
-          <div className="h-[698px] w-[520px] rounded-[18px] bg-white p-[44px] shadow-[0_8px_30px_rgba(0,0,0,0.08)]">
+          <div className="w-[520px] rounded-[18px] bg-white p-[44px] shadow-[0_8px_30px_rgba(0,0,0,0.08)]">
             <h2 className="text-[23px] font-bold tracking-[-0.03em]">
               프로필을 입력하고 입장하세요
             </h2>
+
             <p className="mt-2 text-[11px] text-[#999]">
               별도 로그인이 없습니다. 입장하면 이 기기에 인증 토큰이 저장돼요.
             </p>
 
-            {/* 이름 입력 */}
             <div className="mt-8">
               <label className="text-[12px] font-medium">이름</label>
 
@@ -162,10 +313,7 @@ const InvitePage: React.FC<InvitePageProps> = () => {
                   setName(e.target.value);
 
                   if (e.target.value.trim() !== "") {
-                    setErrors((prev) => ({
-                      ...prev,
-                      name: false,
-                    }));
+                    setErrors((prev) => ({ ...prev, name: false }));
                   }
                 }}
                 className={`mt-2 h-[42px] w-full rounded-[7px] border px-3 text-[13px] outline-none ${
@@ -186,12 +334,11 @@ const InvitePage: React.FC<InvitePageProps> = () => {
               )}
             </div>
 
-            {/* 기수 선택 */}
             <div className="mt-7">
               <label className="text-[12px] font-medium">기수</label>
 
               <div className="mt-3 flex gap-2">
-                {GENERATION_OPTIONS.map((item) => (
+                {generationOptions.map((item) => (
                   <SelectionChip
                     key={item}
                     label={item}
@@ -212,7 +359,6 @@ const InvitePage: React.FC<InvitePageProps> = () => {
               )}
             </div>
 
-            {/* 전공 선택 */}
             <div className="mt-7">
               <div className="flex items-center justify-between">
                 <label className="text-[12px] font-medium">전공</label>
@@ -220,7 +366,7 @@ const InvitePage: React.FC<InvitePageProps> = () => {
               </div>
 
               <div className="mt-3 flex flex-wrap gap-2">
-                {DEPARTMENT_OPTIONS.map((department) => (
+                {departmentOptions.map((department) => (
                   <SelectionChip
                     key={department}
                     label={department}
@@ -241,7 +387,6 @@ const InvitePage: React.FC<InvitePageProps> = () => {
               )}
             </div>
 
-            {/* Notice */}
             <div className="mt-7 flex gap-3 rounded-[8px] bg-[#eaf3ff] px-4 py-4 text-[11px] leading-[1.5] text-[#4d78a8]">
               <img src={alertIcon} alt="" className="mt-[1px] h-4 w-4" />
 
@@ -251,24 +396,26 @@ const InvitePage: React.FC<InvitePageProps> = () => {
               </p>
             </div>
 
-            {/* Enter Button */}
             <button
               type="button"
               onClick={handleSubmit}
-              className="mt-6 flex h-[46px] w-full items-center justify-center gap-2 rounded-[7px] bg-black text-[13px] font-medium text-white transition hover:bg-[#222] active:scale-[0.99] cursor-pointer"
+              disabled={isSubmitting}
+              className="mt-6 flex h-[46px] w-full cursor-pointer items-center justify-center gap-2 rounded-[7px] bg-black text-[13px] font-medium text-white transition hover:bg-[#222] active:scale-[0.99] disabled:opacity-50"
             >
-              입장하기
+              {isSubmitting ? "입장 중..." : "입장하기"}
               <span className="text-[17px]">→</span>
             </button>
 
-            {/* Re-enter Button */}
             <div className="mt-5 text-center text-[10px] text-[#aaa]">
               <span>이미 입장한 적 있나요? </span>
 
               <button
                 type="button"
-                onClick={() => {}}
-                className="font-medium text-[#555] underline underline-offset-2 cursor-pointer"
+                onClick={() => {
+                  setReEntryCode("");
+                  setIsReEntryOpen(true);
+                }}
+                className="cursor-pointer font-medium text-[#555] underline underline-offset-2"
               >
                 재입장 코드 입력
               </button>
@@ -276,6 +423,58 @@ const InvitePage: React.FC<InvitePageProps> = () => {
           </div>
         </section>
       </div>
+
+      {isReEntryOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isReEntering) {
+              setIsReEntryOpen(false);
+            }
+          }}
+        >
+          <div className="w-full max-w-[420px] rounded-2xl bg-white p-8 shadow-xl">
+            <h2 className="text-xl font-bold">재입장 코드 입력</h2>
+
+            <p className="mt-2 text-sm text-gray-500">
+              발급받은 재입장 코드를 입력해 주세요.
+            </p>
+
+            <input
+              autoFocus
+              value={reEntryCode}
+              onChange={(e) => setReEntryCode(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !isReEntering) {
+                  void handleReEntry();
+                }
+              }}
+              placeholder="재입장 코드"
+              className="mt-6 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm outline-none focus:border-black"
+            />
+
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setIsReEntryOpen(false)}
+                disabled={isReEntering}
+                className="h-11 flex-1 rounded-lg border border-gray-300 text-sm disabled:opacity-50"
+              >
+                취소
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void handleReEntry()}
+                disabled={isReEntering}
+                className="h-11 flex-1 rounded-lg bg-black text-sm text-white disabled:opacity-50"
+              >
+                {isReEntering ? "재입장 중..." : "재입장"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

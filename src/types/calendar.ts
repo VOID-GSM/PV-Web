@@ -12,6 +12,7 @@ export interface CalendarEvent {
   assignees?: string[];
   description?: string;
   isMyEvent?: boolean;
+  completed?: boolean;
 }
 
 export interface BoardFilter {
