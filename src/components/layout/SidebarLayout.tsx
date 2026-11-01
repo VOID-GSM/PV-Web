@@ -26,13 +26,14 @@ export default function SidebarLayout({
       return "정리글 아카이브";
     if (pathname.startsWith("/questions")) return "면접 질문 뱅크";
     if (pathname.startsWith("/assignments")) return "과제 · 역량맵";
-    // ★ /worklog 주소면 "업무일지"에 불을 켠다
+    // /worklog 주소면 "업무일지"에 불을 켠다
     if (pathname.startsWith("/worklog")) return "업무일지";
     if (pathname.startsWith("/members")) return "팀원 관리";
     if (pathname.startsWith("/weekly-report") || pathname.startsWith("/report"))
       return "주간 리포트";
     if (pathname.startsWith("/invite")) return "팀원 초대";
-    if (pathname.startsWith("/settings")) return "설정";
+    // 설정 화면은 사이드바에 "설정" 메뉴가 없어서 "팀원 관리"에 불을 켠다
+    if (pathname.startsWith("/settings")) return "팀원 관리";
     return "";
   };
 
@@ -64,7 +65,7 @@ export default function SidebarLayout({
       case "과제 · 역량맵":
         navigate("/assignments");
         break;
-      // ★ 업무일지 → /worklog
+      // 업무일지 → /worklog
       case "업무일지":
         navigate("/worklog");
         break;
