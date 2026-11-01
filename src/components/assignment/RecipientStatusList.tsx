@@ -1,59 +1,55 @@
-import { STATUS_BADGE, getRecipients, type Assignment, type Submission } from "../../constants/assignment";
+import { STATUS_BADGE, type SubmissionStatus } from "../../constants/assignment";
 
-type RecipientStatusListProps = {
-  assignment: Assignment;
-  submissions: Submission[];
-  // 선택된 사람 (있으면 강조)
-  selectedName?: string;
-  // 넘겨주면 줄을 누를 수 있다
-  onSelect?: (name: string) => void;
+// ★ 받는 사람 한 줄 (페이지가 서버 제출 현황을 이 모양으로 바꿔서 넘겨준다)
+export type RecipientRow = {
+  memberId: number;
+  name: string;
+  status: SubmissionStatus | "미제출";
+  // "10-30 22:05" 모양 (안 냈으면 null)
+  submittedAt: string | null;
+  // 제출물 번호 (안 냈으면 null)
+  submissionId: number | null;
 };
 
-export default function RecipientStatusList({
-  assignment,
-  submissions,
-  selectedName,
-  onSelect,
-}: RecipientStatusListProps) {
-  const recipients = getRecipients(assignment.targets, assignment.personalTargets);
+type RecipientStatusListProps = {
+  rows: RecipientRow[];
+  // 선택된 사람 번호 (있으면 강조)
+  selectedMemberId?: number | null;
+  // 넘겨주면 줄을 누를 수 있다
+  onSelect?: (memberId: number) => void;
+};
 
-  if (recipients.length === 0) {
+export default function RecipientStatusList({ rows, selectedMemberId, onSelect }: RecipientStatusListProps) {
+  if (rows.length === 0) {
     return <p className="py-6 text-center text-xs text-neutral-400">과제를 받는 팀원이 없습니다</p>;
   }
 
   return (
     <ul className="flex flex-col">
-      {recipients.map((member) => {
-        // 이 사람의 제출물
-        const submission = submissions.find(
-          (s) => s.assignmentId === assignment.id && s.author === member.name
-        );
-        const status = submission?.status ?? "미제출";
-        return (
-          <li key={member.name} className="border-b last:border-b-0">
-            <button
-              onClick={() => onSelect?.(member.name)}
-              disabled={!onSelect}
-              className={`flex w-full items-center justify-between gap-2 px-2 py-2.5 text-left ${
-                selectedName === member.name ? "bg-neutral-100" : ""
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black text-[10px] text-white">
-                  {member.name.charAt(0)}
-                </span>
-                <span>
-                  <span className="block text-sm">{member.name}</span>
-                  <span className="block text-[11px] text-neutral-400">
-                    {submission ? `${submission.submittedAt.slice(5, 10)} ${submission.type}` : "아직 제출하지 않음"}
-                  </span>
+      {rows.map((row) => (
+        <li key={row.memberId} className="border-b last:border-b-0">
+          <button
+            onClick={() => onSelect?.(row.memberId)}
+            disabled={!onSelect}
+            className={`flex w-full items-center justify-between gap-2 px-2 py-2.5 text-left ${
+              selectedMemberId === row.memberId ? "bg-neutral-100" : ""
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black text-[10px] text-white">
+                {row.name.charAt(0)}
+              </span>
+              <span>
+                <span className="block text-sm">{row.name}</span>
+                <span className="block text-[11px] text-neutral-400">
+                  {row.submittedAt ? `${row.submittedAt} 제출` : "아직 제출하지 않음"}
                 </span>
               </span>
-              <span className={`rounded-full px-2 py-0.5 text-[11px] ${STATUS_BADGE[status]}`}>{status}</span>
-            </button>
-          </li>
-        );
-      })}
+            </span>
+            <span className={`rounded-full px-2 py-0.5 text-[11px] ${STATUS_BADGE[row.status]}`}>{row.status}</span>
+          </button>
+        </li>
+      ))}
     </ul>
   );
 }
