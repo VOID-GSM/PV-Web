@@ -1,5 +1,6 @@
 // src/components/modals/CreateArticleModal.tsx
 import React, { useState } from "react";
+import MarkdownPreview from "../common/MarkdownPreview";
 
 // mode 타입에 "journal", "interview" 추가
 export type ArticleModalMode =
@@ -94,7 +95,15 @@ export const CreateArticleModal: React.FC<CreateArticleModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (onSubmitSuccess && title.trim()) {
+    if (!title.trim()) {
+      window.alert("제목을 입력해 주세요.");
+      return;
+    }
+    if (!content.trim()) {
+      window.alert("내용을 입력해 주세요.");
+      return;
+    }
+    if (onSubmitSuccess) {
       onSubmitSuccess({
         session,
         title,
@@ -200,8 +209,8 @@ export const CreateArticleModal: React.FC<CreateArticleModalProps> = ({
                   className="w-full rounded-2xl border border-gray-200 p-4 text-xs outline-none focus:border-black leading-relaxed"
                 />
               ) : (
-                <div className="min-h-[220px] rounded-2xl border border-gray-100 bg-gray-50/60 p-4 text-xs text-gray-800 leading-relaxed whitespace-pre-wrap">
-                  {content.trim() ? content : "작성된 내용이 없습니다."}
+                <div className="min-h-[220px] rounded-2xl border border-gray-100 bg-gray-50/60 p-4">
+                  {content.trim() ? <MarkdownPreview content={content} className="text-xs" /> : <p className="text-xs italic text-gray-400">작성된 내용이 없습니다.</p>}
                 </div>
               )}
             </div>
