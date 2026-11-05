@@ -11,7 +11,21 @@ import fileTextIcon from "../../assets/icons/file-text.svg";
 import clipboardIcon from "../../assets/icons/clipboard.svg";
 import trendingUpIcon from "../../assets/icons/trending-up.svg";
 import usersIcon from "../../assets/icons/users.svg";
-import filterIcon from "../../assets/icons/filter.svg";
+
+interface InviteProfile {
+  name?: string;
+  generation?: string;
+  departments?: string[];
+}
+
+const getInviteProfile = (): InviteProfile => {
+  try {
+    const saved = localStorage.getItem("pvweb:invite-profile:v1");
+    return saved ? JSON.parse(saved) : {};
+  } catch {
+    return {};
+  }
+};
 
 export interface SidebarProps {
   activeMenu?: string;
@@ -47,6 +61,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const [isLeader, setIsLeader] = useState(false);
+  const [profile] = useState<InviteProfile>(getInviteProfile);
+
+  const displayName = profile.name?.trim() || "사용자";
+  const displayGeneration = profile.generation || "";
+  const displayDepartments = profile.departments?.join(", ") || "";
 
   useEffect(() => {
     let mounted = true;
@@ -341,24 +360,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       <div className="mt-auto border-t border-gray-100 pt-3">
-        <div className="flex items-center justify-between px-1">
+        <div className="flex items-center px-1">
           <div className="flex items-center gap-2.5">
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-black text-xs font-bold text-white">
-              동
+              {displayName.charAt(0)}
             </div>
 
             <div>
-              <p className="text-xs font-bold text-gray-900">동키</p>
-              <p className="text-[10px] text-gray-400">10기 · Front-end</p>
+              <p className="text-xs font-bold text-gray-900">{displayName}</p>
+              <p className="text-[10px] text-gray-400">
+                {[displayGeneration, displayDepartments]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
             </div>
           </div>
-
-          <button
-            type="button"
-            className="cursor-pointer p-1 text-gray-400 hover:text-gray-600"
-          >
-            <img src={filterIcon} alt="설정" className="h-4 w-4 opacity-50" />
-          </button>
         </div>
       </div>
     </aside>
