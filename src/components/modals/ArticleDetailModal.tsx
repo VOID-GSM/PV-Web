@@ -72,7 +72,7 @@ export const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
         <div className="mt-6 border-t border-gray-100 pt-4 flex-1 flex flex-col justify-between overflow-hidden">
           <div>
             <h3 className="text-xs font-bold text-gray-800 mb-2">
-              💬 피드백 ({article.feedbacks.length}개)
+              피드백 ({article.feedbacks.length}개)
             </h3>
 
             <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
