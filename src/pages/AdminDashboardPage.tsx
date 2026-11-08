@@ -1,6 +1,8 @@
 import { useCallback, useState } from "react";
 import { Header } from "../components/layout/Header";
 import Toast from "../components/common/Toast";
+// ★ 공통 확인 창 (브라우저 기본 창 대신)
+import ConfirmModal from "../components/common/ConfirmModal";
 import StatCards from "../components/admin/StatCards";
 import MemberTable from "../components/admin/MemberTable";
 import MemberEditModal from "../components/admin/MemberEditModal";
@@ -19,7 +21,7 @@ import {
   type JoinRequest,
   type Member,
 } from "../constants/admin";
-// ★ 서버 연동
+// 서버 연동
 import {
   useApproveJoinRequest,
   useCreateInvite,
@@ -61,12 +63,12 @@ function toShortDateTime(iso: string): string {
 type ToastState = { id: number; message: string; type: "success" | "info" };
 
 export default function AdminDashboardPage() {
-  // ★ 서버 데이터
+  // 서버 데이터
   const membersQuery = useTeamMembers();
   const dashboardQuery = useDashboard();
   const joinRequestsQuery = useJoinRequests();
 
-  // ★ 서버로 보내는 도구들
+  // 서버로 보내는 도구들
   const updateMember = useUpdateMember();
   const grantRole = useGrantRole();
   const removeRole = useRemoveRole();
@@ -85,12 +87,16 @@ export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState("전체");
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  // ★ 폐기 확인 창에 띄울 링크 (null이면 창 닫힘)
+  const [revokeTarget, setRevokeTarget] = useState<InviteLink | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
 
   const showToast = (message: string, type: "success" | "info" = "success") => {
     setToast((prev) => ({ id: (prev?.id ?? 0) + 1, message, type }));
   };
   const closeToast = useCallback(() => setToast(null), []);
+  // ★ 확인 창 닫기 (ConfirmModal이 Esc 감지에 쓰니까 매번 새로 만들지 않게 기억해 둔다)
+  const closeRevokeConfirm = useCallback(() => setRevokeTarget(null), []);
 
   // ===== 서버 → 화면 =====
 
@@ -244,9 +250,11 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // 초대 링크 폐기
-  const handleRevoke = (link: InviteLink) => {
-    if (!window.confirm("이 초대 링크를 폐기할까요? 이미 입장한 사람에게는 영향이 없습니다.")) return;
+  // ★ 확인 창에서 "폐기"를 눌렀을 때 실제로 서버에 보낸다
+  const handleConfirmRevoke = () => {
+    const link = revokeTarget;
+    setRevokeTarget(null);
+    if (!link) return;
     deleteInvite.mutate(link.id, {
       onSuccess: () => {
         setLinks((prev) => prev.filter((l) => l.id !== link.id));
@@ -277,7 +285,7 @@ export default function AdminDashboardPage() {
   };
   const handleReject = () => showToast("입장 요청 거절은 서버 연결을 준비 중입니다", "info");
 
-  // ★ 서버에 없는 기능
+  // 서버에 없는 기능
   const handleToggleActive = () => showToast("비활성화는 서버 연결을 준비 중입니다", "info");
   const handleAddGeneration = () => showToast("기수 추가는 서버 연결을 준비 중입니다", "info");
   const handleGraduate = () => showToast("기수 졸업 처리는 서버 연결을 준비 중입니다", "info");
@@ -326,7 +334,8 @@ export default function AdminDashboardPage() {
                   `초대 링크를 복사했습니다${link.expiresAt ? ` (${formatMonthDay(link.expiresAt)} 만료)` : ""}`
                 )
               }
-              onRevoke={handleRevoke}
+              // ★ 바로 지우지 않고 확인 창만 연다
+              onRevoke={setRevokeTarget}
               onToggleApproval={handleToggleApproval}
             />
             <JoinRequestCard
@@ -361,6 +370,19 @@ export default function AdminDashboardPage() {
           generations={generations}
           onCreate={handleCreateLink}
           onClose={() => setIsInviteModalOpen(false)}
+        />
+      )}
+
+      {/* ★ 초대 링크 폐기 확인 창 */}
+      {revokeTarget && (
+        <ConfirmModal
+          title="이 초대 링크를 폐기할까요?"
+          message="폐기하면 이 링크로는 더 이상 입장할 수 없어요. 이미 입장한 사람에게는 영향이 없습니다."
+          confirmLabel="폐기"
+          // 되돌릴 수 없는 일이라 빨간 버튼
+          danger
+          onConfirm={handleConfirmRevoke}
+          onCancel={closeRevokeConfirm}
         />
       )}
 
