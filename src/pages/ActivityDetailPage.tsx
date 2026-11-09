@@ -1,4 +1,3 @@
-// src/pages/ActivityDetailPage.tsx
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -7,6 +6,7 @@ import {
   getActivitySessions,
   getActivityMembers,
   getTopicCandidates,
+  proposeTopicCandidate,
   voteTopicCandidate,
   cancelTopicVote,
 } from "../api/activityApi";
@@ -75,6 +75,8 @@ export default function ActivityDetailPage() {
   const [selectedVoteOption, setSelectedVoteOption] = useState<number | null>(
     null,
   );
+  const [isSubmittingTopic, setIsSubmittingTopic] = useState(false);
+  const [isVoting, setIsVoting] = useState(false);
   const [absenceRequests, setAbsenceRequests] = useState<AbsenceRequest[]>([]);
 
   // 정리글
@@ -90,24 +92,31 @@ export default function ActivityDetailPage() {
 
   useEffect(() => {
     let cancelled = false;
+
     if (!id) {
       getActivities()
         .then((activities) => {
           if (cancelled) return;
-          if (activities.length > 0)
+
+          if (activities.length > 0) {
             navigate(`/activity/${activities[0].id}`, { replace: true });
-          else setActivityTitle("등록된 활동이 없습니다");
+          } else {
+            setActivityTitle("등록된 활동이 없습니다");
+          }
         })
         .catch((error: unknown) =>
           console.error("활동 목록 조회 실패:", error),
         );
+
       return () => {
         cancelled = true;
       };
     }
 
     const activityId = Number(id);
+
     if (!Number.isFinite(activityId)) return;
+
     Promise.all([
       getActivity(activityId),
       getActivitySessions(activityId),
@@ -119,6 +128,7 @@ export default function ActivityDetailPage() {
     ])
       .then(async ([detail, apiSessions, apiMembers, absences]) => {
         if (cancelled) return;
+
         setActivityTitle(detail.summary.name);
         setActivitySchedule(
           detail.summary.statusLabel || detail.summary.status || "일정 미정",
@@ -130,6 +140,7 @@ export default function ActivityDetailPage() {
           detail.topicModeLabel || detail.topicMode || "규칙 미정",
         );
         setMembers(apiMembers.map((member) => member.name));
+
         const mappedSessions: SessionItem[] = apiSessions.map((session) => ({
           id: String(session.id),
           sessionNum: `${session.sessionNo ?? ""}회차`,
@@ -143,7 +154,9 @@ export default function ActivityDetailPage() {
                 ? "휴강"
                 : "진행 예정",
         }));
+
         setSessions(mappedSessions);
+
         const postSummaries = await getPosts(
           { activityId, validRange: false },
           0,
@@ -152,10 +165,12 @@ export default function ActivityDetailPage() {
           console.error("활동 정리글 조회 실패:", error);
           return { content: [] };
         });
+
         const mappedPosts = await Promise.all(
           postSummaries.content.map(async (summary) => {
             try {
               const post = await getPost(summary.id);
+
               return {
                 id: String(post.id),
                 session: `회차 ${apiSessions.find((session) => session.id === post.sessionId)?.sessionNo ?? ""}`,
@@ -178,7 +193,9 @@ export default function ActivityDetailPage() {
             }
           }),
         );
+
         setArticles(mappedPosts);
+
         setAbsenceRequests(
           absences
             .filter(
@@ -193,6 +210,7 @@ export default function ActivityDetailPage() {
               reason: absence.reason,
             })),
         );
+
         if (apiSessions[0]) {
           const candidates = await getTopicCandidates(
             activityId,
@@ -201,7 +219,8 @@ export default function ActivityDetailPage() {
             console.error("주제 후보 조회 실패:", error);
             return [];
           });
-          if (!cancelled)
+
+          if (!cancelled) {
             setVotes(
               candidates.map((candidate) => ({
                 id: String(candidate.id),
@@ -210,29 +229,99 @@ export default function ActivityDetailPage() {
                 voted: candidate.voted,
               })),
             );
-          const votedIndex = candidates.findIndex(
-            (candidate) => candidate.voted,
-          );
-          setSelectedVoteOption(votedIndex >= 0 ? votedIndex : null);
+
+            const votedIndex = candidates.findIndex(
+              (candidate) => candidate.voted,
+            );
+
+            setSelectedVoteOption(votedIndex >= 0 ? votedIndex : null);
+          }
         } else {
           setVotes([]);
+          setSelectedVoteOption(null);
         }
       })
       .catch((error: unknown) => {
         console.error("활동 상세 API 조회 실패:", error);
-        if (!cancelled) setActivityTitle("활동 정보를 불러오지 못했습니다");
+
+        if (!cancelled) {
+          setActivityTitle("활동 정보를 불러오지 못했습니다");
+        }
       });
+
     return () => {
       cancelled = true;
     };
   }, [id, navigate]);
 
+  // 주제 후보 목록 새로고침
+  const refreshTopicCandidates = async () => {
+    if (!id || !sessions[0]) return;
+
+    const candidates = await getTopicCandidates(
+      Number(id),
+      Number(sessions[0].id),
+    );
+
+    const mappedCandidates: VoteItem[] = candidates.map((candidate) => ({
+      id: String(candidate.id),
+      text: candidate.title,
+      votes: candidate.voteCount,
+      voted: candidate.voted,
+    }));
+
+    setVotes(mappedCandidates);
+
+    const votedIndex = mappedCandidates.findIndex(
+      (candidate) => candidate.voted,
+    );
+
+    setSelectedVoteOption(votedIndex >= 0 ? votedIndex : null);
+  };
+
+  // 주제 후보 등록
+  const handleProposeTopic = async () => {
+    if (!id || !sessions[0]) {
+      alert("주제를 등록할 회차가 없습니다.");
+      return;
+    }
+
+    const title = window.prompt("제안할 주제를 입력해 주세요.");
+
+    if (!title?.trim()) return;
+
+    try {
+      setIsSubmittingTopic(true);
+
+      await proposeTopicCandidate(
+        Number(id),
+        Number(sessions[0].id),
+        title.trim(),
+      );
+
+      await refreshTopicCandidates();
+
+      alert("주제가 등록되었습니다.");
+    } catch (error) {
+      console.error("주제 후보 등록 실패:", error);
+
+      alert(
+        error instanceof Error ? error.message : "주제를 등록하지 못했습니다.",
+      );
+    } finally {
+      setIsSubmittingTopic(false);
+    }
+  };
+
+  // 결석 요청 승인
   const handleApproveAbsence = async (id: string) => {
     try {
       await approveAbsence(Number(id));
+
       setAbsenceRequests((prev) => prev.filter((item) => item.id !== id));
     } catch (error) {
       console.error("결석 요청 승인 실패:", error);
+
       alert(
         error instanceof Error
           ? error.message
@@ -241,14 +330,19 @@ export default function ActivityDetailPage() {
     }
   };
 
+  // 결석 요청 거절
   const handleRejectAbsence = async (id: string) => {
     const comment = window.prompt("거절 사유를 입력해 주세요.");
+
     if (!comment?.trim()) return;
+
     try {
       await rejectAbsence(Number(id), comment.trim());
+
       setAbsenceRequests((prev) => prev.filter((item) => item.id !== id));
     } catch (error) {
       console.error("결석 요청 거절 실패:", error);
+
       alert(
         error instanceof Error
           ? error.message
@@ -257,14 +351,17 @@ export default function ActivityDetailPage() {
     }
   };
 
+  // 정리글 피드백
   const handleAddFeedback = async (articleId: string, feedbackText: string) => {
     if (!/^\d+$/.test(articleId)) return;
+
     try {
       const comment = await createComment({
         targetType: "NOTE",
         targetId: Number(articleId),
         content: feedbackText,
       });
+
       setArticles((prev) =>
         prev.map((art) =>
           art.id === articleId
@@ -287,6 +384,7 @@ export default function ActivityDetailPage() {
       );
     } catch (error) {
       console.error("정리글 피드백 작성 실패:", error);
+
       alert(
         error instanceof Error
           ? error.message
@@ -295,49 +393,40 @@ export default function ActivityDetailPage() {
     }
   };
 
-  const handleVoteCandidate = async (candidateId: string, index: number) => {
-    if (!id || !sessions[0]) return;
+  // 주제 투표 및 취소
+  const handleVoteCandidate = async (candidateId: string) => {
+    if (!id || !sessions[0] || isVoting) return;
+
     const activityId = Number(id);
     const sessionId = Number(sessions[0].id);
     const candidate = votes.find((item) => item.id === candidateId);
+
     if (!candidate) return;
+
     try {
+      setIsVoting(true);
+
       if (candidate.voted) {
         await cancelTopicVote(activityId, sessionId, Number(candidateId));
-        setVotes((items) =>
-          items.map((item) =>
-            item.id === candidateId
-              ? { ...item, voted: false, votes: Math.max(0, item.votes - 1) }
-              : item,
-          ),
-        );
-        setSelectedVoteOption(null);
       } else {
-        if (votes.some((item) => item.voted)) {
-          const current = votes.find((item) => item.voted);
-          if (current)
-            await cancelTopicVote(activityId, sessionId, Number(current.id));
+        const current = votes.find((item) => item.voted);
+
+        if (current) {
+          await cancelTopicVote(activityId, sessionId, Number(current.id));
         }
+
         await voteTopicCandidate(activityId, sessionId, Number(candidateId));
-        setVotes((items) =>
-          items.map((item) => ({
-            ...item,
-            voted: item.id === candidateId,
-            votes:
-              item.id === candidateId
-                ? item.votes + 1
-                : item.voted
-                  ? Math.max(0, item.votes - 1)
-                  : item.votes,
-          })),
-        );
-        setSelectedVoteOption(index);
       }
+
+      await refreshTopicCandidates();
     } catch (error) {
       console.error("주제 투표 실패:", error);
+
       alert(
         error instanceof Error ? error.message : "투표를 저장하지 못했습니다.",
       );
+    } finally {
+      setIsVoting(false);
     }
   };
 
@@ -348,7 +437,6 @@ export default function ActivityDetailPage() {
         subtitle="모든 보드의 마감·회의·활동을 한 화면에서"
       />
 
-      {/* 메인 스크롤 영역 (토글바 완전히 제거됨) */}
       <div className="flex-1 overflow-y-auto p-8 space-y-6">
         {/* 상단 활동 요약 카드 */}
         <div className="rounded-3xl bg-white p-6 shadow-xs border border-gray-100">
@@ -367,6 +455,7 @@ export default function ActivityDetailPage() {
                   />
                   <span>{activitySchedule}</span>
                 </span>
+
                 <span className="flex items-center gap-1.5">
                   <img
                     src={clockIcon}
@@ -375,6 +464,7 @@ export default function ActivityDetailPage() {
                   />
                   <span>{activityPeriod}</span>
                 </span>
+
                 <span className="flex items-center gap-1.5">
                   <img
                     src={checkCircleIcon}
@@ -389,14 +479,15 @@ export default function ActivityDetailPage() {
                 <span className="font-bold text-gray-700">
                   참여자 {members.length}명
                 </span>
+
                 {members.length > 0 && (
                   <div className="flex -space-x-1.5">
-                    {members.map((m, i) => (
+                    {members.map((member, index) => (
                       <div
-                        key={i}
+                        key={index}
                         className="flex h-6 w-6 items-center justify-center rounded-full bg-black text-[10px] font-bold text-white border-2 border-white"
                       >
-                        {m[0]}
+                        {member[0]}
                       </div>
                     ))}
                   </div>
@@ -408,6 +499,7 @@ export default function ActivityDetailPage() {
               <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-xl">
                 평균 출석률 0%
               </span>
+
               <button
                 type="button"
                 onClick={() => setIsNoticeModalOpen(true)}
@@ -416,6 +508,7 @@ export default function ActivityDetailPage() {
                 <img src={bellIcon} alt="" className="h-3.5 w-3.5 opacity-70" />
                 <span>공지 보내기</span>
               </button>
+
               <button
                 type="button"
                 onClick={() => setIsSettingsModalOpen(true)}
@@ -453,7 +546,7 @@ export default function ActivityDetailPage() {
               ))}
             </div>
 
-            {/* 1. 회차 탭 */}
+            {/* 회차 탭 */}
             {activeTab === "회차" && (
               <div>
                 {sessions.length === 0 ? (
@@ -462,27 +555,30 @@ export default function ActivityDetailPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {sessions.map((s) => (
+                    {sessions.map((session) => (
                       <div
-                        key={s.id}
+                        key={session.id}
                         className="rounded-3xl bg-white p-5 shadow-xs border border-gray-100 hover:shadow-md transition"
                       >
                         <div className="flex justify-between items-start">
                           <div>
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-bold text-gray-400">
-                                {s.sessionNum} {s.date}
+                                {session.sessionNum} {session.date}
                               </span>
+
                               <h3 className="text-base font-bold text-gray-900">
-                                {s.title}
+                                {session.title}
                               </h3>
                             </div>
+
                             <p className="mt-1 text-xs text-gray-500">
-                              {s.description}
+                              {session.description}
                             </p>
                           </div>
+
                           <span className="rounded-full bg-gray-100 text-gray-700 text-xs font-bold px-3 py-1">
-                            {s.status}
+                            {session.status}
                           </span>
                         </div>
                       </div>
@@ -492,28 +588,30 @@ export default function ActivityDetailPage() {
               </div>
             )}
 
-            {/* 2. 참여자 탭 */}
+            {/* 참여자 탭 */}
             {activeTab === "참여자" && (
               <div className="rounded-3xl bg-white p-6 shadow-xs border border-gray-100 space-y-4">
                 <h3 className="font-bold text-gray-900 text-sm">
                   스터디 참여자 ({members.length}명)
                 </h3>
+
                 {members.length === 0 ? (
                   <div className="py-12 text-center text-xs text-gray-400">
                     등록된 참여자가 없습니다.
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-3">
-                    {members.map((m, i) => (
+                    {members.map((member, index) => (
                       <div
-                        key={i}
+                        key={index}
                         className="flex items-center gap-3 p-3 bg-gray-50 rounded-2xl"
                       >
                         <div className="h-8 w-8 rounded-full bg-black text-white flex items-center justify-center font-bold text-xs">
-                          {m[0]}
+                          {member[0]}
                         </div>
+
                         <span className="font-bold text-xs text-gray-800">
-                          {m}
+                          {member}
                         </span>
                       </div>
                     ))}
@@ -522,25 +620,27 @@ export default function ActivityDetailPage() {
               </div>
             )}
 
-            {/* 3. 출석 현황 탭 */}
+            {/* 출석 현황 탭 */}
             {activeTab === "출석 현황" && (
               <div className="rounded-3xl bg-white p-6 shadow-xs border border-gray-100 space-y-4">
                 <h3 className="font-bold text-gray-900 text-sm">
                   회차별 출석 현황
                 </h3>
+
                 <div className="py-16 text-center text-xs text-gray-400">
                   출석 현황 데이터가 없습니다.
                 </div>
               </div>
             )}
 
-            {/* 4. 정리글 탭 */}
+            {/* 정리글 탭 */}
             {activeTab === "정리글" && (
               <div className="rounded-3xl bg-white p-6 shadow-xs border border-gray-100 space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="font-bold text-gray-900 text-sm">
                     제출된 정리글 목록
                   </h3>
+
                   <button
                     type="button"
                     onClick={() => setIsCreateArticleOpen(true)}
@@ -561,25 +661,28 @@ export default function ActivityDetailPage() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {articles.map((art) => (
+                    {articles.map((article) => (
                       <div
-                        key={art.id}
-                        onClick={() => setSelectedArticle(art)}
+                        key={article.id}
+                        onClick={() => setSelectedArticle(article)}
                         className="flex items-center justify-between p-4 rounded-2xl bg-gray-50/70 border border-gray-100 hover:bg-gray-100/60 transition cursor-pointer"
                       >
                         <div className="flex items-center gap-3">
                           <span className="rounded-md bg-gray-200 px-2 py-0.5 text-[10px] font-bold text-gray-600">
-                            {art.session}
+                            {article.session}
                           </span>
+
                           <span className="font-bold text-xs text-gray-900">
-                            {art.title}
+                            {article.title}
                           </span>
+
                           <span className="text-[11px] text-gray-400">
-                            {art.author} · {art.date}
+                            {article.author} · {article.date}
                           </span>
                         </div>
+
                         <span className="text-[11px] font-semibold text-gray-500">
-                          💬 피드백 {art.feedbacks.length}개
+                          피드백 {article.feedbacks.length}개
                         </span>
                       </div>
                     ))}
@@ -588,11 +691,12 @@ export default function ActivityDetailPage() {
               </div>
             )}
 
-            {/* 5. 공지 탭 */}
+            {/* 공지 탭 */}
             {activeTab === "공지" && (
               <div className="rounded-3xl bg-white p-6 shadow-xs border border-gray-100 space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="font-bold text-gray-900 text-sm">공지사항</h3>
+
                   <button
                     type="button"
                     onClick={() => setIsNoticeModalOpen(true)}
@@ -606,6 +710,7 @@ export default function ActivityDetailPage() {
                     <span>공지 작성</span>
                   </button>
                 </div>
+
                 <div className="py-12 text-center text-xs text-gray-400">
                   등록된 공지사항이 없습니다.
                 </div>
@@ -613,59 +718,105 @@ export default function ActivityDetailPage() {
             )}
           </div>
 
-          {/* 우측 카드 영역: 주제 투표 & 불참 요청 승인 대기 */}
+          {/* 우측 카드 영역 */}
           <div className="col-span-4 space-y-4">
             {/* 주제 투표 카드 */}
-            <div className="rounded-3xl bg-white p-5 shadow-xs border border-gray-100 text-xs space-y-3">
-              <h3 className="font-bold text-gray-900 text-sm">주제 투표</h3>
+            <div className="rounded-3xl bg-white p-5 shadow-xs border border-gray-100 text-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-gray-900 text-sm">주제 투표</h3>
 
-              {votes.length === 0 ? (
-                <p className="py-8 text-center text-gray-400">
-                  진행 중인 투표가 없습니다.
-                </p>
+                  <p className="mt-1 text-[11px] text-gray-400">
+                    함께 진행할 활동 주제를 정해 보세요.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleProposeTopic}
+                  disabled={isSubmittingTopic || sessions.length === 0}
+                  className="rounded-xl bg-black px-3 py-2 text-[11px] font-bold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {isSubmittingTopic ? "등록 중..." : "+ 주제 제안"}
+                </button>
+              </div>
+
+              {sessions.length === 0 ? (
+                <div className="py-8 text-center text-gray-400">
+                  회차가 등록되면 주제를 제안할 수 있습니다.
+                </div>
+              ) : votes.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-gray-200 py-8 text-center">
+                  <p className="font-semibold text-gray-600">
+                    아직 등록된 주제가 없습니다.
+                  </p>
+
+                  <p className="mt-1 text-[11px] text-gray-400">
+                    첫 번째 주제를 제안해 보세요.
+                  </p>
+                </div>
               ) : (
                 <>
-                  <div className="space-y-2 pt-1">
-                    {votes.map((item, idx) => (
-                      <div
+                  <div className="space-y-2">
+                    {votes.map((item, index) => (
+                      <button
                         key={item.id}
-                        onClick={() => void handleVoteCandidate(item.id, idx)}
-                        className={`flex items-center justify-between rounded-xl border p-3 cursor-pointer transition ${
-                          selectedVoteOption === idx
-                            ? "border-black bg-white ring-1 ring-black font-bold"
-                            : "border-gray-200 bg-gray-50 text-gray-600"
+                        type="button"
+                        disabled={isVoting}
+                        onClick={() => setSelectedVoteOption(index)}
+                        className={`flex w-full items-center justify-between rounded-xl border p-3 text-left transition disabled:opacity-60 ${
+                          selectedVoteOption === index
+                            ? "border-black bg-gray-50 ring-1 ring-black"
+                            : "border-gray-200 hover:bg-gray-50"
                         }`}
                       >
                         <div className="flex items-center gap-2">
                           <span
-                            className={`h-3.5 w-3.5 rounded-md border border-gray-400 flex items-center justify-center ${
-                              selectedVoteOption === idx
-                                ? "bg-black border-black"
-                                : "bg-white"
+                            className={`flex h-4 w-4 items-center justify-center rounded-full border ${
+                              selectedVoteOption === index
+                                ? "border-black bg-black"
+                                : "border-gray-300 bg-white"
                             }`}
                           >
-                            {selectedVoteOption === idx && (
-                              <img
-                                src={checkCircleIcon}
-                                alt=""
-                                className="h-3 w-3 filter invert"
-                              />
+                            {selectedVoteOption === index && (
+                              <span className="h-1.5 w-1.5 rounded-full bg-white" />
                             )}
                           </span>
-                          <span>{item.text}</span>
+
+                          <span className="font-medium text-gray-800">
+                            {item.text}
+                          </span>
                         </div>
-                        <span className="text-[11px] text-gray-400 font-bold">
+
+                        <span className="text-[11px] font-bold text-gray-400">
                           {item.votes}표
                         </span>
-                      </div>
+                      </button>
                     ))}
                   </div>
 
                   <button
                     type="button"
-                    className="w-full rounded-xl bg-black py-2.5 font-bold text-white hover:bg-gray-800 transition cursor-pointer"
+                    disabled={selectedVoteOption === null || isVoting}
+                    onClick={() => {
+                      if (selectedVoteOption === null) return;
+
+                      const selected = votes[selectedVoteOption];
+
+                      if (selected) {
+                        void handleVoteCandidate(
+                          selected.id,
+                        );
+                      }
+                    }}
+                    className="w-full rounded-xl bg-black py-3 font-bold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
                   >
-                    투표하기
+                    {isVoting
+                      ? "처리 중..."
+                      : selectedVoteOption !== null &&
+                          votes[selectedVoteOption]?.voted
+                        ? "선택한 투표 취소하기"
+                        : "선택한 주제에 투표하기"}
                   </button>
                 </>
               )}
@@ -677,6 +828,7 @@ export default function ActivityDetailPage() {
                 <h3 className="font-bold text-gray-900 text-sm">
                   불참 요청 승인 대기
                 </h3>
+
                 <span className="rounded-full bg-red-500 text-white text-[10px] font-bold px-2 py-0.5">
                   {absenceRequests.length}건
                 </span>
@@ -687,35 +839,39 @@ export default function ActivityDetailPage() {
                   대기 중인 불참 요청이 없습니다.
                 </p>
               ) : (
-                absenceRequests.map((req) => (
+                absenceRequests.map((request) => (
                   <div
-                    key={req.id}
+                    key={request.id}
                     className="rounded-2xl bg-gray-50 p-4 space-y-2 border border-gray-100"
                   >
                     <div className="flex items-center gap-2">
                       <div className="flex h-6 w-6 items-center justify-center rounded-full bg-black text-[10px] font-bold text-white">
-                        {req.name[0]}
+                        {request.name[0]}
                       </div>
+
                       <span className="font-bold text-gray-900">
-                        {req.name}
+                        {request.name}
                       </span>
-                      <span className="text-gray-400">· {req.session}</span>
+
+                      <span className="text-gray-400">· {request.session}</span>
                     </div>
+
                     <p className="text-[11px] text-gray-600 leading-relaxed bg-white p-2.5 rounded-xl border border-gray-100">
-                      "{req.reason}"
+                      "{request.reason}"
                     </p>
 
                     <div className="flex gap-2 pt-1">
                       <button
                         type="button"
-                        onClick={() => handleApproveAbsence(req.id)}
+                        onClick={() => handleApproveAbsence(request.id)}
                         className="flex-1 rounded-xl bg-black py-1.5 font-bold text-white hover:bg-gray-800 transition cursor-pointer"
                       >
                         승인
                       </button>
+
                       <button
                         type="button"
-                        onClick={() => handleRejectAbsence(req.id)}
+                        onClick={() => handleRejectAbsence(request.id)}
                         className="flex-1 rounded-xl border border-gray-200 py-1.5 font-bold text-gray-600 hover:bg-gray-100 transition cursor-pointer"
                       >
                         거절 + 코멘트
@@ -734,25 +890,30 @@ export default function ActivityDetailPage() {
         isOpen={isNoticeModalOpen}
         onClose={() => setIsNoticeModalOpen(false)}
       />
+
       <AbsenceRequestModal
         isOpen={isAbsenceModalOpen}
         onClose={() => setIsAbsenceModalOpen(false)}
       />
+
       <CreateArticleModal
         isOpen={isCreateArticleOpen}
         onClose={() => setIsCreateArticleOpen(false)}
         mode="article"
         onSubmitSuccess={async (data) => {
           const sessionNo = Number(data.session.match(/^\d+/)?.[0]);
+
           const session = sessions.find(
             (item) => Number(item.sessionNum.match(/^\d+/)?.[0]) === sessionNo,
           );
+
           try {
             const post = await createPost({
               title: data.title.trim(),
               content: data.content,
               sessionId: session ? Number(session.id) : undefined,
             });
+
             setArticles((current) => [
               {
                 id: String(post.id),
@@ -769,6 +930,7 @@ export default function ActivityDetailPage() {
             ]);
           } catch (error) {
             console.error("활동 정리글 생성 실패:", error);
+
             alert(
               error instanceof Error
                 ? error.message
@@ -777,6 +939,7 @@ export default function ActivityDetailPage() {
           }
         }}
       />
+
       <ActivitySettingsModal
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
@@ -787,6 +950,7 @@ export default function ActivityDetailPage() {
           if (data.rule) setActivityRule(data.rule);
         }}
       />
+
       <ArticleDetailModal
         article={selectedArticle}
         onClose={() => setSelectedArticle(null)}
