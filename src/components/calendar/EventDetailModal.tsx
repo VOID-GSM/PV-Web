@@ -37,7 +37,8 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({ event, onClo
         </div>
         {event.description ? <div className="rounded-2xl border border-gray-100 p-4 leading-relaxed text-gray-600 whitespace-pre-wrap">{event.description}</div> : <p className="rounded-2xl border border-gray-100 p-4 text-gray-400">등록된 상세 설명이 없습니다.</p>}
         <div className="flex items-center justify-between gap-3 border-t border-gray-100 pt-4">
-          <span className="text-[11px] text-gray-400">수정 내용은 현재 브라우저에 저장됩니다.</span>
+          {/* ★ 서버에 저장되니까 "브라우저에 저장" 안내는 틀린 말 → 삭제 주의 안내로 변경 */}
+          <span className="text-[11px] text-gray-400">삭제한 일정은 되돌릴 수 없습니다.</span>
           <div className="flex shrink-0 gap-2">
             <button type="button" onClick={onDelete} className="rounded-xl bg-red-600 px-4 py-2 font-bold text-white transition hover:bg-red-700">일정 삭제</button>
             <button type="button" onClick={onEdit} className="rounded-xl bg-black px-5 py-2 font-bold text-white transition hover:bg-gray-800">수정하기</button>

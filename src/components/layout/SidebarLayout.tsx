@@ -1,5 +1,19 @@
-import { Outlet, useNavigate, useLocation } from "react-router-dom";
+// Navigate: 화면에 그려지는 순간 다른 주소로 보내주는 부품
+import { Navigate, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
+
+// ★ 토큰이 저장된 이름 (tokenStorage.ts와 친구 api/client.ts가 같이 쓰는 이름)
+const ACCESS_TOKEN_KEY = "pvweb:accessToken";
+
+// ★ 저장된 토큰이 있는지 확인한다
+// try: 개인정보 보호 모드 등에서 localStorage를 못 쓰면 에러가 나서, 그때는 "없음"으로 본다
+const hasAccessToken = () => {
+  try {
+    return Boolean(localStorage.getItem(ACCESS_TOKEN_KEY));
+  } catch {
+    return false;
+  }
+};
 
 interface SidebarLayoutProps {
   todayTaskCount?: number;
@@ -16,6 +30,13 @@ export default function SidebarLayout({
 }: SidebarLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
+
+  // ★ 문지기: 토큰이 없으면(입장 전) 입장 화면으로 보낸다
+  // replace: 뒤로 가기를 눌러도 이 화면으로 다시 오지 않게 기록을 바꿔치기한다
+  // (훅을 모두 부른 뒤에 return해야 해서 여기에 둔다)
+  if (!hasAccessToken()) {
+    return <Navigate to="/invite" replace />;
+  }
 
   // 지금 주소를 보고 사이드바에서 어떤 메뉴에 불을 켤지 정한다
   const getActiveMenu = (pathname: string) => {
