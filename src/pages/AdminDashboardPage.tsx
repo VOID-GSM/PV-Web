@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { Header } from "../components/layout/Header";
 import Toast from "../components/common/Toast";
-// ★ 공통 확인 창 (브라우저 기본 창 대신)
+// 공통 확인 창 (브라우저 기본 창 대신)
 import ConfirmModal from "../components/common/ConfirmModal";
 import StatCards from "../components/admin/StatCards";
 import MemberTable from "../components/admin/MemberTable";
@@ -35,6 +35,8 @@ import {
   useUpdateMember,
   useUpdateTeamSettings,
 } from "../hooks/useTeam";
+// ★ 내 회원 번호 ("(나)" 표시용)
+import { useMyName } from "../hooks/useMyName";
 import { ROLE_LABEL, type MemberUpdateRequest } from "../apis/members";
 import { MAJOR_LABEL, type Major } from "../apis/interviews";
 import { getErrorMessage } from "../apis/client";
@@ -78,6 +80,9 @@ export default function AdminDashboardPage() {
   const approveJoin = useApproveJoinRequest();
   const updateSettings = useUpdateTeamSettings();
 
+  // ★ 내 회원 번호
+  const { myId } = useMyName();
+
   // 초대 링크: 서버에 목록 API가 없어서 "이번에 만든 것"만 화면에 기억한다
   const [links, setLinks] = useState<InviteLink[]>([]);
   // 승인 모드: 현재 상태를 불러오는 API가 없어서 꺼짐으로 시작한다
@@ -87,7 +92,7 @@ export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState("전체");
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
-  // ★ 폐기 확인 창에 띄울 링크 (null이면 창 닫힘)
+  // 폐기 확인 창에 띄울 링크 (null이면 창 닫힘)
   const [revokeTarget, setRevokeTarget] = useState<InviteLink | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
 
@@ -95,7 +100,7 @@ export default function AdminDashboardPage() {
     setToast((prev) => ({ id: (prev?.id ?? 0) + 1, message, type }));
   };
   const closeToast = useCallback(() => setToast(null), []);
-  // ★ 확인 창 닫기 (ConfirmModal이 Esc 감지에 쓰니까 매번 새로 만들지 않게 기억해 둔다)
+  // 확인 창 닫기 (ConfirmModal이 Esc 감지에 쓰니까 매번 새로 만들지 않게 기억해 둔다)
   const closeRevokeConfirm = useCallback(() => setRevokeTarget(null), []);
 
   // ===== 서버 → 화면 =====
@@ -250,7 +255,7 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // ★ 확인 창에서 "폐기"를 눌렀을 때 실제로 서버에 보낸다
+  // 확인 창에서 "폐기"를 눌렀을 때 실제로 서버에 보낸다
   const handleConfirmRevoke = () => {
     const link = revokeTarget;
     setRevokeTarget(null);
@@ -312,6 +317,8 @@ export default function AdminDashboardPage() {
             ) : (
               <MemberTable
                 members={tabMembers}
+                // ★ 내 줄에 (나) 표시
+                myId={myId}
                 tabs={tabs}
                 activeTab={activeTab}
                 onTabChange={setActiveTab}
@@ -334,7 +341,7 @@ export default function AdminDashboardPage() {
                   `초대 링크를 복사했습니다${link.expiresAt ? ` (${formatMonthDay(link.expiresAt)} 만료)` : ""}`
                 )
               }
-              // ★ 바로 지우지 않고 확인 창만 연다
+              // 바로 지우지 않고 확인 창만 연다
               onRevoke={setRevokeTarget}
               onToggleApproval={handleToggleApproval}
             />
@@ -373,7 +380,7 @@ export default function AdminDashboardPage() {
         />
       )}
 
-      {/* ★ 초대 링크 폐기 확인 창 */}
+      {/* 초대 링크 폐기 확인 창 */}
       {revokeTarget && (
         <ConfirmModal
           title="이 초대 링크를 폐기할까요?"
