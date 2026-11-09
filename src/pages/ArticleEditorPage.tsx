@@ -1,10 +1,17 @@
 // src/pages/ArticleEditorPage.tsx
+
 import { useEffect, useRef, useState } from "react";
+
 import { useNavigate } from "react-router-dom";
+
 import Dropdown from "../components/common/Dropdown";
+
 import { ArrowLeftIcon } from "../components/icons/ArrowLeftIcon";
+
 import MarkdownPreview from "../components/common/MarkdownPreview";
+
 import { uploadImage } from "../api/fileApi";
+
 import {
   clearArticleDraft,
   getArticleDraft,
@@ -12,8 +19,11 @@ import {
   saveArticle,
   saveArticleDraft,
 } from "../utils/articles";
+
 import type { ArticleDraft } from "../utils/articles";
+
 import { createPost, getPost, updatePost } from "../api/postApi";
+
 import {
   getActivities,
   getActivitySessions,
@@ -21,60 +31,83 @@ import {
 } from "../api/activityApi";
 
 const defaultRoundOptions = ["회차 선택", "1회차", "2회차", "3회차", "4회차"];
+
 const memberOptions = ["지정할 팀원 선택", "등록된 팀원 없음"];
+
 export default function ArticleEditorPage() {
   const navigate = useNavigate();
+
   const imageInputRef = useRef<HTMLInputElement>(null);
+
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+
   const editId = new URLSearchParams(window.location.search).get("edit");
 
   const [initialDraft] = useState(() => getArticleDraft());
+
   const [initialArticle] = useState(() =>
     editId
       ? (getArticles().find((article) => article.id === editId) ?? null)
       : null,
   );
+
   const contentRef = useRef<HTMLTextAreaElement>(null);
+
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+
   const [title, setTitle] = useState(
     initialArticle?.title ?? initialDraft?.title ?? "",
   );
+
   const [activity, setActivity] = useState(
     initialArticle?.activity ?? initialDraft?.activity ?? "활동 선택",
   );
+
   const [round, setRound] = useState(
     initialArticle?.round ?? initialDraft?.round ?? "회차 선택",
   );
+
   const [content, setContent] = useState(
     initialArticle?.content ?? initialDraft?.content ?? "",
   );
+
   const [feedbackOption, setFeedbackOption] = useState<
     "common" | "all" | "custom" | "none"
   >(initialArticle?.feedbackOption ?? initialDraft?.feedbackOption ?? "none");
+
   const [selectedMember, setSelectedMember] = useState(
     initialArticle?.selectedMember ??
       initialDraft?.selectedMember ??
       "지정할 팀원 선택",
   );
+
   const [tags, setTags] = useState<string[]>(
     initialArticle?.tags ?? initialDraft?.tags ?? [],
   );
+
   const [tagInput, setTagInput] = useState("");
+
   const [isSaving, setIsSaving] = useState(false);
+
   const [apiActivities, setApiActivities] = useState<ActivitySummary[]>([]);
+
   const [availableRounds, setAvailableRounds] =
     useState<string[]>(defaultRoundOptions);
+
   const [sessionIdByRound, setSessionIdByRound] = useState<
     Record<string, number>
   >({});
 
   useEffect(() => {
     let cancelled = false;
+
     getActivities()
       .then((activities) => {
         if (!cancelled) setApiActivities(activities);
       })
+
       .catch((error: unknown) => console.error("활동 목록 조회 실패:", error));
+
     return () => {
       cancelled = true;
     };
@@ -84,22 +117,26 @@ export default function ArticleEditorPage() {
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = event.target.files?.[0];
+
     event.target.value = "";
 
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
       alert("이미지 파일만 업로드할 수 있습니다.");
+
       return;
     }
 
     // 실제 프로젝트의 회원 ID 조회 방식에 맞게 연결해야 합니다.
 
     const memberIdValue = localStorage.getItem("pvweb:memberId");
+
     const memberId = Number(memberIdValue);
 
     if (!memberIdValue || !Number.isSafeInteger(memberId) || memberId <= 0) {
       alert("회원 정보를 확인할 수 없습니다.");
+
       return;
     }
 
@@ -107,13 +144,17 @@ export default function ArticleEditorPage() {
 
     try {
       const fileId = await uploadImage(file, memberId);
+
       const textarea = contentRef.current;
 
       if (!textarea) return;
 
       const start = textarea.selectionStart;
+
       const end = textarea.selectionEnd;
+
       const markdown = `![${file.name}](file:${fileId})`;
+
       const nextContent =
         content.slice(0, start) + markdown + content.slice(end);
 
@@ -121,11 +162,14 @@ export default function ArticleEditorPage() {
 
       requestAnimationFrame(() => {
         textarea.focus();
+
         const cursor = start + markdown.length;
+
         textarea.setSelectionRange(cursor, cursor);
       });
     } catch (error) {
       console.error("이미지 업로드 실패:", error);
+
       alert(
         error instanceof Error
           ? error.message
@@ -138,15 +182,24 @@ export default function ArticleEditorPage() {
 
   const handleActivityChange = async (name: string) => {
     setActivity(name);
+
     setRound("회차 선택");
+
     setAvailableRounds(defaultRoundOptions);
+
     setSessionIdByRound({});
+
     const selected = apiActivities.find((item) => item.name === name);
+
     if (!selected) return;
+
     try {
       const sessions = await getActivitySessions(selected.id);
+
       const labels = sessions.map((session) => `${session.sessionNo}회차`);
+
       setAvailableRounds(["회차 선택", ...labels]);
+
       setSessionIdByRound(
         Object.fromEntries(
           sessions.map((session) => [`${session.sessionNo}회차`, session.id]),
@@ -154,6 +207,7 @@ export default function ArticleEditorPage() {
       );
     } catch (error) {
       console.error("활동 회차 조회 실패:", error);
+
       alert(
         error instanceof Error
           ? error.message
@@ -164,41 +218,57 @@ export default function ArticleEditorPage() {
 
   useEffect(() => {
     if (!editId || !/^\d+$/.test(editId)) return;
+
     let cancelled = false;
+
     getPost(Number(editId))
       .then(async (post) => {
         if (cancelled) return;
+
         setTitle(post.title);
+
         setContent(post.content);
+
         if (post.activityId) {
           const activities = await getActivities();
+
           const matchedActivity = activities.find(
             (item) => item.id === post.activityId,
           );
+
           if (matchedActivity) {
             setActivity(matchedActivity.name);
+
             const sessions = await getActivitySessions(matchedActivity.id);
+
             setAvailableRounds([
               "회차 선택",
+
               ...sessions.map((session) => `${session.sessionNo}회차`),
             ]);
+
             setSessionIdByRound(
               Object.fromEntries(
                 sessions.map((session) => [
                   `${session.sessionNo}회차`,
+
                   session.id,
                 ]),
               ),
             );
+
             const matchedSession = sessions.find(
               (session) => session.id === post.sessionId,
             );
+
             if (matchedSession) setRound(`${matchedSession.sessionNo}회차`);
           }
         }
       })
+
       .catch((error: unknown) => {
         console.error("정리글 조회 실패:", error);
+
         if (!cancelled)
           alert(
             error instanceof Error
@@ -206,6 +276,7 @@ export default function ArticleEditorPage() {
               : "수정할 정리글을 불러오지 못했습니다.",
           );
       });
+
     return () => {
       cancelled = true;
     };
@@ -214,6 +285,7 @@ export default function ArticleEditorPage() {
   const handleAddTag = () => {
     if (tagInput.trim() && !tags.includes(tagInput.trim())) {
       setTags([...tags, tagInput.trim()]);
+
       setTagInput("");
     }
   };
@@ -224,51 +296,80 @@ export default function ArticleEditorPage() {
 
   const currentDraft: ArticleDraft = {
     title,
+
     activity,
+
     round,
+
     content,
+
     tags,
+
     feedbackOption,
+
     selectedMember,
   };
 
   const handleSaveDraft = () => {
     saveArticleDraft(currentDraft);
+
     alert("임시 저장했습니다. 이 브라우저에서 다시 이어 쓸 수 있어요.");
   };
 
   const applyMarkdown = (before: string, after = before, linePrefix = "") => {
     const textarea = contentRef.current;
+
     if (!textarea) return;
+
     const start = textarea.selectionStart;
+
     const end = textarea.selectionEnd;
+
     const selected = content.slice(start, end);
+
     let replacement;
+
     let selectionStart = start;
+
     let selectionEnd = start;
 
     if (linePrefix) {
       const lineStart = content.lastIndexOf("\n", Math.max(0, start - 1)) + 1;
+
       const lineEndFound = content.indexOf("\n", end);
+
       const lineEnd = lineEndFound === -1 ? content.length : lineEndFound;
+
       const lines = content.slice(lineStart, lineEnd);
+
       replacement = lines
+
         .split("\n")
+
         .map((line) => `${linePrefix}${line}`)
+
         .join("\n");
+
       setContent(
         content.slice(0, lineStart) + replacement + content.slice(lineEnd),
       );
+
       selectionStart = lineStart;
+
       selectionEnd = lineStart + replacement.length;
     } else {
       replacement = `${before}${selected || "텍스트"}${after}`;
+
       setContent(content.slice(0, start) + replacement + content.slice(end));
+
       selectionStart = start + before.length;
+
       selectionEnd = selectionStart + (selected || "텍스트").length;
     }
+
     requestAnimationFrame(() => {
       textarea.focus();
+
       textarea.setSelectionRange(selectionStart, selectionEnd);
     });
   };
@@ -278,21 +379,41 @@ export default function ArticleEditorPage() {
       alert("제목을 입력해주세요.");
       return;
     }
+
     if (!content.trim()) {
       alert("본문을 입력해주세요.");
       return;
     }
+
+    const isEdit = Boolean(editId && /^\d+$/.test(editId));
+    const selectedSessionId = sessionIdByRound[round];
+
+    // 새 정리글은 실제 회차 ID가 있어야 등록할 수 있다.
+    if (
+      !isEdit &&
+      (typeof selectedSessionId !== "number" ||
+        !Number.isSafeInteger(selectedSessionId) ||
+        selectedSessionId <= 0)
+    ) {
+      alert("활동과 회차를 선택해주세요.");
+      return;
+    }
+
     if (isSaving) return;
     setIsSaving(true);
+
     try {
-      const response =
-        editId && /^\d+$/.test(editId)
-          ? await updatePost(Number(editId), { title: title.trim(), content })
-          : await createPost({
-              title: title.trim(),
-              content,
-              sessionId: sessionIdByRound[round],
-            });
+      const response = isEdit
+        ? await updatePost(Number(editId), {
+            title: title.trim(),
+            content,
+          })
+        : await createPost({
+            title: title.trim(),
+            content,
+            sessionId: selectedSessionId,
+          });
+
       saveArticle({
         id: String(response.id),
         title: response.title,
@@ -308,8 +429,9 @@ export default function ArticleEditorPage() {
         feedbackOption,
         selectedMember,
       });
+
       clearArticleDraft();
-      alert(editId ? "정리글을 수정했습니다." : "정리글을 발행했습니다.");
+      alert(isEdit ? "정리글을 수정했습니다." : "정리글을 발행했습니다.");
       navigate("/archive");
     } catch (error) {
       console.error("정리글 저장 실패:", error);
@@ -326,6 +448,7 @@ export default function ArticleEditorPage() {
   return (
     <div className="flex-1 flex flex-col h-screen bg-[#f8f9fa] overflow-hidden font-pretendard">
       {/* 상단 네비게이션 헤더 */}
+
       <header className="bg-white border-b border-gray-200 px-6 py-3 flex justify-between items-center shrink-0">
         <div className="flex items-center gap-3">
           <button
@@ -334,8 +457,10 @@ export default function ArticleEditorPage() {
             className="text-xs font-semibold text-gray-500 hover:text-gray-900 flex items-center gap-1 transition"
           >
             <ArrowLeftIcon />
+
             <span>아카이브로</span>
           </button>
+
           <div className="h-4 w-px bg-gray-200" />
 
           <Dropdown
@@ -343,6 +468,7 @@ export default function ArticleEditorPage() {
             value={activity}
             onChange={handleActivityChange}
           />
+
           <Dropdown
             options={availableRounds}
             value={round}
@@ -372,6 +498,7 @@ export default function ArticleEditorPage() {
                 strokeWidth={2}
                 d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
               />
+
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -379,8 +506,10 @@ export default function ArticleEditorPage() {
                 d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
               />
             </svg>
+
             <span>미리보기</span>
           </button>
+
           <button
             type="button"
             onClick={handleSaveDraft}
@@ -388,6 +517,7 @@ export default function ArticleEditorPage() {
           >
             임시 저장
           </button>
+
           <button
             onClick={handlePublish}
             className="px-4 py-1.5 bg-black text-white rounded-lg text-xs font-semibold hover:bg-gray-800 transition flex items-center gap-1.5"
@@ -405,15 +535,18 @@ export default function ArticleEditorPage() {
                 d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
               />
             </svg>
+
             <span>발행하기</span>
           </button>
         </div>
       </header>
 
       {/* 에디터 메인 컨텐츠 영역 */}
+
       <div className="flex-1 flex overflow-hidden p-6 gap-6">
         <div className="flex-1 flex gap-4 overflow-hidden">
           {/* 에디터 창 */}
+
           <div className="flex-1 bg-white rounded-2xl border border-gray-200 flex flex-col overflow-hidden shadow-sm">
             <div className="p-4 border-b border-gray-100">
               <input
@@ -426,6 +559,7 @@ export default function ArticleEditorPage() {
             </div>
 
             {/* 마크다운 툴바 */}
+
             <div className="px-4 py-2 border-b border-gray-100 bg-gray-50/60 flex justify-between items-center text-xs text-gray-600">
               <div className="flex items-center gap-2 font-bold">
                 <button
@@ -435,6 +569,7 @@ export default function ArticleEditorPage() {
                 >
                   H1
                 </button>
+
                 <button
                   type="button"
                   onClick={() => applyMarkdown("## ", "", "## ")}
@@ -442,6 +577,7 @@ export default function ArticleEditorPage() {
                 >
                   H2
                 </button>
+
                 <button
                   type="button"
                   onClick={() => applyMarkdown("**", "**")}
@@ -449,6 +585,7 @@ export default function ArticleEditorPage() {
                 >
                   B
                 </button>
+
                 <button
                   type="button"
                   onClick={() => applyMarkdown("*", "*")}
@@ -456,12 +593,14 @@ export default function ArticleEditorPage() {
                 >
                   I
                 </button>
+
                 <button
                   type="button"
                   onClick={() => {
                     const url = window.prompt(
                       "링크 주소를 입력하세요 (https://로 시작)",
                     );
+
                     if (url && /^https?:\/\//i.test(url))
                       applyMarkdown("[", `](${url})`);
                     else if (url)
@@ -483,6 +622,7 @@ export default function ArticleEditorPage() {
                     />
                   </svg>
                 </button>
+
                 <button
                   type="button"
                   onClick={() => imageInputRef.current?.click()}
@@ -503,8 +643,10 @@ export default function ArticleEditorPage() {
                       d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                     />
                   </svg>
+
                   {isUploadingImage && <span>업로드 중...</span>}
                 </button>
+
                 <input
                   ref={imageInputRef}
                   type="file"
@@ -513,6 +655,7 @@ export default function ArticleEditorPage() {
                   onChange={handleImageUpload}
                 />
               </div>
+
               <span className="text-[10px] text-gray-400 font-mono">
                 Markdown
               </span>
@@ -528,13 +671,16 @@ export default function ArticleEditorPage() {
           </div>
 
           {/* 실시간 미리보기 창 */}
+
           <div className="flex-1 bg-white rounded-2xl border border-gray-200 flex flex-col overflow-hidden shadow-sm">
             <div className="p-3.5 border-b border-gray-100 bg-gray-50/60 flex justify-between items-center">
               <span className="text-xs font-bold text-gray-700">미리보기</span>
+
               <span className="px-2 py-0.5 bg-green-100 text-green-700 font-bold rounded text-[10px]">
                 실시간
               </span>
             </div>
+
             <div className="flex-1 p-5 overflow-y-auto space-y-3">
               {title ? (
                 <h1 className="text-lg font-extrabold text-gray-900">
@@ -545,6 +691,7 @@ export default function ArticleEditorPage() {
                   제목이 표시됩니다.
                 </p>
               )}
+
               {content ? (
                 <MarkdownPreview
                   content={content}
@@ -560,10 +707,12 @@ export default function ArticleEditorPage() {
         </div>
 
         {/* 우측 피드백 및 옵션 설정 패널 */}
+
         <div className="w-80 bg-white rounded-2xl border border-gray-200 p-5 flex flex-col justify-between shrink-0 shadow-sm overflow-y-auto space-y-5">
           <div className="space-y-5">
             <div className="space-y-3">
               <h3 className="text-xs font-bold text-gray-900">피드백 요청</h3>
+
               <p className="text-[11px] text-gray-400 leading-snug">
                 발행과 동시에 알림이 발송되고, 지정한 팀원이 내 글을 함께
                 검토합니다.
@@ -578,6 +727,7 @@ export default function ArticleEditorPage() {
                     onChange={() => setFeedbackOption("common")}
                     className="accent-black"
                   />
+
                   <span>공통 전공 팀원</span>
                 </label>
 
@@ -589,10 +739,12 @@ export default function ArticleEditorPage() {
                     onChange={() => setFeedbackOption("all")}
                     className="accent-black"
                   />
+
                   <span>팀원 전체</span>
                 </label>
 
                 {/* 특정 팀원 지정 라디오 + 서브 지정 드롭다운 UI */}
+
                 <div className="space-y-2">
                   <label
                     className={`flex items-center gap-2.5 p-2.5 border rounded-xl text-xs font-semibold cursor-pointer transition ${
@@ -608,10 +760,12 @@ export default function ArticleEditorPage() {
                       onChange={() => setFeedbackOption("custom")}
                       className="accent-black"
                     />
+
                     <span>특정 팀원 지정</span>
                   </label>
 
                   {/* 특정 팀원 지정 선택 시 아래에 동적 노출되는 UI */}
+
                   {feedbackOption === "custom" && (
                     <div className="pl-3 pr-1 pt-1 space-y-1.5 animate-in fade-in duration-150">
                       <Dropdown
@@ -619,6 +773,7 @@ export default function ArticleEditorPage() {
                         value={selectedMember}
                         onChange={setSelectedMember}
                       />
+
                       <p className="text-[10px] text-gray-400 pl-1">
                         * 등록된 팀원이 없을 경우 지정할 수 없습니다.
                       </p>
@@ -634,6 +789,7 @@ export default function ArticleEditorPage() {
                     onChange={() => setFeedbackOption("none")}
                     className="accent-black"
                   />
+
                   <span>요청하지 않음</span>
                 </label>
               </div>
@@ -641,6 +797,7 @@ export default function ArticleEditorPage() {
 
             <div className="space-y-2 pt-2 border-t border-gray-100">
               <h3 className="text-xs font-bold text-gray-900">태그</h3>
+
               <div className="flex flex-wrap gap-1.5">
                 {tags.map((t) => (
                   <span
@@ -648,6 +805,7 @@ export default function ArticleEditorPage() {
                     className="px-2 py-1 bg-gray-100 text-gray-700 text-[11px] font-semibold rounded-md flex items-center gap-1"
                   >
                     <span>{t}</span>
+
                     <button
                       type="button"
                       onClick={() => handleRemoveTag(t)}
@@ -658,6 +816,7 @@ export default function ArticleEditorPage() {
                   </span>
                 ))}
               </div>
+
               <div className="flex gap-1.5 pt-1">
                 <input
                   type="text"
@@ -666,6 +825,7 @@ export default function ArticleEditorPage() {
                   placeholder="태그 입력"
                   className="flex-1 px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-black"
                 />
+
                 <button
                   type="button"
                   onClick={handleAddTag}
@@ -692,6 +852,7 @@ export default function ArticleEditorPage() {
                   d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                 />
               </svg>
+
               <span>
                 모든 정리글은 팀 전체에 공개됩니다. 내용이 정제되었는지 확인해
                 주세요.
@@ -715,11 +876,13 @@ export default function ArticleEditorPage() {
                   d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
                 />
               </svg>
+
               <span>발행하기</span>
             </button>
           </div>
         </div>
       </div>
+
       {showPreviewModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
@@ -732,6 +895,7 @@ export default function ArticleEditorPage() {
               <h2 className="text-sm font-bold text-gray-900">
                 발행 전 미리보기
               </h2>
+
               <button
                 type="button"
                 onClick={() => setShowPreviewModal(false)}
@@ -741,10 +905,12 @@ export default function ArticleEditorPage() {
                 ✕
               </button>
             </div>
+
             <div className="max-h-[70vh] overflow-y-auto p-6">
               <h1 className="mb-5 text-2xl font-extrabold text-gray-900">
                 {title || "제목이 표시됩니다."}
               </h1>
+
               <MarkdownPreview content={content} />
             </div>
           </div>
