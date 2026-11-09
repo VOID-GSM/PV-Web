@@ -78,6 +78,10 @@ export function deletePost(postId: number) {
 }
 export function comparePosts(cond: PostCompareCondition = {}) {
   return apiRequest<ApiPost[]>(
-    `/posts/compare${queryString(Object.fromEntries(Object.entries(cond).map(([key, value]) => [`cond.${key}`, value])) as Record<string, string | number | boolean | undefined>)}`,
+    `/posts/compare${queryString({
+      sessionId: cond.sessionId,
+      questionId: cond.questionId,
+      exactlyOne: cond.exactlyOne,
+    })}`,
   );
 }

@@ -470,6 +470,8 @@ export const Header: React.FC<HeaderProps> = ({
       <CreateNoticeModal
         isOpen={isNoticeModalOpen}
         onClose={() => setIsNoticeModalOpen(false)}
+        activityId={0}
+        onSuccess={() => setIsNoticeModalOpen(false)}
       />
       <CreateArticleModal
         isOpen={isArticleModalOpen}
