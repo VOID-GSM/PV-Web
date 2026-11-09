@@ -6,7 +6,7 @@ import WorklogCard from "../components/worklog/WorklogCard";
 import WorklogQuickWrite from "../components/worklog/WorklogQuickWrite";
 import BoardProgressCard from "../components/worklog/BoardProgressCard";
 import { BOARDS, type NewWorklog, type Worklog } from "../constants/worklog";
-// ★ 서버 연동
+// 서버 연동
 import {
   useBoards,
   useCreateWorklog,
@@ -14,6 +14,8 @@ import {
   useWorklogComments,
   useWorklogs,
 } from "../hooks/useWorklogs";
+// ★ 진짜 내 이름·번호
+import { useMyName } from "../hooks/useMyName";
 import type { Worklog as ServerWorklog } from "../apis/worklogs";
 import type { Board as ServerBoard } from "../apis/boards";
 import { getErrorMessage } from "../apis/client";
@@ -23,7 +25,7 @@ import { tokenStorage } from "../apis/tokenStorage";
 const formatDate = (d: Date) => d.toLocaleDateString("sv-SE");
 
 // ─────────────────────────────────────────────
-// ★ 항목(오늘 한 일 등) ↔ 서버 글 하나 바꾸기
+// 항목(오늘 한 일 등) ↔ 서버 글 하나 바꾸기
 // ─────────────────────────────────────────────
 
 // 화면 항목들 → 서버에 보낼 글
@@ -35,17 +37,13 @@ function toServerContent(contents: Record<string, string>): string {
     .join("\n\n");
 }
 
-// 서버 글 → 화면 항목들 (위와 반대)
-// "## 제목" 줄이 없는 글은 통째로 "자유 형식"에 넣는다
+// 서버 글 → 화면 항목들 (위와 반대). "## 제목" 줄이 없는 글은 통째로 "자유 형식"
 function toContents(content: string): Record<string, string> {
-  // split에 ( )가 있으면 나눈 기준(제목)도 결과에 들어간다
-  // → ["앞부분", "오늘 한 일", "A", "막힌 점", "B"]
   const parts = content.split(/^## (.+)$/m);
   if (parts.length === 1) return { "자유 형식": content };
 
   const result: Record<string, string> = {};
   if (parts[0].trim() !== "") result["자유 형식"] = parts[0].trim();
-  // 1번부터 두 칸씩: [제목, 내용]
   for (let i = 1; i < parts.length; i += 2) {
     result[parts[i].trim()] = (parts[i + 1] ?? "").trim();
   }
@@ -55,7 +53,6 @@ function toContents(content: string): Record<string, string> {
 // 서버 일지 → 화면 일지
 function toPageWorklog(w: ServerWorklog, boards: ServerBoard[]): Worklog {
   const created = new Date(w.createdAt);
-  // 보드 번호 → 보드 이름 (못 찾으면 태그 없음)
   const boardName = boards.find((b) => b.id === w.boardId)?.name;
   return {
     id: w.id,
@@ -65,33 +62,32 @@ function toPageWorklog(w: ServerWorklog, boards: ServerBoard[]): Worklog {
     boards: boardName ? [boardName] : [],
     isPublic: w.visibility === "PUBLIC",
     contents: toContents(w.content),
-    // 댓글은 카드마다 따로 불러온다 (아래 WorklogCardWithComments)
+    // 댓글은 카드마다 따로 불러온다
     comments: [],
   };
 }
 
 // ─────────────────────────────────────────────
-// ★ 댓글을 서버에서 불러와서 카드에 붙여주는 부품
-// 훅은 반복문 안에서 못 쓰니까, 카드 하나마다 이 부품이 각자 불러온다
-// (컴포넌트 바깥에 만들어서 매번 새로 만들어지지 않게)
+// 댓글을 서버에서 불러와서 카드에 붙여주는 부품
 // ─────────────────────────────────────────────
 type WorklogCardWithCommentsProps = {
   worklog: Worklog;
+  // ★ 내가 쓴 일지인지
+  isMine: boolean;
   // 회원 번호 → 이름 (댓글은 서버가 이름을 안 주고 번호만 줘서)
   names: Map<number, string>;
-  myId: number | null;
   onError: (message: string) => void;
 };
 
-function WorklogCardWithComments({ worklog, names, myId, onError }: WorklogCardWithCommentsProps) {
+function WorklogCardWithComments({ worklog, isMine, names, onError }: WorklogCardWithCommentsProps) {
   // 비공개 글은 댓글을 받을 수 없으니 요청하지 않는다
   const commentsQuery = useWorklogComments(worklog.isPublic ? worklog.id : null);
   const createComment = useCreateWorklogComment();
 
   const comments = (commentsQuery.data ?? []).map((c) => ({
     id: c.id,
-    // 이름을 못 찾으면: 나면 "나", 아니면 "팀원"
-    author: names.get(c.authorId) ?? (c.authorId === myId ? "나" : "팀원"),
+    // ★ 이름표에서 찾고, 못 찾으면 "팀원"
+    author: names.get(c.authorId) ?? "팀원",
     content: c.content,
   }));
 
@@ -102,10 +98,12 @@ function WorklogCardWithComments({ worklog, names, myId, onError }: WorklogCardW
     );
   };
 
-  return <WorklogCard worklog={{ ...worklog, comments }} onAddComment={handleAddComment} />;
+  return (
+    <WorklogCard worklog={{ ...worklog, comments }} isMine={isMine} onAddComment={handleAddComment} />
+  );
 }
 
-// 빈 목록 안내 상자. 제목, 설명, (있으면) 필터 초기화 버튼
+// 빈 목록 안내 상자
 type EmptyStateProps = {
   title: string;
   description: string;
@@ -129,11 +127,14 @@ function EmptyState({ title, description, onReset }: EmptyStateProps) {
 type ToastState = { id: number; message: string; type: "success" | "info" };
 
 export default function WorklogPage() {
-  // ★ 서버 데이터
+  // 서버 데이터
   const worklogsQuery = useWorklogs();
   const boardsQuery = useBoards();
   const createWorklog = useCreateWorklog();
-  const myId = tokenStorage.getMemberId();
+
+  // ★ 진짜 내 정보. 회원 번호를 아직 못 불러왔으면 토큰에서 꺼낸 번호를 쓴다
+  const { myName, myId: profileId } = useMyName();
+  const myId = profileId ?? tokenStorage.getMemberId();
 
   // 화면 상태
   const [activeTab, setActiveTab] = useState("팀 전체");
@@ -162,7 +163,7 @@ export default function WorklogPage() {
     }
   };
 
-  // 탭·보드·기간을 처음 상태로 되돌린다
+  // 탭·보드·기간을 처음 상태로
   const handleResetFilters = () => {
     setActiveTab("팀 전체");
     setBoard("");
@@ -170,20 +171,21 @@ export default function WorklogPage() {
     setPeriodStart("");
   };
 
-  // ★ 서버 일지 → 화면 일지 (최신 글이 위로)
+  // 서버 일지 → 화면 일지 (최신 글이 위로)
   const serverWorklogs = [...(worklogsQuery.data?.content ?? [])].sort((a, b) =>
     b.createdAt.localeCompare(a.createdAt)
   );
   const boards = boardsQuery.data ?? [];
   const worklogs = serverWorklogs.map((w) => toPageWorklog(w, boards));
 
-  // ★ 내가 쓴 일지 번호들 ("내 일지" 탭에 사용)
+  // 내가 쓴 일지 번호들 ("내 일지" 탭, 검은 동그라미에 사용)
   const myWorklogIds = new Set(serverWorklogs.filter((w) => w.authorId === myId).map((w) => w.id));
 
-  // ★ 회원 번호 → 이름 (댓글 작성자 이름 찾기용)
+  // ★ 회원 번호 → 이름 (일지 작성자들 + 나)
   const names = new Map(serverWorklogs.map((w) => [w.authorId, w.authorName]));
+  if (myId !== null && myName) names.set(myId, myName);
 
-  // ★ 작성 → 서버에 저장
+  // 작성 → 서버에 저장
   const handleAddWorklog = (data: NewWorklog) => {
     const content = toServerContent(data.contents);
     if (content === "") {
@@ -196,7 +198,6 @@ export default function WorklogPage() {
         title: `${formatDate(new Date())} 업무일지`,
         content,
         visibility: data.isPublic ? "PUBLIC" : "PRIVATE",
-        // 보드 태그는 보드 목록 연결 후 지원 (지금은 보내지 않는다)
       },
       {
         onSuccess: () => showToast("일지를 올렸습니다", "success"),
@@ -220,19 +221,23 @@ export default function WorklogPage() {
     items: visibleWorklogs.filter((w) => w.boards.includes(b.name)),
   })).filter((group) => group.items.length > 0);
 
-  // 필터를 하나라도 바꿨는지
   const isFiltered =
     activeTab !== "팀 전체" || (board !== "" && board !== "전체") || (period !== "" && period !== "전체");
   const resetIfFiltered = isFiltered ? handleResetFilters : undefined;
 
-  // 카드 하나 그리기 (댓글 포함)
+  // ★ 카드 하나 그리기 (내 글인지 같이 넘긴다)
   const renderCard = (w: Worklog) => (
-    <WorklogCardWithComments key={w.id} worklog={w} names={names} myId={myId} onError={showToast} />
+    <WorklogCardWithComments
+      key={w.id}
+      worklog={w}
+      isMine={myWorklogIds.has(w.id)}
+      names={names}
+      onError={showToast}
+    />
   );
 
   // 왼쪽 목록에 무엇을 보여줄지
   const renderList = () => {
-    // ★ 불러오는 중 / 실패
     if (worklogsQuery.isPending) {
       return <p className="rounded-lg bg-white py-12 text-center text-sm text-neutral-400">일지를 불러오는 중...</p>;
     }
@@ -244,7 +249,6 @@ export default function WorklogPage() {
       );
     }
 
-    // 1) 일지가 아예 없음
     if (readableWorklogs.length === 0) {
       return (
         <EmptyState
@@ -255,7 +259,6 @@ export default function WorklogPage() {
       );
     }
 
-    // 2) 보드별 모아보기
     if (activeTab === "보드별 모아보기") {
       if (groupedByBoard.length === 0) {
         return (
@@ -278,7 +281,6 @@ export default function WorklogPage() {
       ));
     }
 
-    // 3) 일지는 있는데 필터에 걸려서 없음
     if (visibleWorklogs.length === 0) {
       return (
         <EmptyState
@@ -289,7 +291,6 @@ export default function WorklogPage() {
       );
     }
 
-    // 4) 일지 목록
     return visibleWorklogs.map(renderCard);
   };
 
