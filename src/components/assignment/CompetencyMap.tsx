@@ -1,12 +1,14 @@
 import { useState } from "react";
 import Dropdown from "../common/Dropdown";
-import { MAJORS, ME, averageColor, scoreColor, type Member, type Skill } from "../../constants/assignment";
+import { MAJORS, averageColor, scoreColor, type Member, type Skill } from "../../constants/assignment";
 import targetIcon from "../../assets/icons/target.svg";
 import arrowRightIcon from "../../assets/icons/arrow-right.svg";
 
 type CompetencyMapProps = {
   skills: Skill[];
   members: Member[];
+  // ★ 내 이름 (가짜 ME "동키" 대신 서버의 진짜 이름. 못 불러왔으면 "")
+  myName: string;
   // 내 자가진단 점수 (역량 항목 번호 → 점수)
   myScores: Record<number, number>;
   onScoreChange: (skillId: number) => void;
@@ -17,6 +19,7 @@ type CompetencyMapProps = {
 export default function CompetencyMap({
   skills,
   members,
+  myName,
   myScores,
   onScoreChange,
   onAddSkill,
@@ -25,9 +28,12 @@ export default function CompetencyMap({
   const [newName, setNewName] = useState("");
   const [newMajor, setNewMajor] = useState("");
 
+  // ★ 이 줄이 내 줄인지 (이름이 비어 있으면 아무 줄도 내 것으로 보지 않는다)
+  const isMe = (memberName: string) => myName !== "" && memberName === myName;
+
   // 팀원의 점수 꺼내기 (지금은 내 점수만 있다)
   const getScore = (memberName: string, skillId: number) =>
-    memberName === ME ? myScores[skillId] : undefined;
+    isMe(memberName) ? myScores[skillId] : undefined;
 
   // 점수가 있는 것만 평균 (없으면 undefined)
   const average = (scores: (number | undefined)[]) => {
@@ -101,7 +107,8 @@ export default function CompetencyMap({
                     </td>
                     {skills.map((skill) => {
                       const score = getScore(member.name, skill.id);
-                      const isMine = member.name === ME;
+                      // ★ 내 줄만 눌러서 점수를 바꿀 수 있다
+                      const isMine = isMe(member.name);
                       return (
                         <td key={skill.id} className="px-1 py-2">
                           <button

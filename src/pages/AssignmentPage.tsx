@@ -14,19 +14,18 @@ import {
   ASSIGNMENT_TABS,
   GENERATIONS,
   MAJORS,
-  ME,
-  MEMBERS,
   SUBMIT_TYPES,
   TARGET_ALL,
   TARGET_PERSONAL,
   getDaysLeft,
   type Assignment,
   type AssignmentForm,
+  type Member,
   type Skill,
   type Submission,
   type SubmissionStatus,
 } from "../constants/assignment";
-// ★ 서버 연동
+// 서버 연동
 import {
   useAssignments,
   useCreateAssignment,
@@ -40,6 +39,8 @@ import {
   useSubmissionStatus,
   useSubmitAssignment,
 } from "../hooks/useAssignments";
+// ★ 진짜 내 이름·기수·전공
+import { useMyName } from "../hooks/useMyName";
 import type {
   AssignmentSummary,
   SubmissionStatus as ServerSubmissionStatus,
@@ -109,7 +110,8 @@ function toMySubmission(a: AssignmentSummary): Submission | null {
   return {
     id: -a.id,
     assignmentId: a.id,
-    author: ME,
+    // ★ 내 제출물 탭에서는 작성자 이름을 보여주지 않아서 "나"로 둔다 (가짜 ME 삭제)
+    author: "나",
     type: "",
     content: "",
     submittedAt: "",
@@ -140,13 +142,13 @@ function uniqueById(list: AssignmentSummary[]): AssignmentSummary[] {
 type ToastState = { id: number; message: string; type: "success" | "info" };
 
 export default function AssignmentPage() {
-  // ★ 서버 데이터
+  // 서버 데이터
   const receivedQuery = useAssignments("RECEIVED");
   const createdQuery = useAssignments("CREATED");
   const skillsQuery = useSkills();
   const mySkillsQuery = useMySkills();
 
-  // ★ 서버로 보내는 도구들
+  // 서버로 보내는 도구들
   const createAssignment = useCreateAssignment();
   const submitAssignment = useSubmitAssignment();
   const resubmitAssignment = useResubmitAssignment();
@@ -155,6 +157,9 @@ export default function AssignmentPage() {
   const createSkill = useCreateSkill();
   const saveScores = useSaveMyScores();
 
+  // ★ 진짜 내 정보
+  const { myName, myGeneration, myMajors } = useMyName();
+
   // 화면 상태
   const [activeTab, setActiveTab] = useState("역량 맵");
   const [generation, setGeneration] = useState("");
@@ -162,7 +167,7 @@ export default function AssignmentPage() {
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<number | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [initialSkillId, setInitialSkillId] = useState<number | null>(null);
-  // ★ 이번에 화면에서 제출한 제출물 번호 (재제출할 때 필요. 과제 번호 → 제출물 번호)
+  // 이번에 화면에서 제출한 제출물 번호 (재제출할 때 필요. 과제 번호 → 제출물 번호)
   const [mySubmissionIds, setMySubmissionIds] = useState<Record<number, number>>({});
   const [toast, setToast] = useState<ToastState | null>(null);
 
@@ -187,7 +192,7 @@ export default function AssignmentPage() {
   const summaryAssignment =
     assignments.find((a) => a.id === selectedAssignmentId) ?? ongoingAssignments[0] ?? null;
 
-  // ★ 제출 현황: 제출 현황 탭에서 고른 과제 / 역량맵 탭 오른쪽 요약 과제
+  // 제출 현황: 제출 현황 탭에서 고른 과제 / 역량맵 탭 오른쪽 요약 과제
   const statusQuery = useSubmissionStatus(selectedAssignmentId, activeTab === "제출 현황");
   const summaryStatusQuery = useSubmissionStatus(summaryAssignment?.id ?? null, activeTab === "역량 맵");
 
@@ -201,10 +206,13 @@ export default function AssignmentPage() {
       .map((s) => [s.skillId, s.selfScore as number])
   );
 
+  // ★ 역량맵 팀원 목록: 지금은 내 점수만 있어서 진짜 나 한 줄 (아직 못 불러왔으면 빈 목록)
+  const myMembers: Member[] = myName ? [{ name: myName, generation: myGeneration, majors: myMajors }] : [];
+
   const majorFilter = major === "" || major === "전체" ? "" : major;
   const generationFilter = generation === "" || generation === "전체" ? "" : generation;
   const visibleSkills = pageSkills.filter((s) => majorFilter === "" || s.major === majorFilter);
-  const visibleMembers = MEMBERS.filter(
+  const visibleMembers = myMembers.filter(
     (m) =>
       (generationFilter === "" || m.generation === generationFilter) &&
       (majorFilter === "" || m.majors.includes(majorFilter))
@@ -266,7 +274,7 @@ export default function AssignmentPage() {
         targetMajors: isAll ? [] : targetMajors,
         targetMemberIds: [],
         fileKeys: [],
-        // ★ 이제 역량 항목이 서버 번호라서 그대로 보낸다
+        // 역량 항목이 서버 번호라서 그대로 보낸다
         skillIds: form.skillId !== null ? [form.skillId] : [],
       },
       {
@@ -310,7 +318,6 @@ export default function AssignmentPage() {
       { assignmentId, body },
       {
         onSuccess: (submission) => {
-          // 재제출 때 쓰려고 제출물 번호를 기억해 둔다
           setMySubmissionIds((prev) => ({ ...prev, [assignmentId]: submission.id }));
           showToast(submission.late ? "지각 제출되었습니다" : "과제를 제출했습니다", "success");
         },
@@ -379,6 +386,8 @@ export default function AssignmentPage() {
           <CompetencyMap
             skills={visibleSkills}
             members={visibleMembers}
+            // ★ 내 줄 찾기용 진짜 이름
+            myName={myName}
             myScores={myScores}
             onScoreChange={handleScoreChange}
             onAddSkill={handleAddSkill}
@@ -479,4 +488,4 @@ export default function AssignmentPage() {
       {toast && <Toast key={toast.id} message={toast.message} type={toast.type} onClose={closeToast} />}
     </div>
   );
-}
+} 
