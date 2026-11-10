@@ -1,4 +1,7 @@
-import { useEffect, useState } from "react";
+// useCallback: 함수를 한 번만 만들어 두고 재사용 (확인 창 닫기에 사용)
+import { useCallback, useEffect, useState } from "react";
+// ★ 브라우저 confirm 대신 쓸 공통 확인 창
+import ConfirmModal from "../common/ConfirmModal";
 import {
   ANSWER_TIME_LIMIT,
   MAX_ANSWER_LENGTH,
@@ -40,6 +43,8 @@ export default function MockInterviewSession({
   const [mode, setMode] = useState<"idle" | "write" | "record">("idle");
   const [answerText, setAnswerText] = useState("");
   const [records, setRecords] = useState<PracticeRecord[]>([]);
+  // ★ 나가기 확인 창이 열려 있는지
+  const [isExitConfirmOpen, setIsExitConfirmOpen] = useState(false);
 
   // 1초마다 남은 시간을 1씩 줄인다 (0이 되면 멈춘다)
   useEffect(() => {
@@ -49,11 +54,15 @@ export default function MockInterviewSession({
     return () => clearInterval(timerId);
   }, []);
 
+  // ★ 확인 창 닫기 (ConfirmModal이 Esc 감지에 쓰니까 기억해 둔다)
+  const closeExitConfirm = useCallback(() => setIsExitConfirmOpen(false), []);
+
   const isDone = index >= questions.length;
   const current = questions[index];
   const isTimeOver = remaining === 0;
 
-  const goNext = (status: PracticeStatus) => {
+  // ★ 다음 질문으로: 상태와 함께 답변 내용도 기록한다 (말로 연습·건너뜀은 "")
+  const goNext = (status: PracticeStatus, answer: string) => {
     const now = new Date();
     setRecords([
       ...records,
@@ -64,6 +73,7 @@ export default function MockInterviewSession({
         date: formatDate(now),
         seconds: ANSWER_TIME_LIMIT - remaining,
         status,
+        answer,
       },
     ]);
     setIndex(index + 1);
@@ -77,20 +87,27 @@ export default function MockInterviewSession({
       setMode("record");
       return;
     }
-    goNext(isTimeOver ? "시간 초과" : "말로 연습");
+    // 녹음은 글이 없어서 답변은 ""
+    goNext(isTimeOver ? "시간 초과" : "말로 연습", "");
   };
 
   const handleSaveWritten = () => {
-    onSaveAnswer(current.id, answerText.trim());
-    goNext(isTimeOver ? "시간 초과" : "저장됨");
+    const written = answerText.trim();
+    onSaveAnswer(current.id, written);
+    // ★ 시간 초과여도 쓴 답변은 기록에 남긴다
+    goNext(isTimeOver ? "시간 초과" : "저장됨", written);
   };
 
   const handleSkip = () => {
-    goNext(isTimeOver ? "시간 초과" : "건너뜀");
+    goNext(isTimeOver ? "시간 초과" : "건너뜀", "");
   };
 
+  // ★ 나가기: 기록이 있으면 확인 창, 없으면 바로 나간다
   const handleExit = () => {
-    if (records.length > 0 && !window.confirm("나가면 이번 세션 기록이 저장되지 않습니다. 나갈까요?")) return;
+    if (records.length > 0) {
+      setIsExitConfirmOpen(true);
+      return;
+    }
     onExit();
   };
 
@@ -238,6 +255,8 @@ export default function MockInterviewSession({
             {records.map((r) => (
               <li key={r.id} className="rounded bg-neutral-800 px-3 py-2">
                 <p className="truncate text-xs">{r.questionTitle}</p>
+                {/* ★ 쓴 답변이 있으면 두 줄까지 보여준다 */}
+                {r.answer && <p className="mt-1 line-clamp-2 text-[11px] text-neutral-300">{r.answer}</p>}
                 <div className="mt-1 flex items-center justify-between">
                   <span className="text-[11px] text-neutral-400">{formatDuration(r.seconds)}</span>
                   <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${STATUS_BADGE[r.status]}`}>
@@ -268,6 +287,18 @@ export default function MockInterviewSession({
           </button>
         </aside>
       </div>
+
+      {/* ★ 나가기 확인 창 (브라우저 confirm 대신) */}
+      {isExitConfirmOpen && (
+        <ConfirmModal
+          title="모의면접을 나갈까요?"
+          message="나가면 이번 세션 기록이 저장되지 않습니다. 글로 저장한 답변은 질문 뱅크에 남아 있어요."
+          confirmLabel="나가기"
+          danger
+          onConfirm={onExit}
+          onCancel={closeExitConfirm}
+        />
+      )}
     </div>
   );
 }
