@@ -24,6 +24,10 @@ interface CreateActivityModalProps {
   onCreateSuccess?: (activityData: ActivityFormData) => void;
 }
 
+// ★ 서버가 받는 정원 범위 (api-docs: 1 ~ 200)
+const MIN_CAPACITY = 1;
+const MAX_CAPACITY = 200;
+
 export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
   isOpen,
   onClose,
@@ -47,6 +51,8 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
   const [confirmMode, setConfirmMode] = useState<"스터디장 승인" | "선착순">(
     "스터디장 승인",
   );
+  // ★ 저장을 눌렀을 때 빈 칸이 있으면 보여줄 안내 (없으면 "")
+  const [error, setError] = useState("");
 
   // 렌더링 단계 폼 초기화
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
@@ -64,6 +70,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
       setTopicMode("투표형");
       setVoteTime("회차 3일 전");
       setConfirmMode("스터디장 승인");
+      setError("");
     }
   }
 
@@ -81,8 +88,29 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
     );
   };
 
+  // ★ 서버에 보내기 전에 꼭 필요한 칸을 검사한다 (문제가 있으면 안내 문구, 없으면 "")
+  const validate = () => {
+    if (title.trim() === "") return "활동명을 입력해 주세요.";
+    const count = Number(memberCount);
+    // Number.isInteger: 소수가 아닌 정수인지
+    if (!Number.isInteger(count) || count < MIN_CAPACITY || count > MAX_CAPACITY) {
+      return `모집 인원은 ${MIN_CAPACITY}~${MAX_CAPACITY}명 사이 숫자로 입력해 주세요.`;
+    }
+    if (startDate === "") return "시작일을 선택해 주세요.";
+    if (endDate === "") return "종료일을 선택해 주세요.";
+    // "2026-11-10" 모양은 글자 비교로도 날짜 순서가 맞다
+    if (endDate < startDate) return "종료일은 시작일 이후여야 합니다.";
+    return "";
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const message = validate();
+    if (message) {
+      // ★ 빈 칸이 있으면 창을 닫지 않고 안내만 보여준다
+      setError(message);
+      return;
+    }
     if (onCreateSuccess) {
       onCreateSuccess({
         title,
@@ -158,6 +186,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              maxLength={100}
               className="w-full rounded-xl border border-gray-300 p-3 text-sm font-semibold outline-none focus:border-black"
               placeholder="예: React 심화 스터디"
             />
@@ -216,11 +245,14 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
               <label className="block font-bold text-gray-700 mb-2">
                 모집 인원
               </label>
+              {/* ★ type="number": 숫자만 입력 가능 ("6명" 같은 글자가 안 들어가게) */}
               <input
-                type="text"
+                type="number"
+                min={MIN_CAPACITY}
+                max={MAX_CAPACITY}
                 value={memberCount}
                 onChange={(e) => setMemberCount(e.target.value)}
-                placeholder="예: 6명"
+                placeholder="예: 6"
                 className="w-full rounded-xl border border-gray-200 p-3 outline-none focus:border-black"
               />
             </div>
@@ -239,9 +271,11 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
               <label className="block font-bold text-gray-700 mb-2">
                 종료일
               </label>
+              {/* ★ min: 시작일보다 앞은 못 고르게 */}
               <input
                 type="date"
                 value={endDate}
+                min={startDate || undefined}
                 onChange={(e) => setEndDate(e.target.value)}
                 className="w-full rounded-xl border border-gray-200 p-2.5 outline-none focus:border-black font-medium bg-white"
               />
@@ -376,6 +410,11 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
               </div>
             </div>
           </div>
+
+          {/* ★ 빈 칸 안내 (있을 때만) */}
+          {error && (
+            <p className="rounded-xl bg-red-50 px-4 py-3 font-semibold text-red-600">{error}</p>
+          )}
 
           {/* Footer */}
           <div className="border-t border-gray-100 pt-5 flex items-center justify-between">

@@ -1,6 +1,9 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import React, { useEffect, useState } from "react";
-import { apiRequest } from "../../api/client";
+import React from "react";
+// ★ 내 정보: 설정 화면과 같은 창고(TanStack Query)를 쓴다
+// → 서버 요청은 한 번만, 설정에서 이름을 바꾸면 사이드바도 바로 바뀐다
+import { useMyProfile } from "../../hooks/useMembers";
+import { MAJOR_LABEL } from "../../apis/interviews";
 
 import logo from "../../assets/images/logo.svg";
 import homeIcon from "../../assets/icons/home.svg";
@@ -12,12 +15,14 @@ import clipboardIcon from "../../assets/icons/clipboard.svg";
 import trendingUpIcon from "../../assets/icons/trending-up.svg";
 import usersIcon from "../../assets/icons/users.svg";
 
+// 입장할 때 이 기기에 저장해 둔 프로필 (친구 코드)
 interface InviteProfile {
   name?: string;
   generation?: string;
   departments?: string[];
 }
 
+// 저장된 입장 프로필 꺼내기 (없거나 못 읽으면 빈 값)
 const getInviteProfile = (): InviteProfile => {
   try {
     const saved = localStorage.getItem("pvweb:invite-profile:v1");
@@ -60,33 +65,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [isLeader, setIsLeader] = useState(false);
-  const [profile] = useState<InviteProfile>(getInviteProfile);
 
-  const displayName = profile.name?.trim() || "사용자";
-  const displayGeneration = profile.generation || "";
-  const displayDepartments = profile.departments?.join(", ") || "";
+  // ★ 서버의 내 정보 (이름·기수·전공·역할)
+  const profileQuery = useMyProfile();
+  const me = profileQuery.data;
+  // ★ 서버 정보가 오기 전에 잠깐 보여줄 기기 저장 프로필
+  const saved = getInviteProfile();
 
-  useEffect(() => {
-    let mounted = true;
+  // 부장(LEADER)이면 팀원 관리 메뉴를 보여준다
+  const isLeader = me?.roles.includes("LEADER") ?? false;
 
-    apiRequest<{ roles?: string[] }>("/members/me")
-      .then((member) => {
-        if (mounted) {
-          setIsLeader(member.roles?.includes("LEADER") ?? false);
-        }
-      })
-      .catch((error) => {
-        console.error("회원 권한 조회 실패:", error);
-        if (mounted) {
-          setIsLeader(false);
-        }
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  // ★ 아래 프로필 글자: 서버 정보가 있으면 서버, 없으면 기기 저장, 그것도 없으면 "사용자"
+  const displayName = me?.name ?? (saved.name?.trim() || "사용자");
+  const displaySub = me
+    ? `${me.generation}기 · ${me.majors.map((m) => MAJOR_LABEL[m]).join(", ")}`
+    : [saved.generation, saved.departments?.join(", ")].filter(Boolean).join(" · ");
 
   const currentActiveMenu =
     activeMenu || PATH_TO_MENU[location.pathname] || "오늘 할 일";
@@ -359,20 +352,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
       </div>
 
+      {/* ★ 아래 프로필: 들어온 사람의 정보 (필터 버튼은 친구 코드처럼 뺐다) */}
       <div className="mt-auto border-t border-gray-100 pt-3">
         <div className="flex items-center px-1">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-black text-xs font-bold text-white">
+          <div className="flex min-w-0 items-center gap-2.5">
+            {/* 이름 첫 글자 */}
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black text-xs font-bold text-white">
               {displayName.charAt(0)}
             </div>
 
-            <div>
-              <p className="text-xs font-bold text-gray-900">{displayName}</p>
-              <p className="text-[10px] text-gray-400">
-                {[displayGeneration, displayDepartments]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </p>
+            {/* min-w-0 + truncate: 이름·전공이 길면 ...으로 줄인다 */}
+            <div className="min-w-0">
+              <p className="truncate text-xs font-bold text-gray-900">{displayName}</p>
+              <p className="truncate text-[10px] text-gray-400">{displaySub}</p>
             </div>
           </div>
         </div>
