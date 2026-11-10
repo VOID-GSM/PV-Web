@@ -50,9 +50,9 @@ export const Header: React.FC<HeaderProps> = ({
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isNoticeOpen, setIsNoticeOpen] = useState(false);
-  const [activeNoticeTab, setActiveNoticeTab] = useState<
-    "전체" | "안 읽음" | "멘션"
-  >("전체");
+  const [activeNoticeTab, setActiveNoticeTab] = useState<"전체" | "안 읽음">(
+    "전체",
+  );
 
   // 모달 제어 상태
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
@@ -63,29 +63,9 @@ export const Header: React.FC<HeaderProps> = ({
   >("article");
 
   const [notifications, setNotifications] = useState<ApiNotification[]>([]);
-  const [dismissedNotificationIds, setDismissedNotificationIds] = useState<number[]>(() => {
-    try {
-      const saved = localStorage.getItem("pvweb:dismissed-notification-ids");
-      return saved ? (JSON.parse(saved) as number[]) : [];
-    } catch { return []; }
-  });
-
-  const isMentionNotification = (item: ApiNotification) =>
-    (item.type ?? "").toUpperCase().includes("MENTION") ||
-    `${item.title ?? ""} ${item.content ?? ""}`.includes("멘션");
-
-  const handleDismissNotification = (id: number) => {
-    setDismissedNotificationIds((current) => {
-      const next = current.includes(id) ? current : [...current, id];
-      try { localStorage.setItem("pvweb:dismissed-notification-ids", JSON.stringify(next)); } catch { /* 저장소를 사용할 수 없으면 현재 화면에서만 숨김 */ }
-      return next;
-    });
-  };
 
   const visibleNotifications = notifications.filter((item) => {
-    if (dismissedNotificationIds.includes(item.id)) return false;
     if (activeNoticeTab === "안 읽음") return !item.read;
-    if (activeNoticeTab === "멘션") return isMentionNotification(item);
     return true;
   });
 
@@ -201,7 +181,10 @@ export const Header: React.FC<HeaderProps> = ({
           : 3,
       });
       // ★ alert → 토스트 (성공)
-      showToast("활동을 생성했습니다. 활동 페이지를 새로고침해 주세요.", "success");
+      showToast(
+        "활동을 생성했습니다. 활동 페이지를 새로고침해 주세요.",
+        "success",
+      );
     } catch (error) {
       console.error("활동 생성 실패:", error);
       // ★ alert → 토스트 (실패)
@@ -273,7 +256,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
 
                 <div className="flex border-b border-gray-100 pb-1 pt-2 gap-4 text-xs font-semibold text-gray-400">
-                  {(["전체", "안 읽음", "멘션"] as const).map((tab) => (
+                  {(["전체", "안 읽음"] as const).map((tab) => (
                     <button
                       key={tab}
                       type="button"
@@ -290,23 +273,33 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
 
                 {visibleNotifications.length === 0 ? (
-                  <div className="py-8 text-center text-xs text-gray-400">
-                    <p>{activeNoticeTab === "멘션" ? "멘션 알림이 없습니다." : "새로운 알림이 없습니다."}</p>
-                  </div>
+                  <div className="py-8 text-center text-xs text-gray-400"></div>
                 ) : (
                   <div className="max-h-72 overflow-y-auto py-2">
                     {visibleNotifications.map((item) => (
-                      <div key={item.id} className={`mb-1 flex items-start gap-2 rounded-xl px-3 py-3 ${item.read ? "opacity-60" : "bg-blue-50/50"}`}>
-                        <button type="button" onClick={() => handleReadNotification(item)} className="min-w-0 flex-1 text-left hover:opacity-80">
-                          <span className="block text-xs font-semibold text-gray-800">{item.title || "새 알림"}</span>
-                          {item.content && <span className="mt-1 block text-xs text-gray-500">{item.content}</span>}
+                      <div
+                        key={item.id}
+                        className={`mb-1 flex items-start gap-2 rounded-xl px-3 py-3 ${item.read ? "opacity-60" : "bg-blue-50/50"}`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleReadNotification(item)}
+                          className="min-w-0 flex-1 text-left hover:opacity-80"
+                        >
+                          <span className="block text-xs font-semibold text-gray-800">
+                            {item.title || "새 알림"}
+                          </span>
+                          {item.content && (
+                            <span className="mt-1 block text-xs text-gray-500">
+                              {item.content}
+                            </span>
+                          )}
                           <span className="mt-1 block text-[10px] text-gray-400">
-                            {item.createdAt ? new Date(item.createdAt).toLocaleString("ko-KR") : ""}
+                            {item.createdAt
+                              ? new Date(item.createdAt).toLocaleString("ko-KR")
+                              : ""}
                           </span>
                         </button>
-                        {isMentionNotification(item) && (
-                          <button type="button" onClick={() => handleDismissNotification(item.id)} aria-label="멘션 알림 숨기기" title="멘션 알림 숨기기" className="shrink-0 rounded-md px-1.5 py-1 text-sm text-gray-400 hover:bg-white hover:text-gray-700">✕</button>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -523,7 +516,14 @@ export const Header: React.FC<HeaderProps> = ({
       />
 
       {/* ★ 새로 만들기·알림 결과 토스트 */}
-      {toast && <Toast key={toast.id} message={toast.message} type={toast.type} onClose={closeToast} />}
+      {toast && (
+        <Toast
+          key={toast.id}
+          message={toast.message}
+          type={toast.type}
+          onClose={closeToast}
+        />
+      )}
     </>
   );
 };
