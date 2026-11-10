@@ -14,8 +14,10 @@ import {
   useWorklogComments,
   useWorklogs,
 } from "../hooks/useWorklogs";
-// ★ 진짜 내 이름·번호
+// 진짜 내 이름·번호
 import { useMyName } from "../hooks/useMyName";
+// ★ 팀원 목록 (댓글 작성자 이름 찾기용)
+import { useTeamMembers } from "../hooks/useTeam";
 import type { Worklog as ServerWorklog } from "../apis/worklogs";
 import type { Board as ServerBoard } from "../apis/boards";
 import { getErrorMessage } from "../apis/client";
@@ -72,7 +74,7 @@ function toPageWorklog(w: ServerWorklog, boards: ServerBoard[]): Worklog {
 // ─────────────────────────────────────────────
 type WorklogCardWithCommentsProps = {
   worklog: Worklog;
-  // ★ 내가 쓴 일지인지
+  // 내가 쓴 일지인지
   isMine: boolean;
   // 회원 번호 → 이름 (댓글은 서버가 이름을 안 주고 번호만 줘서)
   names: Map<number, string>;
@@ -86,7 +88,7 @@ function WorklogCardWithComments({ worklog, isMine, names, onError }: WorklogCar
 
   const comments = (commentsQuery.data ?? []).map((c) => ({
     id: c.id,
-    // ★ 이름표에서 찾고, 못 찾으면 "팀원"
+    // 이름표에서 찾고, 그래도 못 찾으면 "팀원"
     author: names.get(c.authorId) ?? "팀원",
     content: c.content,
   }));
@@ -131,8 +133,10 @@ export default function WorklogPage() {
   const worklogsQuery = useWorklogs();
   const boardsQuery = useBoards();
   const createWorklog = useCreateWorklog();
+  // ★ 팀원 전체 (못 불러와도 아래에서 일지 작성자 이름으로 채운다)
+  const teamQuery = useTeamMembers();
 
-  // ★ 진짜 내 정보. 회원 번호를 아직 못 불러왔으면 토큰에서 꺼낸 번호를 쓴다
+  // 진짜 내 정보. 회원 번호를 아직 못 불러왔으면 토큰에서 꺼낸 번호를 쓴다
   const { myName, myId: profileId } = useMyName();
   const myId = profileId ?? tokenStorage.getMemberId();
 
@@ -181,8 +185,11 @@ export default function WorklogPage() {
   // 내가 쓴 일지 번호들 ("내 일지" 탭, 검은 동그라미에 사용)
   const myWorklogIds = new Set(serverWorklogs.filter((w) => w.authorId === myId).map((w) => w.id));
 
-  // ★ 회원 번호 → 이름 (일지 작성자들 + 나)
-  const names = new Map(serverWorklogs.map((w) => [w.authorId, w.authorName]));
+  // ★ 회원 번호 → 이름 표 (뒤에 넣은 것이 앞의 것을 덮어쓴다)
+  // ① 팀원 전체 ② 일지 작성자 ③ 나
+  const names = new Map<number, string>();
+  (teamQuery.data ?? []).forEach((m) => names.set(m.memberId, m.name));
+  serverWorklogs.forEach((w) => names.set(w.authorId, w.authorName));
   if (myId !== null && myName) names.set(myId, myName);
 
   // 작성 → 서버에 저장
@@ -225,7 +232,7 @@ export default function WorklogPage() {
     activeTab !== "팀 전체" || (board !== "" && board !== "전체") || (period !== "" && period !== "전체");
   const resetIfFiltered = isFiltered ? handleResetFilters : undefined;
 
-  // ★ 카드 하나 그리기 (내 글인지 같이 넘긴다)
+  // 카드 하나 그리기 (내 글인지 같이 넘긴다)
   const renderCard = (w: Worklog) => (
     <WorklogCardWithComments
       key={w.id}
