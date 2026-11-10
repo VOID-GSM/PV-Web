@@ -57,6 +57,42 @@ export const Header: React.FC<HeaderProps> = ({
   >("article");
 
   const [notifications, setNotifications] = useState<ApiNotification[]>([]);
+  const [dismissedNotificationIds, setDismissedNotificationIds] = useState<
+    number[]
+  >(() => {
+    try {
+      const saved = localStorage.getItem("pvweb:dismissed-notification-ids");
+      return saved ? (JSON.parse(saved) as number[]) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const isMentionNotification = (item: ApiNotification) =>
+    (item.type ?? "").toUpperCase().includes("MENTION") ||
+    `${item.title ?? ""} ${item.content ?? ""}`.includes("멘션");
+
+  const handleDismissNotification = (id: number) => {
+    setDismissedNotificationIds((current) => {
+      const next = current.includes(id) ? current : [...current, id];
+      try {
+        localStorage.setItem(
+          "pvweb:dismissed-notification-ids",
+          JSON.stringify(next),
+        );
+      } catch {
+        /* 저장소를 사용할 수 없으면 현재 화면에서만 숨김 */
+      }
+      return next;
+    });
+  };
+
+  const visibleNotifications = notifications.filter((item) => {
+    if (dismissedNotificationIds.includes(item.id)) return false;
+    if (activeNoticeTab === "안 읽음") return !item.read;
+    if (activeNoticeTab === "멘션") return isMentionNotification(item);
+    return true;
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -204,7 +240,7 @@ export const Header: React.FC<HeaderProps> = ({
               className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-100 text-gray-500 hover:bg-gray-50 transition cursor-pointer relative"
             >
               <img src={bellIcon} alt="알림" className="h-4 w-4 opacity-60" />
-              {notifications.length > 0 && (
+              {unreadCount > 0 && (
                 <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500" />
               )}
             </button>
@@ -244,33 +280,53 @@ export const Header: React.FC<HeaderProps> = ({
                   ))}
                 </div>
 
-                {notifications.length === 0 ? (
+                {visibleNotifications.length === 0 ? (
                   <div className="py-8 text-center text-xs text-gray-400">
-                    <p>새로운 알림이 없습니다.</p>
+                    <p>
+                      {activeNoticeTab === "멘션"
+                        ? "멘션 알림이 없습니다."
+                        : "새로운 알림이 없습니다."}
+                    </p>
                   </div>
                 ) : (
                   <div className="max-h-72 overflow-y-auto py-2">
-                    {notifications
-                      .filter(
-                        (item) => activeNoticeTab !== "안 읽음" || !item.read,
-                      )
-                      .map((item) => (
+                    {visibleNotifications.map((item) => (
+                      <div
+                        key={item.id}
+                        className={`mb-1 flex items-start gap-2 rounded-xl px-3 py-3 ${item.read ? "opacity-60" : "bg-blue-50/50"}`}
+                      >
                         <button
-                          key={item.id}
                           type="button"
                           onClick={() => handleReadNotification(item)}
-                          className={`block w-full rounded-xl px-3 py-3 text-left hover:bg-gray-50 ${item.read ? "opacity-60" : "bg-blue-50/50"}`}
+                          className="min-w-0 flex-1 text-left hover:opacity-80"
                         >
                           <span className="block text-xs font-semibold text-gray-800">
                             {item.title || "새 알림"}
                           </span>
+                          {item.content && (
+                            <span className="mt-1 block text-xs text-gray-500">
+                              {item.content}
+                            </span>
+                          )}
                           <span className="mt-1 block text-[10px] text-gray-400">
                             {item.createdAt
                               ? new Date(item.createdAt).toLocaleString("ko-KR")
                               : ""}
                           </span>
                         </button>
-                      ))}
+                        {isMentionNotification(item) && (
+                          <button
+                            type="button"
+                            onClick={() => handleDismissNotification(item.id)}
+                            aria-label="멘션 알림 숨기기"
+                            title="멘션 알림 숨기기"
+                            className="shrink-0 rounded-md px-1.5 py-1 text-sm text-gray-400 hover:bg-white hover:text-gray-700"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
