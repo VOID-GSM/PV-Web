@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Header } from "../components/layout/Header";
 import type { CalendarEvent } from "../types/calendar";
 import { getHomeTodos, getHomeDashboard, type HomeTodoItem, type DashboardResponse } from "../api/homeApi";
+import { getActivities, type ActivitySummary } from "../api/activityApi";
 
 export interface MainPageProps {
   events?: CalendarEvent[];
@@ -17,6 +18,7 @@ export const MainPage: React.FC<MainPageProps> = ({
 }) => {
   const [apiTodos, setApiTodos] = useState<HomeTodoItem[]>([]);
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
+  const [apiActivities, setApiActivities] = useState<ActivitySummary[]>([]);
   useEffect(() => {
     let cancelled = false;
     getHomeTodos()
@@ -25,6 +27,9 @@ export const MainPage: React.FC<MainPageProps> = ({
     getHomeDashboard()
       .then((response) => { if (!cancelled) setDashboard(response); })
       .catch((error: unknown) => console.error("홈 대시보드 API 조회 실패:", error));
+    getActivities()
+      .then((response) => { if (!cancelled) setApiActivities(response ?? []); })
+      .catch((error: unknown) => console.error("이번 주 활동 조회 실패:", error));
     return () => { cancelled = true; };
   }, []);
 
@@ -54,9 +59,23 @@ export const MainPage: React.FC<MainPageProps> = ({
   const upcomingDeadlines = events.filter(
     (event) => event.type === "마감" && event.date >= todayStr && event.date <= weekEndStr,
   );
-  const activities = events.filter(
+  const eventActivities = events.filter(
     (event) => event.type === "활동" && event.date >= weekStartStr && event.date <= weekEndStr,
   );
+  const weeklyActivities = apiActivities.filter((activity) =>
+    activity.startDate <= weekEndStr && activity.endDate >= weekStartStr && activity.status !== "ENDED",
+  );
+  // 활동 API를 기준으로 집계하고, API에 없는 캘린더 활동 일정도 함께 표시한다.
+  const activityCards = [
+    ...weeklyActivities.map((activity) => ({
+      id: `activity:${activity.id}`,
+      title: activity.name,
+      board: activity.typeLabel || activity.type,
+    })),
+    ...eventActivities.filter((event) => !weeklyActivities.some((activity) => activity.name === event.title)).map((event) => ({
+      id: event.id, title: event.title, board: event.board,
+    })),
+  ];
 
   return (
     <div className="flex flex-1 flex-col h-full overflow-hidden bg-[#f7f7f8]">
@@ -107,7 +126,7 @@ export const MainPage: React.FC<MainPageProps> = ({
               </span>
               <div className="mt-4 flex items-baseline gap-2">
                 <span className="text-2xl font-extrabold text-gray-900">
-                  {activities.length}
+                  {activityCards.length}
                 </span>
                 <span className="text-[11px] font-medium text-emerald-600">
                   건
@@ -192,13 +211,13 @@ export const MainPage: React.FC<MainPageProps> = ({
               </p>
             </div>
 
-            {activities.length === 0 ? (
+            {activityCards.length === 0 ? (
               <div className="py-10 text-center text-xs text-gray-400">
                 등록된 이번 주 활동이 없습니다.
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-4 mt-4">
-                {activities.map((act) => (
+                {activityCards.map((act) => (
                   <div
                     key={act.id}
                     className="flex flex-col justify-between rounded-2xl border border-gray-100 bg-white p-5 shadow-2xs"
