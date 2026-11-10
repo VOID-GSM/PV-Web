@@ -18,7 +18,7 @@ import { createActivity } from "../../api/activityApi";
 import { createPost } from "../../api/postApi";
 import CreateNoticeModal from "../modals/CreateNoticeModal";
 import CreateArticleModal from "../modals/CreateArticleModal";
-// ★ 브라우저 alert 대신 쓸 토스트
+// 브라우저 alert 대신 쓸 토스트
 import Toast from "../common/Toast";
 import {
   getNotifications,
@@ -37,8 +37,13 @@ interface OutletContextType {
   onOpenAddModal?: () => void;
 }
 
-// ★ 토스트 하나의 모양 (id가 바뀌면 같은 문구여도 새로 뜬다)
+// 토스트 하나의 모양 (id가 바뀌면 같은 문구여도 새로 뜬다)
 type ToastState = { id: number; message: string; type: "success" | "info" };
+
+// ★ 알림 탭 (멘션은 서버에 기능이 없어서 뺐다)
+const NOTICE_TABS = ["전체", "안 읽음"] as const;
+// NOTICE_TABS 안의 글자 중 하나라는 뜻 ("전체" | "안 읽음")
+type NoticeTab = (typeof NOTICE_TABS)[number];
 
 export const Header: React.FC<HeaderProps> = ({
   title,
@@ -50,9 +55,8 @@ export const Header: React.FC<HeaderProps> = ({
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isNoticeOpen, setIsNoticeOpen] = useState(false);
-  const [activeNoticeTab, setActiveNoticeTab] = useState<
-    "전체" | "안 읽음" | "멘션"
-  >("전체");
+  // ★ 지금 고른 알림 탭 ("전체" | "안 읽음")
+  const [activeNoticeTab, setActiveNoticeTab] = useState<NoticeTab>("전체");
 
   // 모달 제어 상태
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
@@ -64,14 +68,14 @@ export const Header: React.FC<HeaderProps> = ({
 
   const [notifications, setNotifications] = useState<ApiNotification[]>([]);
 
-  // ★ 지금 떠 있는 토스트 (null이면 안 보임)
+  // 지금 떠 있는 토스트 (null이면 안 보임)
   const [toast, setToast] = useState<ToastState | null>(null);
 
-  // ★ 토스트 띄우기: 이전 번호 + 1로 새 토스트를 만든다
+  // 토스트 띄우기: 이전 번호 + 1로 새 토스트를 만든다
   const showToast = (message: string, type: "success" | "info" = "info") => {
     setToast((prev) => ({ id: (prev?.id ?? 0) + 1, message, type }));
   };
-  // ★ 토스트 닫기 (Toast가 2.5초 뒤 부른다)
+  // 토스트 닫기 (Toast가 2.5초 뒤 부른다)
   const closeToast = useCallback(() => setToast(null), []);
 
   useEffect(() => {
@@ -94,7 +98,6 @@ export const Header: React.FC<HeaderProps> = ({
       );
     } catch (error) {
       console.error("알림 전체 읽음 처리 실패:", error);
-      // ★ alert → 토스트
       showToast(
         error instanceof Error
           ? error.message
@@ -114,7 +117,6 @@ export const Header: React.FC<HeaderProps> = ({
       );
     } catch (error) {
       console.error("알림 읽음 처리 실패:", error);
-      // ★ alert → 토스트
       showToast(
         error instanceof Error
           ? error.message
@@ -175,11 +177,9 @@ export const Header: React.FC<HeaderProps> = ({
           ? topicOpenDaysBefore
           : 3,
       });
-      // ★ alert → 토스트 (성공)
       showToast("활동을 생성했습니다. 활동 페이지를 새로고침해 주세요.", "success");
     } catch (error) {
       console.error("활동 생성 실패:", error);
-      // ★ alert → 토스트 (실패)
       showToast(
         error instanceof Error ? error.message : "활동을 생성하지 못했습니다.",
       );
@@ -247,8 +247,9 @@ export const Header: React.FC<HeaderProps> = ({
                   </button>
                 </div>
 
+                {/* ★ 탭: 전체 / 안 읽음 (멘션 삭제) */}
                 <div className="flex border-b border-gray-100 pb-1 pt-2 gap-4 text-xs font-semibold text-gray-400">
-                  {(["전체", "안 읽음", "멘션"] as const).map((tab) => (
+                  {NOTICE_TABS.map((tab) => (
                     <button
                       key={tab}
                       type="button"
@@ -471,7 +472,11 @@ export const Header: React.FC<HeaderProps> = ({
         isOpen={isNoticeModalOpen}
         onClose={() => setIsNoticeModalOpen(false)}
         activityId={0}
-        onSuccess={() => setIsNoticeModalOpen(false)}
+        // ★ 공지를 보내면 창을 닫고 토스트로 안내 (공지 창의 alert 대신)
+        onSuccess={() => {
+          setIsNoticeModalOpen(false);
+          showToast("공지를 보냈습니다", "success");
+        }}
       />
       <CreateArticleModal
         isOpen={isArticleModalOpen}
@@ -479,7 +484,6 @@ export const Header: React.FC<HeaderProps> = ({
         mode={articleModalMode}
         onSubmitSuccess={async (data) => {
           if (data.mode !== "article") {
-            // ★ alert → 토스트 (안내)
             showToast(
               "이 유형은 추가 필수 정보가 필요해 해당 화면에서 작성해 주세요.",
             );
@@ -490,11 +494,9 @@ export const Header: React.FC<HeaderProps> = ({
               title: data.title.trim(),
               content: data.content,
             });
-            // ★ alert → 토스트 (성공)
             showToast("정리글을 저장했습니다.", "success");
           } catch (error) {
             console.error("정리글 생성 실패:", error);
-            // ★ alert → 토스트 (실패)
             showToast(
               error instanceof Error
                 ? error.message
@@ -504,7 +506,7 @@ export const Header: React.FC<HeaderProps> = ({
         }}
       />
 
-      {/* ★ 새로 만들기·알림 결과 토스트 */}
+      {/* 새로 만들기·알림 결과 토스트 */}
       {toast && <Toast key={toast.id} message={toast.message} type={toast.type} onClose={closeToast} />}
     </>
   );

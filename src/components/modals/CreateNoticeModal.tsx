@@ -131,7 +131,7 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
 
       await createNotice(body);
 
-      alert("공지사항이 등록되었습니다.");
+      // ★ alert 삭제: 성공 안내는 부모(Header)가 onSuccess에서 토스트로 띄운다
       onSuccess();
       handleClose();
     } catch (error) {
