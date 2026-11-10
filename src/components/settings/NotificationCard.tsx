@@ -8,13 +8,17 @@ import {
 import type { NotificationType } from "../../apis/notifications";
 import { getErrorMessage } from "../../apis/client";
 
-// ★ 화면에 보여줄 알림 줄들 (서버 알림 종류와 짝을 맞춘다)
+// 화면에 보여줄 알림 줄들 (서버 알림 종류와 짝을 맞춘다)
 const SERVER_ROWS: { type: NotificationType; title: string; description: string }[] = [
   { type: "NOTICE", title: "공지 알림", description: "새 공지가 올라오면 알림" },
   { type: "DEADLINE_DDAY", title: "마감 D-day 알림", description: "D-7 · D-3 · D-1 · 당일" },
   { type: "TOPIC_REMINDER", title: "주제 미정 재알림", description: "회차 D-1까지 주제가 없으면 재알림" },
   { type: "UNEXCUSED_ABSENCE", title: "무단 불참 알림", description: "스터디장·부장에게 전달" },
   { type: "WEEKLY_REPORT", title: "주간 리포트", description: "매주 월요일 09:00" },
+  // ★ 댓글 알림 3종
+  { type: "WORKLOG_COMMENT", title: "업무일지 댓글 알림", description: "내 업무일지에 댓글이 달리면 알림" },
+  { type: "SUBMISSION_COMMENT", title: "제출물 댓글 알림", description: "내 과제 제출물에 댓글이 달리면 알림" },
+  { type: "NOTE_COMMENT", title: "정리글 댓글 알림", description: "내 정리글에 댓글이 달리면 알림" },
 ];
 
 // 토글 스위치 (켜짐/꺼짐, 잠금)
@@ -88,7 +92,7 @@ export default function NotificationCard() {
           </span>
         </li>
 
-        {/* ★ 서버와 연결된 알림들 */}
+        {/* 서버와 연결된 알림들 */}
         {SERVER_ROWS.map((row) => (
           <li key={row.type} className="flex items-center justify-between gap-3 rounded bg-neutral-50 px-4 py-3">
             <div>
