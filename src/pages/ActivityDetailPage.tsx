@@ -84,6 +84,36 @@ export default function ActivityDetailPage() {
   const [isSubmittingTopic, setIsSubmittingTopic] = useState(false);
   const [isVoting, setIsVoting] = useState(false);
 
+  // 주제 제안 모달
+  const [isTopicModalOpen, setIsTopicModalOpen] = useState(false);
+  const [topicTitle, setTopicTitle] = useState("");
+
+  // Toast 알림
+  const [toast, setToast] = useState<{
+    id: number;
+    message: string;
+    type: "success" | "info";
+  } | null>(null);
+
+  const showToast = (message: string, type: "success" | "info" = "info") => {
+    setToast((prev) => ({
+      id: (prev?.id ?? 0) + 1,
+      message,
+      type,
+    }));
+  };
+
+  const closeToast = useCallback(() => setToast(null), []);
+  useEffect(() => {
+    if (!toast) return;
+
+    const timer = window.setTimeout(() => {
+      setToast(null);
+    }, 3000);
+
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
   const [absenceRequests, setAbsenceRequests] = useState<AbsenceRequest[]>([]);
 
   const [articles, setArticles] = useState<ArticleDetailData[]>([]);
@@ -389,25 +419,46 @@ export default function ActivityDetailPage() {
     };
   }, [id, navigate, refreshTopicCandidates]);
 
-  const handleProposeTopic = async () => {
+  const handleProposeTopic = () => {
     if (!id || !sessions[0]) {
-      alert("주제를 제안할 회차가 없습니다.");
+      showToast("주제를 제안할 회차가 없습니다.");
       return;
     }
 
-    const title = window.prompt("제안할 주제를 입력해 주세요.");
-    if (!title?.trim()) return;
+    setTopicTitle("");
+    setIsTopicModalOpen(true);
+  };
+
+  const handleSubmitTopic = async () => {
+    const title = topicTitle.trim();
+
+    if (!title) {
+      showToast("제안할 주제를 입력해 주세요.");
+      return;
+    }
+
+    if (!sessions[0]) {
+      showToast("주제를 제안할 회차가 없습니다.");
+      setIsTopicModalOpen(false);
+      return;
+    }
 
     const sessionId = Number(sessions[0].id);
 
     try {
       setIsSubmittingTopic(true);
-      await proposeTopicCandidate(activityId, sessionId, title.trim());
+
+      await proposeTopicCandidate(activityId, sessionId, title);
       await refreshTopicCandidates(activityId, sessionId);
-      alert("주제가 제안되었습니다.");
+
+      setIsTopicModalOpen(false);
+      setTopicTitle("");
+
+      showToast("주제가 제안되었습니다.", "success");
     } catch (error) {
       console.error("주제 제안 실패:", error);
-      alert(
+
+      showToast(
         error instanceof Error ? error.message : "주제를 제안하지 못했습니다.",
       );
     } finally {
@@ -1034,6 +1085,92 @@ export default function ActivityDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* 주제 제안 모달 */}
+      {isTopicModalOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setIsTopicModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 className="text-lg font-bold text-gray-900">
+              새로운 주제 제안
+            </h2>
+
+            <p className="mt-2 text-sm text-gray-500">
+              함께 진행하고 싶은 활동 주제를 입력해 주세요.
+            </p>
+
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleSubmitTopic();
+              }}
+            >
+              <input
+                type="text"
+                value={topicTitle}
+                onChange={(event) => setTopicTitle(event.target.value)}
+                placeholder="주제 이름을 입력해 주세요."
+                maxLength={100}
+                autoFocus
+                disabled={isSubmittingTopic}
+                className="mt-5 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-black"
+              />
+
+              <div className="mt-6 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsTopicModalOpen(false)}
+                  disabled={isSubmittingTopic}
+                  className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50"
+                >
+                  취소
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isSubmittingTopic || !topicTitle.trim()}
+                  className="rounded-xl bg-black px-5 py-2.5 text-sm font-bold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {isSubmittingTopic ? "등록 중..." : "주제 제안"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Toast 알림 */}
+      {toast && (
+        <div
+          key={toast.id}
+          className="fixed right-6 top-6 z-[200] flex min-w-[280px] items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-lg"
+        >
+          <div className="flex items-center gap-3">
+            <span
+              className={`h-2.5 w-2.5 rounded-full ${
+                toast.type === "success" ? "bg-green-500" : "bg-blue-500"
+              }`}
+            />
+            <p className="text-sm font-semibold text-gray-800">
+              {toast.message}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={closeToast}
+            className="text-lg text-gray-400 hover:text-gray-800"
+            aria-label="알림 닫기"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       <CreateNoticeModal
         isOpen={isNoticeModalOpen}
