@@ -1,5 +1,6 @@
 // src/components/layout/Header.tsx
-import React, { useState, useRef, useEffect } from "react";
+// useCallback: 함수를 한 번만 만들어 두고 재사용하게 해주는 기능 (토스트 닫기에 사용)
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useOutletContext } from "react-router-dom";
 
 import bellIcon from "../../assets/icons/bell.svg";
@@ -17,6 +18,8 @@ import { createActivity } from "../../api/activityApi";
 import { createPost } from "../../api/postApi";
 import CreateNoticeModal from "../modals/CreateNoticeModal";
 import CreateArticleModal from "../modals/CreateArticleModal";
+// ★ 브라우저 alert 대신 쓸 토스트
+import Toast from "../common/Toast";
 import {
   getNotifications,
   markAllNotificationsRead,
@@ -33,6 +36,9 @@ interface HeaderProps {
 interface OutletContextType {
   onOpenAddModal?: () => void;
 }
+
+// ★ 토스트 하나의 모양 (id가 바뀌면 같은 문구여도 새로 뜬다)
+type ToastState = { id: number; message: string; type: "success" | "info" };
 
 export const Header: React.FC<HeaderProps> = ({
   title,
@@ -83,6 +89,16 @@ export const Header: React.FC<HeaderProps> = ({
     return true;
   });
 
+  // ★ 지금 떠 있는 토스트 (null이면 안 보임)
+  const [toast, setToast] = useState<ToastState | null>(null);
+
+  // ★ 토스트 띄우기: 이전 번호 + 1로 새 토스트를 만든다
+  const showToast = (message: string, type: "success" | "info" = "info") => {
+    setToast((prev) => ({ id: (prev?.id ?? 0) + 1, message, type }));
+  };
+  // ★ 토스트 닫기 (Toast가 2.5초 뒤 부른다)
+  const closeToast = useCallback(() => setToast(null), []);
+
   useEffect(() => {
     let cancelled = false;
     getNotifications()
@@ -103,7 +119,8 @@ export const Header: React.FC<HeaderProps> = ({
       );
     } catch (error) {
       console.error("알림 전체 읽음 처리 실패:", error);
-      alert(
+      // ★ alert → 토스트
+      showToast(
         error instanceof Error
           ? error.message
           : "알림을 읽음 처리하지 못했습니다.",
@@ -122,7 +139,8 @@ export const Header: React.FC<HeaderProps> = ({
       );
     } catch (error) {
       console.error("알림 읽음 처리 실패:", error);
-      alert(
+      // ★ alert → 토스트
+      showToast(
         error instanceof Error
           ? error.message
           : "알림을 읽음 처리하지 못했습니다.",
@@ -182,10 +200,12 @@ export const Header: React.FC<HeaderProps> = ({
           ? topicOpenDaysBefore
           : 3,
       });
-      alert("활동을 생성했습니다. 활동 페이지를 새로고침해 주세요.");
+      // ★ alert → 토스트 (성공)
+      showToast("활동을 생성했습니다. 활동 페이지를 새로고침해 주세요.", "success");
     } catch (error) {
       console.error("활동 생성 실패:", error);
-      alert(
+      // ★ alert → 토스트 (실패)
+      showToast(
         error instanceof Error ? error.message : "활동을 생성하지 못했습니다.",
       );
     }
@@ -468,6 +488,8 @@ export const Header: React.FC<HeaderProps> = ({
       <CreateNoticeModal
         isOpen={isNoticeModalOpen}
         onClose={() => setIsNoticeModalOpen(false)}
+        activityId={0}
+        onSuccess={() => setIsNoticeModalOpen(false)}
       />
       <CreateArticleModal
         isOpen={isArticleModalOpen}
@@ -475,7 +497,8 @@ export const Header: React.FC<HeaderProps> = ({
         mode={articleModalMode}
         onSubmitSuccess={async (data) => {
           if (data.mode !== "article") {
-            alert(
+            // ★ alert → 토스트 (안내)
+            showToast(
               "이 유형은 추가 필수 정보가 필요해 해당 화면에서 작성해 주세요.",
             );
             return;
@@ -485,10 +508,12 @@ export const Header: React.FC<HeaderProps> = ({
               title: data.title.trim(),
               content: data.content,
             });
-            alert("정리글을 저장했습니다.");
+            // ★ alert → 토스트 (성공)
+            showToast("정리글을 저장했습니다.", "success");
           } catch (error) {
             console.error("정리글 생성 실패:", error);
-            alert(
+            // ★ alert → 토스트 (실패)
+            showToast(
               error instanceof Error
                 ? error.message
                 : "정리글을 저장하지 못했습니다.",
@@ -496,6 +521,9 @@ export const Header: React.FC<HeaderProps> = ({
           }
         }}
       />
+
+      {/* ★ 새로 만들기·알림 결과 토스트 */}
+      {toast && <Toast key={toast.id} message={toast.message} type={toast.type} onClose={closeToast} />}
     </>
   );
 };

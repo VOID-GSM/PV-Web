@@ -1,10 +1,12 @@
 // src/components/calendar/AddEventModal.tsx
 import React, { useState } from "react";
+// ★ 팀원 목록을 서버에서 불러오는 도구
+import { useQuery } from "@tanstack/react-query";
 import type { CalendarEvent } from "../../types/calendar";
+import { getMembers } from "../../apis/members";
+import { teamKeys } from "../../hooks/useTeam";
 
 import alertIcon from "../../assets/icons/alert.svg";
-import calendarIcon from "../../assets/icons/calendar.svg";
-import clockIcon from "../../assets/icons/clock.svg";
 import plusIcon from "../../assets/icons/plus.svg";
 import checkCircleIcon from "../../assets/icons/check-circle.svg";
 
@@ -36,6 +38,20 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
     initialEvent?.assignees ?? [],
   );
   const [alerts, setAlerts] = useState<string[]>([]);
+  // ★ 팀원 고르기 목록이 열려 있는지
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+
+  // ★ 팀원 목록: 고르기 목록을 열었을 때만 서버에 요청한다
+  // (훅은 아래 "if (!isOpen) return null"보다 위에 있어야 해서 여기에 둔다)
+  const membersQuery = useQuery({
+    queryKey: teamKeys.members,
+    queryFn: getMembers,
+    enabled: isOpen && isPickerOpen,
+  });
+  // 가입된 팀원 중 아직 안 고른 사람만
+  const pickableMembers = (membersQuery.data ?? []).filter(
+    (m) => m.status === "JOINED" && !assignees.includes(m.name),
+  );
 
   // useEffect 대신 렌더링 단계에서 isOpen 상태 변화를 감지해 폼 초기화 (ESLint 에러 방지)
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
@@ -51,12 +67,12 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
       setEndDate(initialEvent?.endDate ?? "");
       setAssignees(initialEvent?.assignees ?? []);
       setAlerts([]);
+      // ★ 창을 다시 열면 팀원 목록은 닫힌 상태로
+      setIsPickerOpen(false);
     }
   }
 
   if (!isOpen) return null;
-
-  // ... 이하 동일
 
   const toggleAlert = (level: string) => {
     setAlerts((prev) =>
@@ -68,6 +84,12 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
 
   const removeAssignee = (name: string) => {
     setAssignees((prev) => prev.filter((item) => item !== name));
+  };
+
+  // ★ 목록에서 팀원을 고르면 담당자에 추가하고 목록을 닫는다
+  const addAssignee = (name: string) => {
+    setAssignees((prev) => [...prev, name]);
+    setIsPickerOpen(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -191,12 +213,12 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
               <label className="block font-bold text-gray-700 mb-1.5">
                 날짜
               </label>
+              {/* ★ type="date": 누르면 달력이 뜨고, 값은 "2026-11-09" 모양으로 들어온다 */}
               <input
-                type="text"
+                type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                placeholder="2026-09-24"
-                className="w-full rounded-xl border border-gray-200 p-3 outline-none focus:border-black font-medium"
+                className="w-full rounded-xl border border-gray-200 p-2.5 outline-none focus:border-black font-medium bg-white"
               />
             </div>
 
@@ -204,40 +226,27 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
               <label className="block font-bold text-gray-700 mb-1.5">
                 시간
               </label>
-              <div className="relative flex items-center">
-                <input
-                  type="text"
-                  value={time}
-                  onChange={(e) => setTime(e.target.value)}
-                  placeholder="23:59"
-                  className="w-full rounded-xl border border-gray-200 p-3 pr-8 outline-none focus:border-black font-medium"
-                />
-                <img
-                  src={clockIcon}
-                  alt=""
-                  className="absolute right-3 h-4 w-4 opacity-40 pointer-events-none"
-                />
-              </div>
+              {/* ★ type="time": 누르면 시간 고르기가 뜨고, 값은 "23:59" 모양 */}
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 p-2.5 outline-none focus:border-black font-medium bg-white"
+              />
             </div>
 
             <div>
               <label className="block font-bold text-gray-700 mb-1.5">
                 종료
               </label>
-              <div className="relative flex items-center">
-                <input
-                  type="text"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  placeholder="당일"
-                  className="w-full rounded-xl border border-gray-200 p-3 pr-8 outline-none focus:border-black font-medium"
-                />
-                <img
-                  src={calendarIcon}
-                  alt=""
-                  className="absolute right-3 h-4 w-4 opacity-40 pointer-events-none"
-                />
-              </div>
+              {/* ★ 종료일도 달력으로. min: 시작 날짜보다 앞은 못 고르게 */}
+              <input
+                type="date"
+                value={endDate}
+                min={date || undefined}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 p-2.5 outline-none focus:border-black font-medium bg-white"
+              />
             </div>
           </div>
 
@@ -263,13 +272,45 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
                   </button>
                 </span>
               ))}
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 rounded-full border border-dashed border-gray-300 px-3 py-1 font-semibold text-gray-500 hover:bg-gray-50 transition cursor-pointer"
-              >
-                <img src={plusIcon} alt="" className="h-3 w-3 opacity-60" />
-                <span>팀원 추가</span>
-              </button>
+
+              {/* ★ 팀원 추가 버튼 + 그 아래 뜨는 목록 */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsPickerOpen(!isPickerOpen)}
+                  className="inline-flex items-center gap-1 rounded-full border border-dashed border-gray-300 px-3 py-1 font-semibold text-gray-500 hover:bg-gray-50 transition cursor-pointer"
+                >
+                  <img src={plusIcon} alt="" className="h-3 w-3 opacity-60" />
+                  <span>팀원 추가</span>
+                </button>
+
+                {isPickerOpen && (
+                  <div className="absolute left-0 z-10 mt-2 max-h-56 w-56 overflow-y-auto rounded-2xl border border-gray-100 bg-white p-2 shadow-xl">
+                    {membersQuery.isPending ? (
+                      <p className="px-3 py-2 text-gray-400">불러오는 중...</p>
+                    ) : membersQuery.isError ? (
+                      <p className="px-3 py-2 text-red-500">팀원 목록을 불러오지 못했습니다</p>
+                    ) : pickableMembers.length === 0 ? (
+                      <p className="px-3 py-2 text-gray-400">추가할 팀원이 없습니다</p>
+                    ) : (
+                      pickableMembers.map((m) => (
+                        <button
+                          key={m.memberId}
+                          type="button"
+                          onClick={() => addAssignee(m.name)}
+                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-gray-50 cursor-pointer"
+                        >
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-black text-[9px] font-bold text-white">
+                            {m.name.charAt(0)}
+                          </span>
+                          <span className="font-semibold text-gray-800">{m.name}</span>
+                          <span className="text-[10px] text-gray-400">{m.generation}기</span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -315,7 +356,8 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
           {/* Footer */}
           <div className="border-t border-gray-100 pt-4 flex items-center justify-between">
             <span className="text-[11px] text-gray-400">
-              추가하면 담당자와 모든 팀원에게 알림이 갑니다
+              {/* ★ 수정일 때는 수정 안내 */}
+              {initialEvent ? "저장하면 일정이 바로 수정됩니다" : "추가하면 담당자와 모든 팀원에게 알림이 갑니다"}
             </span>
             <div className="flex gap-2">
               <button
@@ -329,7 +371,8 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
                 type="submit"
                 className="rounded-xl bg-black px-5 py-2 font-bold text-white hover:bg-gray-800 transition cursor-pointer"
               >
-                일정 추가
+                {/* ★ 수정일 때는 "저장" */}
+                {initialEvent ? "저장" : "일정 추가"}
               </button>
             </div>
           </div>
