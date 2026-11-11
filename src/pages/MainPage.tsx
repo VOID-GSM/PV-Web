@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { Header } from "../components/layout/Header";
 import type { CalendarEvent } from "../types/calendar";
 import {
-  getHomeTodos,
   getHomeDashboard,
   type HomeTodoItem,
   type DashboardResponse,
@@ -11,6 +10,7 @@ import { getActivities, type ActivitySummary } from "../api/activityApi";
 
 export interface MainPageProps {
   events?: CalendarEvent[];
+  homeTodos?: HomeTodoItem[];
   onNavigate?: (menu: string) => void;
   onOpenAddModal?: () => void;
   onToggleEvent?: (eventId: string) => void;
@@ -18,21 +18,14 @@ export interface MainPageProps {
 
 export const MainPage: React.FC<MainPageProps> = ({
   events = [],
+  homeTodos = [],
   onOpenAddModal,
   onToggleEvent,
 }) => {
-  const [apiTodos, setApiTodos] = useState<HomeTodoItem[]>([]);
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
   const [apiActivities, setApiActivities] = useState<ActivitySummary[]>([]);
   useEffect(() => {
     let cancelled = false;
-    getHomeTodos()
-      .then((response) => {
-        if (!cancelled) setApiTodos(response.items ?? []);
-      })
-      .catch((error: unknown) =>
-        console.error("오늘 할 일 API 조회 실패:", error),
-      );
     getHomeDashboard()
       .then((response) => {
         if (!cancelled) setDashboard(response);
@@ -60,8 +53,7 @@ export const MainPage: React.FC<MainPageProps> = ({
   weekEnd.setDate(today.getDate() + ((7 - today.getDay()) % 7));
   const weekStartStr = weekStart.toLocaleDateString("sv-SE");
   const weekEndStr = weekEnd.toLocaleDateString("sv-SE");
-
-  const apiTodoEvents: CalendarEvent[] = apiTodos.map((todo) => ({
+  const apiTodoEvents: CalendarEvent[] = homeTodos.map((todo) => ({
     id: `todo:${todo.type}:${todo.targetId}`,
     title: todo.targetName || todo.typeLabel,
     type: todo.dueAt || todo.overdue ? "마감" : "활동",

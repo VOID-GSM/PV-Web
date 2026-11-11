@@ -1,7 +1,7 @@
 // useCallback: 함수를 한 번만 만들어 두고 재사용하게 해주는 기능 (토스트 닫기에 사용)
 import { useCallback, useEffect, useState } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
-import { getHomeTodos } from "./api/homeApi";
+import { getHomeTodos, type HomeTodoItem } from "./api/homeApi";
 import { MainPage } from "./pages/MainPage";
 import CalendarPage from "./pages/CalendarPage";
 import ActivityDetailPage from "./pages/ActivityDetailPage";
@@ -39,7 +39,7 @@ export default function App() {
 
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [boards, setBoards] = useState<ApiBoard[]>([]);
-  const [homeTodoCount, setHomeTodoCount] = useState(0);
+  const [homeTodos, setHomeTodos] = useState<HomeTodoItem[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   // ★ 지금 떠 있는 토스트 (null이면 안 보임)
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -52,10 +52,13 @@ export default function App() {
   const closeToast = useCallback(() => setToast(null), []);
 
   useEffect(() => {
+    let cancelled = false;
+
+    // 오늘 할 일 조회
     getHomeTodos()
       .then((response) => {
         if (!cancelled) {
-          setHomeTodoCount(response.totalCount ?? response.items?.length ?? 0);
+          setHomeTodos(response.items ?? []);
         }
       })
       .catch((error: unknown) => {
@@ -63,7 +66,6 @@ export default function App() {
           console.error("오늘 할 일 API 조회 실패:", error);
         }
       });
-    let cancelled = false;
 
     const formatDate = (date: Date) => {
       const year = date.getFullYear();
@@ -76,13 +78,13 @@ export default function App() {
     const fromDate = new Date(now);
     const toDate = new Date(now);
 
-    // 달력에서 이전/향후 달로 이동해도 저장된 일정이 사라진 것처럼 보이지 않도록 넉넉한 기간을 조회한다.
     fromDate.setFullYear(fromDate.getFullYear() - 1);
     toDate.setFullYear(toDate.getFullYear() + 2);
 
     const from = formatDate(fromDate);
     const to = formatDate(toDate);
 
+    // 캘린더 일정 조회
     getCalendarEvents(from, to)
       .then((data) => {
         if (cancelled) return;
@@ -114,6 +116,7 @@ export default function App() {
         }
       });
 
+    // 회원 정보 및 보드 조회
     apiRequest<{ roles: string[] }>("/members/me")
       .then((member) => {
         if (cancelled) return;
@@ -239,7 +242,10 @@ export default function App() {
   const todayStr = new Date().toLocaleDateString("sv-SE");
 
   const todayTaskCount =
-    events.filter((event) => event.date === todayStr).length + homeTodoCount;
+    events.filter((event) => event.date === todayStr).length +
+    homeTodos.filter(
+      (todo) => (todo.dueAt?.slice(0, 10) || todayStr) === todayStr,
+    ).length;
 
   const handleNavigate = (menuName: string) => {
     switch (menuName) {
@@ -301,6 +307,7 @@ export default function App() {
             element={
               <MainPage
                 events={events}
+                homeTodos={homeTodos}
                 onOpenAddModal={() => setIsAddModalOpen(true)}
                 onToggleEvent={handleToggleEvent}
               />
