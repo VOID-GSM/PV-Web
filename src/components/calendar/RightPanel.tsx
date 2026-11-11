@@ -84,7 +84,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
         </p>
 
         <div className="flex flex-wrap gap-2">
-          {(["D-7", "D-3", "D-1", "당일", "D-14"] as const).map((dday) => (
+          {(["D-14", "D-7", "D-3", "D-1", "당일"] as const).map((dday) => (
             <button
               key={dday}
               type="button"

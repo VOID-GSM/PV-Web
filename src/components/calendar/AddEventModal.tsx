@@ -289,9 +289,13 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
                     {membersQuery.isPending ? (
                       <p className="px-3 py-2 text-gray-400">불러오는 중...</p>
                     ) : membersQuery.isError ? (
-                      <p className="px-3 py-2 text-red-500">팀원 목록을 불러오지 못했습니다</p>
+                      <p className="px-3 py-2 text-red-500">
+                        팀원 목록을 불러오지 못했습니다
+                      </p>
                     ) : pickableMembers.length === 0 ? (
-                      <p className="px-3 py-2 text-gray-400">추가할 팀원이 없습니다</p>
+                      <p className="px-3 py-2 text-gray-400">
+                        추가할 팀원이 없습니다
+                      </p>
                     ) : (
                       pickableMembers.map((m) => (
                         <button
@@ -303,8 +307,12 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
                           <span className="flex h-5 w-5 items-center justify-center rounded-full bg-black text-[9px] font-bold text-white">
                             {m.name.charAt(0)}
                           </span>
-                          <span className="font-semibold text-gray-800">{m.name}</span>
-                          <span className="text-[10px] text-gray-400">{m.generation}기</span>
+                          <span className="font-semibold text-gray-800">
+                            {m.name}
+                          </span>
+                          <span className="text-[10px] text-gray-400">
+                            {m.generation}기
+                          </span>
                         </button>
                       ))
                     )}
@@ -321,7 +329,7 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
               <span className="text-[10px] text-gray-400">복수 선택</span>
             </div>
             <div className="flex gap-2">
-              {["D-7", "D-3", "D-1", "당일"].map((level) => (
+              {["D-14", "D-7", "D-3", "D-1", "당일"].map((level) => (
                 <button
                   key={level}
                   type="button"
@@ -357,7 +365,9 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
           <div className="border-t border-gray-100 pt-4 flex items-center justify-between">
             <span className="text-[11px] text-gray-400">
               {/* ★ 수정일 때는 수정 안내 */}
-              {initialEvent ? "저장하면 일정이 바로 수정됩니다" : "추가하면 담당자와 모든 팀원에게 알림이 갑니다"}
+              {initialEvent
+                ? "저장하면 일정이 바로 수정됩니다"
+                : "추가하면 담당자와 모든 팀원에게 알림이 갑니다"}
             </span>
             <div className="flex gap-2">
               <button
