@@ -64,7 +64,7 @@ export const MainPage: React.FC<MainPageProps> = ({
   const apiTodoEvents: CalendarEvent[] = apiTodos.map((todo) => ({
     id: `todo:${todo.type}:${todo.targetId}`,
     title: todo.targetName || todo.typeLabel,
-    type: todo.overdue ? "마감" : "활동",
+    type: todo.dueAt || todo.overdue ? "마감" : "활동",
     board: todo.typeLabel || "할 일",
     date: todo.dueAt?.slice(0, 10) || todayStr,
     time: todo.dueAt?.slice(11, 16),
@@ -75,12 +75,24 @@ export const MainPage: React.FC<MainPageProps> = ({
     ...events.filter((event) => event.date === todayStr),
     ...apiTodoEvents.filter((event) => event.date === todayStr),
   ];
-  const upcomingDeadlines = events.filter(
-    (event) =>
-      event.type === "마감" &&
-      event.date >= todayStr &&
-      event.date <= weekEndStr,
-  );
+  const upcomingDeadlines = [
+    ...events.filter(
+      (event) =>
+        event.type === "마감" &&
+        event.date >= todayStr &&
+        event.date <= weekEndStr,
+    ),
+    ...apiTodoEvents.filter(
+      (event) =>
+        event.type === "마감" &&
+        event.date >= todayStr &&
+        event.date <= weekEndStr &&
+        !events.some(
+          (existing) =>
+            existing.title === event.title && existing.date === event.date,
+        ),
+    ),
+  ];
   const eventActivities = events.filter(
     (event) =>
       event.type === "활동" &&

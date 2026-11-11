@@ -1,7 +1,7 @@
 // useCallback: 함수를 한 번만 만들어 두고 재사용하게 해주는 기능 (토스트 닫기에 사용)
 import { useCallback, useEffect, useState } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
-
+import { getHomeTodos } from "./api/homeApi";
 import { MainPage } from "./pages/MainPage";
 import CalendarPage from "./pages/CalendarPage";
 import ActivityDetailPage from "./pages/ActivityDetailPage";
@@ -39,6 +39,7 @@ export default function App() {
 
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [boards, setBoards] = useState<ApiBoard[]>([]);
+  const [homeTodoCount, setHomeTodoCount] = useState(0);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   // ★ 지금 떠 있는 토스트 (null이면 안 보임)
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -51,6 +52,17 @@ export default function App() {
   const closeToast = useCallback(() => setToast(null), []);
 
   useEffect(() => {
+    getHomeTodos()
+      .then((response) => {
+        if (!cancelled) {
+          setHomeTodoCount(response.totalCount ?? response.items?.length ?? 0);
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          console.error("오늘 할 일 API 조회 실패:", error);
+        }
+      });
     let cancelled = false;
 
     const formatDate = (date: Date) => {
@@ -78,7 +90,14 @@ export default function App() {
         const loadedEvents: CalendarEvent[] = data.map((event) => ({
           id: String(event.id),
           title: event.title,
-          type: event.type === "DEADLINE" ? "마감" : event.type === "MEETING" ? "회의" : event.type === "ACTIVITY" ? "활동" : "개인 일정",
+          type:
+            event.type === "DEADLINE"
+              ? "마감"
+              : event.type === "MEETING"
+                ? "회의"
+                : event.type === "ACTIVITY"
+                  ? "활동"
+                  : "개인 일정",
           board: "",
           date: event.startsAt.slice(0, 10),
           endDate: event.endsAt.slice(0, 10),
@@ -145,7 +164,9 @@ export default function App() {
     } catch (error) {
       console.error("일정 생성 실패:", error);
       // ★ alert → 토스트
-      showToast(error instanceof Error ? error.message : "일정을 저장하지 못했습니다.");
+      showToast(
+        error instanceof Error ? error.message : "일정을 저장하지 못했습니다.",
+      );
     }
   };
 
@@ -183,7 +204,9 @@ export default function App() {
     } catch (error) {
       console.error("일정 수정 실패:", error);
       // ★ alert → 토스트
-      showToast(error instanceof Error ? error.message : "일정을 수정하지 못했습니다.");
+      showToast(
+        error instanceof Error ? error.message : "일정을 수정하지 못했습니다.",
+      );
     }
   };
 
@@ -197,7 +220,9 @@ export default function App() {
     } catch (error) {
       console.error("일정 삭제 실패:", error);
       // ★ alert → 토스트
-      showToast(error instanceof Error ? error.message : "일정을 삭제하지 못했습니다.");
+      showToast(
+        error instanceof Error ? error.message : "일정을 삭제하지 못했습니다.",
+      );
     }
   };
 
@@ -212,9 +237,9 @@ export default function App() {
   };
 
   const todayStr = new Date().toLocaleDateString("sv-SE");
-  const todayTaskCount = events.filter(
-    (event) => event.date === todayStr,
-  ).length;
+
+  const todayTaskCount =
+    events.filter((event) => event.date === todayStr).length + homeTodoCount;
 
   const handleNavigate = (menuName: string) => {
     switch (menuName) {
@@ -327,7 +352,14 @@ export default function App() {
       />
 
       {/* ★ 일정 추가·수정·삭제 결과 토스트 (어느 페이지에서든 뜬다) */}
-      {toast && <Toast key={toast.id} message={toast.message} type={toast.type} onClose={closeToast} />}
+      {toast && (
+        <Toast
+          key={toast.id}
+          message={toast.message}
+          type={toast.type}
+          onClose={closeToast}
+        />
+      )}
     </>
   );
 }
