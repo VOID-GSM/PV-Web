@@ -64,8 +64,9 @@ export default function App() {
     const fromDate = new Date(now);
     const toDate = new Date(now);
 
-    fromDate.setDate(fromDate.getDate() - 45);
-    toDate.setDate(toDate.getDate() + 45);
+    // 달력에서 이전/향후 달로 이동해도 저장된 일정이 사라진 것처럼 보이지 않도록 넉넉한 기간을 조회한다.
+    fromDate.setFullYear(fromDate.getFullYear() - 1);
+    toDate.setFullYear(toDate.getFullYear() + 2);
 
     const from = formatDate(fromDate);
     const to = formatDate(toDate);
@@ -77,7 +78,7 @@ export default function App() {
         const loadedEvents: CalendarEvent[] = data.map((event) => ({
           id: String(event.id),
           title: event.title,
-          type: "개인 일정",
+          type: event.type === "DEADLINE" ? "마감" : event.type === "MEETING" ? "회의" : event.type === "ACTIVITY" ? "활동" : "개인 일정",
           board: "",
           date: event.startsAt.slice(0, 10),
           endDate: event.endsAt.slice(0, 10),
