@@ -1,5 +1,7 @@
 import { useState } from "react";
 import Dropdown from "../common/Dropdown";
+// ★ 진짜 내 이름·기수 (작성자 선택지용)
+import { useMyName } from "../../hooks/useMyName";
 
 // 고를 수 있는 유형 3가지
 const IMPORT_TYPES = [
@@ -11,8 +13,7 @@ const IMPORT_TYPES = [
 // 위쪽 단계 표시 글자
 const STEPS = ["파일 선택", "유형·작성자 지정", "미리보기 후 가져오기"];
 
-// 드롭다운 항목들
-const AUTHOR_OPTIONS = ["동키 (10기)"];
+// 드롭다운 항목들 (작성자는 내 정보로 만들어서 컴포넌트 안으로 옮겼다)
 const ACTIVITY_OPTIONS = ["React 심화 스터디", "CS 면접 준비", "포폴 피드백 모임"];
 const DATE_OPTIONS = ["파일의 날짜 사용", "오늘 날짜로"];
 
@@ -32,6 +33,10 @@ type NotionImportModalProps = {
 };
 
 export default function NotionImportModal({ onClose }: NotionImportModalProps) {
+  // ★ 작성자 선택지: "전민서 (10기)" 모양. 아직 못 불러왔으면 빈 목록
+  const { myName, myGeneration } = useMyName();
+  const authorOptions = myName ? [`${myName} (${myGeneration})`] : [];
+
   const [files, setFiles] = useState<ImportFile[]>([]);
   const [importType, setImportType] = useState("");
   const [author, setAuthor] = useState("");
@@ -39,6 +44,8 @@ export default function NotionImportModal({ onClose }: NotionImportModalProps) {
   const [dateOption, setDateOption] = useState("");
   // "오늘 날짜로"를 고른 순간의 날짜를 저장해 둔다
   const [todayDate, setTodayDate] = useState("");
+  // ★ 가져오기를 눌렀을 때 창 안에 보여줄 안내 (없으면 "")
+  const [notice, setNotice] = useState("");
 
   const selectedType = IMPORT_TYPES.find((type) => type.value === importType);
 
@@ -93,9 +100,10 @@ export default function NotionImportModal({ onClose }: NotionImportModalProps) {
     setFiles(files.filter((_, i) => i !== index));
   };
 
+  // ★ alert로 "가져옵니다"라고 하던 것을 솔직한 안내로 바꿨다
+  // (서버의 노션 가져오기 API는 아직 화면과 연결 전이다)
   const handleImport = () => {
-    alert(`${files.length}개 파일을 ${selectedType?.label}(으)로 가져옵니다`);
-    onClose();
+    setNotice(`노션 가져오기는 서버 연결을 준비 중입니다. ${selectedType?.label ?? ""} ${files.length}개 파일은 아직 저장되지 않았어요.`);
   };
 
   return (
@@ -223,7 +231,8 @@ export default function NotionImportModal({ onClose }: NotionImportModalProps) {
                 작성자 <span className="text-red-500">*</span>
               </p>
               <div className="mt-1">
-                <Dropdown options={AUTHOR_OPTIONS} value={author} onChange={setAuthor} />
+                {/* ★ 진짜 내 이름으로 만든 선택지 */}
+                <Dropdown options={authorOptions} value={author} onChange={setAuthor} />
               </div>
             </div>
             <div>
@@ -304,6 +313,11 @@ export default function NotionImportModal({ onClose }: NotionImportModalProps) {
               </>
             )}
           </div>
+
+          {/* ★ 가져오기를 눌렀을 때 안내 (alert 대신) */}
+          {notice && (
+            <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-700">{notice}</p>
+          )}
         </div>
 
         {/* ===== 바닥 ===== */}

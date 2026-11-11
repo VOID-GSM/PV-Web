@@ -1,11 +1,21 @@
 import { api } from "./client";
 
 // ─────────────────────────────────────────────
-// 1) 서버가 쓰는 값들 (api-docs.json에서 확인)
+// 1) 서버가 쓰는 값들
 // ─────────────────────────────────────────────
 
-// 알림 종류: 공지 / 마감 D-day / 주제 미정 재알림 / 무단 불참 / 주간 리포트
-export type NotificationType = "NOTICE" | "DEADLINE_DDAY" | "TOPIC_REMINDER" | "UNEXCUSED_ABSENCE" | "WEEKLY_REPORT";
+// 알림 종류
+// 공지 / 마감 D-day / 주제 미정 재알림 / 무단 불참 / 주간 리포트
+// ★ 댓글 알림 3종 추가: 업무일지 댓글 / 제출물 댓글 / 정리글 댓글
+export type NotificationType =
+  | "NOTICE"
+  | "DEADLINE_DDAY"
+  | "TOPIC_REMINDER"
+  | "UNEXCUSED_ABSENCE"
+  | "WEEKLY_REPORT"
+  | "WORKLOG_COMMENT"
+  | "SUBMISSION_COMMENT"
+  | "NOTE_COMMENT";
 
 // 알림 종류 하나의 켜짐/꺼짐
 export interface NotificationSetting {

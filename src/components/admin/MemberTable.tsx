@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  ME,
   OVERLOAD_THRESHOLD,
   attendanceColor,
   submissionColor,
@@ -11,6 +10,8 @@ import moreIcon from "../../assets/icons/more.svg";
 
 type MemberTableProps = {
   members: Member[];
+  // ★ 내 회원 번호 (가짜 ME 대신. 이 번호의 줄에 "(나)"를 붙인다. 못 불러왔으면 null)
+  myId: number | null;
   tabs: string[];
   activeTab: string;
   onTabChange: (tab: string) => void;
@@ -34,6 +35,7 @@ function RateBar({ rate, color }: { rate: number | null; color: (r: number) => s
 
 export default function MemberTable({
   members,
+  myId,
   tabs,
   activeTab,
   onTabChange,
@@ -102,7 +104,8 @@ export default function MemberTable({
                           {m.name.charAt(0)}
                         </span>
                         {m.name}
-                        {m.name === ME && <span className="text-[10px] text-neutral-400">(나)</span>}
+                        {/* ★ 내 회원 번호와 같은 줄에만 (나) */}
+                        {myId !== null && m.id === myId && <span className="text-[10px] text-neutral-400">(나)</span>}
                       </span>
                     </td>
                     <td className="py-3 text-xs">

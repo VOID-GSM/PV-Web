@@ -14,19 +14,18 @@ import {
   ASSIGNMENT_TABS,
   GENERATIONS,
   MAJORS,
-  ME,
-  MEMBERS,
   SUBMIT_TYPES,
   TARGET_ALL,
   TARGET_PERSONAL,
   getDaysLeft,
   type Assignment,
   type AssignmentForm,
+  type Member,
   type Skill,
   type Submission,
   type SubmissionStatus,
 } from "../constants/assignment";
-// ★ 서버 연동
+// 서버 연동
 import {
   useAssignments,
   useCreateAssignment,
@@ -40,14 +39,20 @@ import {
   useSubmissionStatus,
   useSubmitAssignment,
 } from "../hooks/useAssignments";
+// 진짜 내 이름·기수·전공·번호
+import { useMyName } from "../hooks/useMyName";
 import type {
   AssignmentSummary,
+  SubmissionRequest,
   SubmissionStatus as ServerSubmissionStatus,
   SubmissionStatusSummary,
   TargetType,
 } from "../apis/assignments";
 import { MAJOR_LABEL, type Major } from "../apis/interviews";
 import { getErrorMessage } from "../apis/client";
+// ★ 파일 업로드
+import { uploadFile } from "../apis/files";
+import { tokenStorage } from "../apis/tokenStorage";
 
 // ─────────────────────────────────────────────
 // 서버 모양 → 화면 모양 번역 함수들 (컴포넌트 바깥)
@@ -109,7 +114,8 @@ function toMySubmission(a: AssignmentSummary): Submission | null {
   return {
     id: -a.id,
     assignmentId: a.id,
-    author: ME,
+    // 내 제출물 탭에서는 작성자 이름을 보여주지 않아서 "나"로 둔다
+    author: "나",
     type: "",
     content: "",
     submittedAt: "",
@@ -140,13 +146,13 @@ function uniqueById(list: AssignmentSummary[]): AssignmentSummary[] {
 type ToastState = { id: number; message: string; type: "success" | "info" };
 
 export default function AssignmentPage() {
-  // ★ 서버 데이터
+  // 서버 데이터
   const receivedQuery = useAssignments("RECEIVED");
   const createdQuery = useAssignments("CREATED");
   const skillsQuery = useSkills();
   const mySkillsQuery = useMySkills();
 
-  // ★ 서버로 보내는 도구들
+  // 서버로 보내는 도구들
   const createAssignment = useCreateAssignment();
   const submitAssignment = useSubmitAssignment();
   const resubmitAssignment = useResubmitAssignment();
@@ -155,6 +161,10 @@ export default function AssignmentPage() {
   const createSkill = useCreateSkill();
   const saveScores = useSaveMyScores();
 
+  // 진짜 내 정보 (★ 회원 번호는 파일 업로드에 필요. 못 불러왔으면 토큰에서)
+  const { myName, myGeneration, myMajors, myId: profileId } = useMyName();
+  const myId = profileId ?? tokenStorage.getMemberId();
+
   // 화면 상태
   const [activeTab, setActiveTab] = useState("역량 맵");
   const [generation, setGeneration] = useState("");
@@ -162,8 +172,10 @@ export default function AssignmentPage() {
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<number | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [initialSkillId, setInitialSkillId] = useState<number | null>(null);
-  // ★ 이번에 화면에서 제출한 제출물 번호 (재제출할 때 필요. 과제 번호 → 제출물 번호)
+  // 이번에 화면에서 제출한 제출물 번호 (재제출할 때 필요. 과제 번호 → 제출물 번호)
   const [mySubmissionIds, setMySubmissionIds] = useState<Record<number, number>>({});
+  // ★ 지금 제출(파일 업로드 포함) 중인 과제 번호
+  const [submittingId, setSubmittingId] = useState<number | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
 
   const showToast = (message: string, type: "success" | "info" = "info") => {
@@ -187,7 +199,7 @@ export default function AssignmentPage() {
   const summaryAssignment =
     assignments.find((a) => a.id === selectedAssignmentId) ?? ongoingAssignments[0] ?? null;
 
-  // ★ 제출 현황: 제출 현황 탭에서 고른 과제 / 역량맵 탭 오른쪽 요약 과제
+  // 제출 현황: 제출 현황 탭에서 고른 과제 / 역량맵 탭 오른쪽 요약 과제
   const statusQuery = useSubmissionStatus(selectedAssignmentId, activeTab === "제출 현황");
   const summaryStatusQuery = useSubmissionStatus(summaryAssignment?.id ?? null, activeTab === "역량 맵");
 
@@ -201,10 +213,13 @@ export default function AssignmentPage() {
       .map((s) => [s.skillId, s.selfScore as number])
   );
 
+  // 역량맵 팀원 목록: 지금은 내 점수만 있어서 진짜 나 한 줄
+  const myMembers: Member[] = myName ? [{ name: myName, generation: myGeneration, majors: myMajors }] : [];
+
   const majorFilter = major === "" || major === "전체" ? "" : major;
   const generationFilter = generation === "" || generation === "전체" ? "" : generation;
   const visibleSkills = pageSkills.filter((s) => majorFilter === "" || s.major === majorFilter);
-  const visibleMembers = MEMBERS.filter(
+  const visibleMembers = myMembers.filter(
     (m) =>
       (generationFilter === "" || m.generation === generationFilter) &&
       (majorFilter === "" || m.majors.includes(majorFilter))
@@ -266,7 +281,6 @@ export default function AssignmentPage() {
         targetMajors: isAll ? [] : targetMajors,
         targetMemberIds: [],
         fileKeys: [],
-        // ★ 이제 역량 항목이 서버 번호라서 그대로 보낸다
         skillIds: form.skillId !== null ? [form.skillId] : [],
       },
       {
@@ -276,47 +290,60 @@ export default function AssignmentPage() {
     );
   };
 
-  // 제출 / 재제출 → 서버
-  const handleSubmitWork = (assignmentId: number, type: string, content: string) => {
-    if (type === "파일 첨부") {
-      showToast("파일 제출은 준비 중입니다. 텍스트나 GitHub 링크로 제출해 주세요");
-      return;
-    }
+  // ★ 제출 / 재제출 → 서버 (파일 첨부면 먼저 파일을 올린다)
+  // async: 파일 업로드를 기다렸다가 제출해야 해서
+  const handleSubmitWork = async (assignmentId: number, type: string, content: string, file: File | null) => {
     if (type === "GitHub 링크" && !content.startsWith("https://github.com/")) {
       showToast("GitHub 링크는 https://github.com/ 으로 시작해야 합니다");
       return;
     }
-    const body = type === "GitHub 링크" ? { githubUrl: content } : { content };
 
-    // 재제출 요청을 받은 과제면 재제출(PATCH)
-    const mine = received.find((a) => a.id === assignmentId);
-    if (mine?.mySubmissionStatus === "RESUBMIT_REQUESTED") {
-      const submissionId = mySubmissionIds[assignmentId];
-      if (submissionId === undefined) {
-        showToast("재제출은 서버 연결을 확인 중입니다");
+    setSubmittingId(assignmentId);
+    try {
+      // ★ 형식에 맞게 보낼 내용 만들기
+      let body: SubmissionRequest;
+      if (type === "파일 첨부") {
+        if (!file) {
+          showToast("파일을 선택해 주세요");
+          return;
+        }
+        if (myId === null) {
+          showToast("내 정보를 불러오는 중입니다. 잠시 후 다시 시도해 주세요");
+          return;
+        }
+        showToast("파일을 올리는 중입니다...");
+        // 파일을 올리고 받은 이름표(objectKey)로 제출한다
+        const objectKey = await uploadFile(file, myId);
+        body = { fileKeys: [objectKey] };
+      } else if (type === "GitHub 링크") {
+        body = { githubUrl: content };
+      } else {
+        body = { content };
+      }
+
+      // 재제출 요청을 받은 과제면 재제출(PATCH)
+      const mine = received.find((a) => a.id === assignmentId);
+      if (mine?.mySubmissionStatus === "RESUBMIT_REQUESTED") {
+        const submissionId = mySubmissionIds[assignmentId];
+        if (submissionId === undefined) {
+          showToast("재제출은 서버 연결을 확인 중입니다");
+          return;
+        }
+        await resubmitAssignment.mutateAsync({ assignmentId, submissionId, body });
+        showToast("다시 제출했습니다", "success");
         return;
       }
-      resubmitAssignment.mutate(
-        { assignmentId, submissionId, body },
-        {
-          onSuccess: () => showToast("다시 제출했습니다", "success"),
-          onError: (error) => showToast(getErrorMessage(error)),
-        }
-      );
-      return;
-    }
 
-    submitAssignment.mutate(
-      { assignmentId, body },
-      {
-        onSuccess: (submission) => {
-          // 재제출 때 쓰려고 제출물 번호를 기억해 둔다
-          setMySubmissionIds((prev) => ({ ...prev, [assignmentId]: submission.id }));
-          showToast(submission.late ? "지각 제출되었습니다" : "과제를 제출했습니다", "success");
-        },
-        onError: (error) => showToast(getErrorMessage(error)),
-      }
-    );
+      // 처음 제출
+      const submission = await submitAssignment.mutateAsync({ assignmentId, body });
+      setMySubmissionIds((prev) => ({ ...prev, [assignmentId]: submission.id }));
+      showToast(submission.late ? "지각 제출되었습니다" : "과제를 제출했습니다", "success");
+    } catch (error) {
+      showToast(getErrorMessage(error));
+    } finally {
+      // finally: 성공·실패·중간에 return 어느 경우든 마지막에 꼭 실행된다
+      setSubmittingId(null);
+    }
   };
 
   // 통과 / 재제출 요청 → 서버
@@ -370,7 +397,15 @@ export default function AssignmentPage() {
       );
     }
     if (activeTab === "내 제출물") {
-      return <MySubmissions assignments={myAssignments} submissions={mySubmissions} onSubmit={handleSubmitWork} />;
+      return (
+        <MySubmissions
+          assignments={myAssignments}
+          submissions={mySubmissions}
+          onSubmit={handleSubmitWork}
+          // ★ 제출 중인 카드의 버튼을 잠근다
+          submittingId={submittingId}
+        />
+      );
     }
 
     return (
@@ -379,6 +414,7 @@ export default function AssignmentPage() {
           <CompetencyMap
             skills={visibleSkills}
             members={visibleMembers}
+            myName={myName}
             myScores={myScores}
             onScoreChange={handleScoreChange}
             onAddSkill={handleAddSkill}

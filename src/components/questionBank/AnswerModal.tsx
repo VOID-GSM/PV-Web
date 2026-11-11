@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   MAX_ANSWER_LENGTH,
-  ME,
   getCategoryBadge,
   type Answer,
   type Question,
@@ -12,14 +11,19 @@ import chevronDownIcon from "../../assets/icons/chevron-down.svg";
 type AnswerModalProps = {
   question: Question;
   answers: Answer[];
+  // ★ 내 이름 (가짜 ME "동키" 대신 서버의 진짜 이름. 못 불러왔으면 "")
+  myName: string;
   onSave: (content: string, alsoArchive: boolean) => void;
   onDelete: () => void;
   onClose: () => void;
 };
 
-export default function AnswerModal({ question, answers, onSave, onDelete, onClose }: AnswerModalProps) {
-  const myAnswer = answers.find((a) => a.author === ME);
-  const otherAnswers = answers.filter((a) => a.author !== ME);
+export default function AnswerModal({ question, answers, myName, onSave, onDelete, onClose }: AnswerModalProps) {
+  // ★ 내 답변인지: 이름이 비어 있으면(아직 못 불러옴) 아무것도 내 것으로 보지 않는다
+  const isMineAnswer = (a: Answer) => myName !== "" && a.author === myName;
+
+  const myAnswer = answers.find(isMineAnswer);
+  const otherAnswers = answers.filter((a) => !isMineAnswer(a));
   const isEdit = myAnswer !== undefined;
 
   const [content, setContent] = useState(myAnswer?.content ?? "");

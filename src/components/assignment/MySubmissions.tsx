@@ -13,10 +13,13 @@ type MySubmissionsProps = {
   assignments: Assignment[];
   // 내 제출물들
   submissions: Submission[];
-  onSubmit: (assignmentId: number, type: string, content: string) => void;
+  // ★ 파일 첨부면 진짜 파일(file)도 같이 넘긴다
+  onSubmit: (assignmentId: number, type: string, content: string, file: File | null) => void;
+  // ★ 제출(또는 파일 업로드) 중인 과제 번호 (그 카드의 버튼만 잠근다)
+  submittingId: number | null;
 };
 
-export default function MySubmissions({ assignments, submissions, onSubmit }: MySubmissionsProps) {
+export default function MySubmissions({ assignments, submissions, onSubmit, submittingId }: MySubmissionsProps) {
   if (assignments.length === 0) {
     return (
       <p className="rounded-lg border border-dashed bg-white py-16 text-center text-sm text-neutral-400">
@@ -33,6 +36,7 @@ export default function MySubmissions({ assignments, submissions, onSubmit }: My
           assignment={a}
           submission={submissions.find((s) => s.assignmentId === a.id)}
           onSubmit={onSubmit}
+          isSubmitting={submittingId === a.id}
         />
       ))}
     </ul>
@@ -43,23 +47,34 @@ export default function MySubmissions({ assignments, submissions, onSubmit }: My
 type MySubmissionCardProps = {
   assignment: Assignment;
   submission: Submission | undefined;
-  onSubmit: (assignmentId: number, type: string, content: string) => void;
+  onSubmit: (assignmentId: number, type: string, content: string, file: File | null) => void;
+  isSubmitting: boolean;
 };
 
-function MySubmissionCard({ assignment, submission, onSubmit }: MySubmissionCardProps) {
+// 바이트 → "12KB" / "1.2MB"
+const formatSize = (bytes: number) =>
+  bytes < 1024 * 1024 ? `${Math.round(bytes / 1024)}KB` : `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+
+function MySubmissionCard({ assignment, submission, onSubmit, isSubmitting }: MySubmissionCardProps) {
   // 제출 형식과 내용. 처음엔 비어 있음
   const [type, setType] = useState("");
   const [content, setContent] = useState("");
+  // ★ 고른 파일 (파일 첨부일 때만)
+  const [file, setFile] = useState<File | null>(null);
 
   const status = submission?.status ?? "미제출";
   // 아직 안 냈거나 재제출 요청을 받았으면 제출 칸을 보여준다
   const canSubmitNow = !submission || submission.status === "재제출 요청";
   const days = getDaysLeft(assignment.deadline);
 
+  // ★ 제출할 수 있는지: 파일 첨부는 파일이 있어야, 나머지는 내용이 있어야
+  const isReady = type === "파일 첨부" ? file !== null : type !== "" && content.trim() !== "";
+
   const handleSubmit = () => {
-    onSubmit(assignment.id, type, content.trim());
+    onSubmit(assignment.id, type, content.trim(), type === "파일 첨부" ? file : null);
     setType("");
     setContent("");
+    setFile(null);
   };
 
   return (
@@ -101,6 +116,7 @@ function MySubmissionCard({ assignment, submission, onSubmit }: MySubmissionCard
                 onClick={() => {
                   setType(t);
                   setContent("");
+                  setFile(null);
                 }}
                 className={`rounded-full border px-3 py-1.5 text-xs ${
                   type === t ? "border-black font-semibold" : "border-neutral-200 text-neutral-500"
@@ -116,7 +132,7 @@ function MySubmissionCard({ assignment, submission, onSubmit }: MySubmissionCard
               value={content}
               onChange={(e) => setContent(e.target.value)}
               rows={4}
-              maxLength={2000}
+              maxLength={10000}
               className="mt-2 w-full resize-none rounded border px-3 py-2 text-sm"
             />
           )}
@@ -129,21 +145,28 @@ function MySubmissionCard({ assignment, submission, onSubmit }: MySubmissionCard
             />
           )}
           {type === "파일 첨부" && (
-            // 실제 업로드는 서버 연결 후. 지금은 파일 이름만 저장한다
-            <input
-              type="file"
-              onChange={(e) => setContent(e.target.files?.[0]?.name ?? "")}
-              className="mt-2 block text-sm"
-            />
+            <div className="mt-2">
+              {/* ★ 진짜 파일을 기억한다 (files?.[0]: 고른 파일 중 첫 번째, 없으면 null) */}
+              <input
+                type="file"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                className="block text-sm"
+              />
+              {file && (
+                <p className="mt-1 text-xs text-neutral-500">
+                  {file.name} · {formatSize(file.size)}
+                </p>
+              )}
+            </div>
           )}
 
           <div className="mt-3 flex justify-end">
             <button
               onClick={handleSubmit}
-              disabled={type === "" || content.trim() === ""}
+              disabled={!isReady || isSubmitting}
               className="rounded bg-black px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
             >
-              제출
+              {isSubmitting ? "제출 중..." : "제출"}
             </button>
           </div>
         </div>
