@@ -1,6 +1,6 @@
 // ===== 면접 질문 뱅크에서 쓰는 고정 값, 타입, 도우미 함수 =====
 
-// 지금 로그인한 나 (서버 연결 전이라 고정 값)
+// 퍼블리싱 때 쓰던 가짜 "나" (이제 화면에서는 안 쓰고 useMyName()을 쓴다. 나중에 정리 예정)
 export const ME = "동키";
 export const MY_GENERATION = "10기";
 
@@ -63,6 +63,8 @@ export type PracticeRecord = {
   // 걸린 시간(초)
   seconds: number;
   status: PracticeStatus;
+  // ★ 글로 쓴 답변 내용 (말로 연습·건너뜀이면 "")
+  answer: string;
 };
 
 // 상태별 배지 색

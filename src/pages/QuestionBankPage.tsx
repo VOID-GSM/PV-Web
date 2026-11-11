@@ -13,8 +13,6 @@ import {
   CATEGORIES,
   MAJORS,
   MAX_SESSION_QUESTIONS,
-  ME,
-  MY_GENERATION,
   QB_TABS,
   formatDate,
   getCategoryBadge,
@@ -24,6 +22,9 @@ import {
 } from "../constants/questionBank";
 // 서버 연동
 import { useAllAnswers, useCreateAnswer, useCreateQuestion, useQuestions } from "../hooks/useInterviews";
+// ★ 진짜 내 이름·기수, 팀원 목록(다른 사람 기수 찾기용)
+import { useMyName } from "../hooks/useMyName";
+import { useTeamMembers } from "../hooks/useTeam";
 import {
   CATEGORY_LABEL,
   MAJOR_LABEL,
@@ -45,13 +46,11 @@ function findKey<K extends string>(labels: Record<K, string>, label: string): K 
   return (Object.keys(labels) as K[]).find((key) => labels[key] === label);
 }
 
-// ★ 피셔-예이츠 섞기: 뒤에서부터 하나씩, 앞쪽 무작위 자리와 바꾼다 → 모든 순서가 똑같은 확률로 나온다
+// 피셔-예이츠 섞기: 뒤에서부터 하나씩, 앞쪽 무작위 자리와 바꾼다 → 모든 순서가 똑같은 확률로 나온다
 function shuffle<T>(items: T[]): T[] {
   const result = [...items];
   for (let i = result.length - 1; i > 0; i--) {
-    // 0 ~ i 중 무작위 자리
     const j = Math.floor(Math.random() * (i + 1));
-    // 두 자리 바꾸기
     [result[i], result[j]] = [result[j], result[i]];
   }
   return result;
@@ -71,16 +70,14 @@ function toPageQuestion(q: ServerQuestion): Question {
   };
 }
 
-// 서버 답변 → 화면 답변
-// 화면 부품은 author === ME 로 "내 답변"을 알아보니까, 내 번호와 같으면 ME로 바꿔 준다
-function toPageAnswer(a: ServerAnswer, questionId: number, myId: number | null): Answer {
-  const isMine = myId !== null && a.memberId === myId;
+// ★ 서버 답변 → 화면 답변
+// 작성자는 서버가 준 진짜 이름 그대로, 기수는 페이지가 찾아서 넘겨준다
+function toPageAnswer(a: ServerAnswer, questionId: number, generation: string): Answer {
   return {
     id: a.id,
     questionId,
-    author: isMine ? ME : a.memberName,
-    // 서버가 기수를 안 알려줘서, 내 것만 내 기수로 표시
-    generation: isMine ? MY_GENERATION : "기수 미확인",
+    author: a.memberName,
+    generation,
     date: formatDate(new Date(a.createdAt)),
     content: a.content,
     // 추천 기능은 서버에 없어서 빈 배열
@@ -106,35 +103,52 @@ export default function QuestionBankPage() {
   // 모의면접 세션 (null이면 진행 중 아님)
   const [session, setSession] = useState<{ questions: Question[]; categories: string[] } | null>(null);
 
-  // 토스트 번호는 "이전 번호 + 1"
   const showToast = (message: string, type: "success" | "info" = "success") => {
     setToast((prev) => ({ id: (prev?.id ?? 0) + 1, message, type }));
   };
   const closeToast = useCallback(() => setToast(null), []);
 
-  // 토큰에서 꺼낸 내 회원 번호
-  const myId = tokenStorage.getMemberId();
+  // ★ 진짜 내 정보 (서버). 회원 번호를 아직 못 불러왔으면 토큰에서 꺼낸 번호를 쓴다
+  const { myName, myGeneration, myId: profileId } = useMyName();
+  const myId = profileId ?? tokenStorage.getMemberId();
+
+  // ★ 팀원 목록 → 회원 번호로 기수 찾기 ("10기"). 못 불러오면 빈 표
+  const teamQuery = useTeamMembers();
+  const generationById = new Map((teamQuery.data ?? []).map((m) => [m.memberId, `${m.generation}기`]));
 
   // 서버에서 질문 목록 불러오기
   const questionsQuery = useQuestions();
   const serverQuestions = questionsQuery.data ?? [];
   const questions = serverQuestions.map(toPageQuestion);
 
-  // ★ 모든 질문의 답변을 한꺼번에 불러와서 한 줄로 모으기
+  // 모든 질문의 답변을 한꺼번에 불러오기
   const { answersByQuestion, isPending: isAnswersPending } = useAllAnswers(serverQuestions.map((q) => q.id));
-  const allAnswers = serverQuestions.flatMap((q) =>
-    (answersByQuestion.get(q.id) ?? []).map((a) => toPageAnswer(a, q.id, myId))
+
+  // ★ 내 답변 번호들 (이름이 아니라 회원 번호로 판단해서, 같은 이름이 있어도 안 헷갈린다)
+  const myAnswerIds = new Set(
+    serverQuestions.flatMap((q) =>
+      (answersByQuestion.get(q.id) ?? []).filter((a) => myId !== null && a.memberId === myId).map((a) => a.id)
+    )
   );
 
-  // 이 질문에 내가 이미 답했는지
+  // ★ 화면용 답변: 기수는 내 것이면 내 기수, 아니면 팀원 목록에서 찾기
+  const allAnswers = serverQuestions.flatMap((q) =>
+    (answersByQuestion.get(q.id) ?? []).map((a) => {
+      const generation =
+        (myAnswerIds.has(a.id) && myGeneration) || generationById.get(a.memberId) || "기수 미확인";
+      return toPageAnswer(a, q.id, generation);
+    })
+  );
+
+  // ★ 이 질문에 내가 이미 답했는지
   const hasMyAnswer = (questionId: number) =>
-    allAnswers.some((a) => a.questionId === questionId && a.author === ME);
+    allAnswers.some((a) => a.questionId === questionId && myAnswerIds.has(a.id));
 
   // "전체"나 빈 값이면 필터 안 함
   const majorFilter = major === "" || major === "전체" ? "" : major;
   const categoryFilter = category === "" || category === "전체" ? "" : category;
 
-  // ★ 전공 필터: 고른 전공 질문 + 공통 질문 (서버 API와 같은 동작)
+  // 전공 필터: 고른 전공 질문 + 공통 질문 (서버 API와 같은 동작)
   const questionsByMajor = questions.filter(
     (q) => majorFilter === "" || q.major === majorFilter || q.major === COMMON_MAJOR
   );
@@ -153,7 +167,6 @@ export default function QuestionBankPage() {
 
   // 질문 추가 → 서버에 등록
   const handleAddQuestion = (data: { title: string; major: string; category: string }) => {
-    // 화면 글자 → 서버 값 ("기술" → "TECH")
     const categoryKey = findKey(CATEGORY_LABEL, data.category);
     if (!categoryKey) {
       showToast(`'${data.category}' 카테고리는 서버에서 지원하지 않습니다`, "info");
@@ -162,8 +175,6 @@ export default function QuestionBankPage() {
     createQuestionMutation.mutate(
       {
         content: data.title,
-        // ★ 추가 창에서는 전공을 반드시 고르므로 항상 그 전공의 질문으로 등록된다
-        // (공통 질문 등록은 추가 창에 '공통' 선택지를 넣을 때 지원 예정)
         major: findKey(MAJOR_LABEL, data.major),
         category: categoryKey,
       },
@@ -174,7 +185,7 @@ export default function QuestionBankPage() {
     );
   };
 
-  // ★ 답변 창 열기: 이미 답했으면 수정 API가 없어서 창을 열지 않는다 (입력한 내용이 사라지지 않게)
+  // 답변 창 열기: 이미 답했으면 수정 API가 없어서 창을 열지 않는다
   const handleOpenAnswerModal = () => {
     if (!selectedQuestion) return;
     if (isAnswersPending) {
@@ -190,12 +201,10 @@ export default function QuestionBankPage() {
 
   // 답변 저장 → 서버에 작성 (한 질문에 1인 1답변)
   const handleSaveAnswer = (questionId: number, content: string) => {
-    // ★ 답변을 다 불러오기 전에는 중복인지 알 수 없어서 막는다
     if (isAnswersPending) {
       showToast("답변 정보를 불러오는 중입니다. 잠시 후 다시 시도해 주세요", "info");
       return;
     }
-    // ★ 어느 질문이든 이미 답했으면 서버로 보내지 않는다 (서버는 409로 거절함)
     if (hasMyAnswer(questionId)) {
       showToast("이미 답변한 질문입니다", "info");
       return;
@@ -210,7 +219,6 @@ export default function QuestionBankPage() {
   };
 
   // 서버에 아직 없는 기능들
-  // (삭제 버튼은 수정 창에만 있는데, 내 답변이 있으면 창을 열지 않아서 실제로는 눌리지 않는다)
   const handleDeleteAnswer = () => {
     showToast("답변 삭제는 서버 연결을 준비 중입니다", "info");
   };
@@ -238,7 +246,8 @@ export default function QuestionBankPage() {
     setActiveTab("질문 목록");
   };
 
-  const myAnswers = allAnswers.filter((a) => a.author === ME);
+  // ★ 내 답변 탭: 회원 번호로 고른 내 답변들
+  const myAnswers = allAnswers.filter((a) => myAnswerIds.has(a.id));
   const findQuestion = (id: number) => questions.find((q) => q.id === id);
 
   // 기수별 묶음
@@ -326,10 +335,10 @@ export default function QuestionBankPage() {
     return (
       <div className="flex flex-col gap-4 lg:flex-row">
         <div className="w-full shrink-0 self-start lg:w-72">
-          {/* ★ 전체 답변을 넘겨서 질문마다 답변 수가 맞게 나온다 */}
           <QuestionList
             questions={filteredQuestions}
             answers={allAnswers}
+            myName={myName}
             selectedId={selectedQuestion?.id ?? null}
             onSelect={setSelectedId}
           />
@@ -338,6 +347,7 @@ export default function QuestionBankPage() {
           <QuestionDetail
             question={selectedQuestion}
             answers={selectedAnswers}
+            myName={myName}
             onOpenAnswerModal={handleOpenAnswerModal}
             onToggleLike={handleToggleLike}
           />
@@ -411,6 +421,7 @@ export default function QuestionBankPage() {
         <AnswerModal
           question={selectedQuestion}
           answers={selectedAnswers}
+          myName={myName}
           onSave={(content) => handleSaveAnswer(selectedQuestion.id, content)}
           onDelete={handleDeleteAnswer}
           onClose={() => setIsAnswerModalOpen(false)}

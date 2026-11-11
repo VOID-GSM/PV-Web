@@ -1,14 +1,16 @@
-import { ME, getCategoryBadge, type Answer, type Question } from "../../constants/questionBank";
+import { getCategoryBadge, type Answer, type Question } from "../../constants/questionBank";
 
 type QuestionListProps = {
   questions: Question[];
   answers: Answer[];
+  // ★ 내 이름 (가짜 ME 대신. "내 답변 있음" 표시에 사용)
+  myName: string;
   // 선택된 질문 번호 (null이면 선택 안 됨)
   selectedId: number | null;
   onSelect: (id: number) => void;
 };
 
-export default function QuestionList({ questions, answers, selectedId, onSelect }: QuestionListProps) {
+export default function QuestionList({ questions, answers, myName, selectedId, onSelect }: QuestionListProps) {
   return (
     <section className="rounded-lg bg-white">
       <div className="flex items-center justify-between border-b px-4 py-3">
@@ -26,7 +28,8 @@ export default function QuestionList({ questions, answers, selectedId, onSelect 
           {questions.map((q) => {
             // 이 질문에 달린 답변 수, 그중 내 답변이 있는지
             const questionAnswers = answers.filter((a) => a.questionId === q.id);
-            const hasMine = questionAnswers.some((a) => a.author === ME);
+            // ★ 내 이름이 비어 있으면(아직 못 불러옴) "내 답변 있음"을 띄우지 않는다
+            const hasMine = myName !== "" && questionAnswers.some((a) => a.author === myName);
             return (
               <li key={q.id} className="border-b last:border-b-0">
                 <button

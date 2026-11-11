@@ -1,10 +1,12 @@
-import { ME, getCategoryBadge, type Answer, type Question } from "../../constants/questionBank";
+import { getCategoryBadge, type Answer, type Question } from "../../constants/questionBank";
 import editIcon from "../../assets/icons/edit.svg";
 import starIcon from "../../assets/icons/star.svg";
 
 type QuestionDetailProps = {
   question: Question | null;
   answers: Answer[];
+  // ★ 내 이름 (가짜 ME "동키" 대신 서버의 진짜 이름. 못 불러왔으면 "")
+  myName: string;
   onOpenAnswerModal: () => void;
   onToggleLike: (answerId: number) => void;
 };
@@ -12,6 +14,7 @@ type QuestionDetailProps = {
 export default function QuestionDetail({
   question,
   answers,
+  myName,
   onOpenAnswerModal,
   onToggleLike,
 }: QuestionDetailProps) {
@@ -23,9 +26,12 @@ export default function QuestionDetail({
     );
   }
 
-  const hasMine = answers.some((a) => a.author === ME);
+  // ★ 내 답변인지: 이름이 비어 있으면(아직 못 불러옴) 아무것도 내 것으로 보지 않는다
+  const isMineAnswer = (answer: Answer) => myName !== "" && answer.author === myName;
+
+  const hasMine = answers.some(isMineAnswer);
   // 내 답변이 맨 위에 오도록 정렬
-  const sorted = [...answers].sort((a, b) => Number(b.author === ME) - Number(a.author === ME));
+  const sorted = [...answers].sort((a, b) => Number(isMineAnswer(b)) - Number(isMineAnswer(a)));
 
   return (
     <section className="rounded-lg bg-white p-6">
@@ -59,8 +65,9 @@ export default function QuestionDetail({
         ) : (
           <ul className="flex flex-col gap-3">
             {sorted.map((answer) => {
-              const isMine = answer.author === ME;
-              const likedByMe = answer.likedBy.includes(ME);
+              const isMine = isMineAnswer(answer);
+              // ★ 내가 추천했는지도 내 이름으로 확인
+              const likedByMe = myName !== "" && answer.likedBy.includes(myName);
               return (
                 <li
                   key={answer.id}

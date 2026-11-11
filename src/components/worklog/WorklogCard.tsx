@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BOARDS, ME, type Worklog } from "../../constants/worklog";
+import { BOARDS, type Worklog } from "../../constants/worklog";
 
 // 항목마다 아이콘·글자색·배경색 (막힌 점만 노란 배경)
 const SECTION_STYLES: Record<string, { icon: string; color: string; bg: string }> = {
@@ -14,11 +14,13 @@ const SECTION_ORDER = ["오늘 한 일", "내일 할 일", "막힌 점", "자유
 
 type WorklogCardProps = {
   worklog: Worklog;
+  // ★ 내가 쓴 일지인지 (가짜 ME 대신 페이지가 회원 번호로 판단해서 넘겨준다)
+  isMine: boolean;
   // 댓글을 달았을 때 페이지에 알리는 함수 (어느 일지인지 + 내용)
   onAddComment: (worklogId: number, content: string) => void;
 };
 
-export default function WorklogCard({ worklog, onAddComment }: WorklogCardProps) {
+export default function WorklogCard({ worklog, isMine, onAddComment }: WorklogCardProps) {
   // 댓글 입력칸의 글자
   const [commentText, setCommentText] = useState("");
 
@@ -39,10 +41,10 @@ export default function WorklogCard({ worklog, onAddComment }: WorklogCardProps)
       {/* ===== 머리: 작성자 · 날짜 · 보드 태그 · 공개 여부 ===== */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          {/* 아바타: 이름 첫 글자. 내 글은 검은 원 */}
+          {/* ★ 아바타: 이름 첫 글자. 내 글은 검은 원 */}
           <div
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm ${
-              worklog.author === ME ? "bg-black text-white" : "bg-neutral-200"
+              isMine ? "bg-black text-white" : "bg-neutral-200"
             }`}
           >
             {worklog.author.charAt(0)}
