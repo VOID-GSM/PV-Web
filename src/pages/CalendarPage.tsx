@@ -1,5 +1,5 @@
 // src/pages/CalendarPage.tsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Header } from "../components/layout/Header";
 import { CalendarHeader } from "../components/calendar/CalendarHeader";
@@ -24,6 +24,7 @@ interface CalendarPageProps {
   onAddEvent?: (newEvent: CalendarEvent) => void;
   onDeleteEvent?: (eventId: string) => void;
   onUpdateEvent?: (event: CalendarEvent) => void;
+  onMonthChange?: (date: Date) => void;
 }
 
 export default function CalendarPage({
@@ -33,19 +34,40 @@ export default function CalendarPage({
   onAddEvent = () => {},
   onDeleteEvent = () => {},
   onUpdateEvent = () => {},
+  onMonthChange,
 }: CalendarPageProps = {}) {
   const [viewMode, setViewMode] = useState<ViewMode>("월간");
   const [onlyMyEvents, setOnlyMyEvents] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
 
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  // 보는 달이 바뀌면 그 달의 일정을 불러온다 (이미 불러온 달은 App에서 건너뜀)
+  useEffect(() => {
+    onMonthChange?.(currentDate);
+  }, [currentDate, onMonthChange]);
+
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
+    null,
+  );
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // 보드는 미리 만들어 두지 않고, 실제 일정에 입력된 보드만 표시한다.
-  const [uncheckedBoards, setUncheckedBoards] = useState<Record<string, boolean>>({});
-  const boardColors = ["#3b82f6", "#10b981", "#8b5cf6", "#14b8a6", "#ec4899", "#f59e0b"];
-  const eventBoardNames = events.map((event) => event.board?.trim()).filter((name): name is string => Boolean(name));
-  const boardNames = Array.from(new Set([...boards.map((board) => board.name), ...eventBoardNames]));
+  const [uncheckedBoards, setUncheckedBoards] = useState<
+    Record<string, boolean>
+  >({});
+  const boardColors = [
+    "#3b82f6",
+    "#10b981",
+    "#8b5cf6",
+    "#14b8a6",
+    "#ec4899",
+    "#f59e0b",
+  ];
+  const eventBoardNames = events
+    .map((event) => event.board?.trim())
+    .filter((name): name is string => Boolean(name));
+  const boardNames = Array.from(
+    new Set([...boards.map((board) => board.name), ...eventBoardNames]),
+  );
   const boardFilters: BoardFilter[] = boardNames.map((name, index) => {
     const serverBoard = boards.find((board) => board.name === name);
     return {
@@ -112,10 +134,13 @@ export default function CalendarPage({
     setMilestones((prev) => prev.map((m) => ({ ...m, status: "확정" })));
   };
 
-  const activeFilters = boardFilters.filter((filter) => filter.checked).map((filter) => filter.name);
-  const filteredEvents = events.filter((event) =>
-    (!onlyMyEvents || event.isMyEvent) &&
-    (!event.board || activeFilters.includes(event.board))
+  const activeFilters = boardFilters
+    .filter((filter) => filter.checked)
+    .map((filter) => filter.name);
+  const filteredEvents = events.filter(
+    (event) =>
+      (!onlyMyEvents || event.isMyEvent) &&
+      (!event.board || activeFilters.includes(event.board)),
   );
 
   return (
