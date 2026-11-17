@@ -10,6 +10,8 @@ export interface ApiCalendarEvent {
   allDay: boolean;
   boardId?: number;
   activityId?: number;
+  // 개인 일정의 완료 여부 (마감·활동 일정은 항상 false)
+  completed?: boolean;
 }
 export interface ApiBoard {
   id: number;
@@ -28,6 +30,8 @@ export interface EventWriteRequest {
   startsAt: string;
   endsAt: string;
   allDay: boolean;
+  // 수정(PATCH) 때만 사용. 값이 없으면 서버는 완료 상태를 바꾸지 않는다.
+  completed?: boolean;
 }
 export interface BoardCreateRequest {
   name: string;
@@ -38,16 +42,30 @@ export interface BoardCreateRequest {
   alertDays: number[];
 }
 
-export function getCalendarEvents(from: string, to: string, boardIds?: number[], mine = false) {
+export function getCalendarEvents(
+  from: string,
+  to: string,
+  boardIds?: number[],
+  mine = false,
+) {
   const params = new URLSearchParams({ from, to, mine: String(mine) });
   boardIds?.forEach((id) => params.append("boardIds", String(id)));
   return apiRequest<ApiCalendarEvent[]>(`/calendar?${params.toString()}`);
 }
 export function createCalendarEvent(body: EventWriteRequest) {
-  return apiRequest<ApiCalendarEvent>("/calendar/events", { method: "POST", body });
+  return apiRequest<ApiCalendarEvent>("/calendar/events", {
+    method: "POST",
+    body,
+  });
 }
-export function updateCalendarEvent(eventId: number, body: Partial<EventWriteRequest>) {
-  return apiRequest<ApiCalendarEvent>(`/calendar/events/${eventId}`, { method: "PATCH", body });
+export function updateCalendarEvent(
+  eventId: number,
+  body: Partial<EventWriteRequest>,
+) {
+  return apiRequest<ApiCalendarEvent>(`/calendar/events/${eventId}`, {
+    method: "PATCH",
+    body,
+  });
 }
 export function deleteCalendarEvent(eventId: number) {
   return apiRequest<void>(`/calendar/events/${eventId}`, { method: "DELETE" });
@@ -59,14 +77,23 @@ export function createBoard(body: BoardCreateRequest) {
   return apiRequest<ApiBoard>("/boards", { method: "POST", body });
 }
 export function getBoard(boardId: number) {
-  return apiRequest<{ board: ApiBoard; participants: unknown[]; deadlines: unknown[] }>(`/boards/${boardId}`);
+  return apiRequest<{
+    board: ApiBoard;
+    participants: unknown[];
+    deadlines: unknown[];
+  }>(`/boards/${boardId}`);
 }
-export function updateBoard(boardId: number, body: Partial<BoardCreateRequest>) {
+export function updateBoard(
+  boardId: number,
+  body: Partial<BoardCreateRequest>,
+) {
   return apiRequest<ApiBoard>(`/boards/${boardId}`, { method: "PATCH", body });
 }
 export function deleteBoard(boardId: number) {
   return apiRequest<void>(`/boards/${boardId}`, { method: "DELETE" });
 }
 export function getCalendarConflicts(from: string, to: string) {
-  return apiRequest<unknown[]>(`/calendar/conflicts${queryString({ from, to })}`);
+  return apiRequest<unknown[]>(
+    `/calendar/conflicts${queryString({ from, to })}`,
+  );
 }

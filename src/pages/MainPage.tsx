@@ -216,41 +216,50 @@ export const MainPage: React.FC<MainPageProps> = ({
               </div>
             ) : (
               <div className="space-y-2.5">
-                {todayTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className="flex items-center justify-between rounded-2xl border border-gray-50 bg-gray-50/50 p-4"
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <input
-                        type="checkbox"
-                        aria-label={`${task.title} 완료`}
-                        checked={Boolean(task.completed)}
-                        disabled={task.id.startsWith("todo:")}
-                        onChange={() => onToggleEvent?.(task.id)}
-                        title={
-                          task.id.startsWith("todo:")
-                            ? "이 할 일의 완료 처리 API는 현재 명세에 없습니다."
-                            : "완료 상태 변경"
-                        }
-                        className="h-4 w-4 shrink-0 cursor-pointer accent-black disabled:cursor-not-allowed disabled:opacity-40"
-                      />
-                      <div className="min-w-0">
-                        <p
-                          className={`text-xs font-bold text-gray-900 ${task.completed ? "line-through text-gray-400" : ""}`}
-                        >
-                          {task.title}
-                        </p>
-                        <p className="text-[11px] text-gray-400 mt-0.5">
-                          {task.board} · {task.date}
-                        </p>
+                {todayTasks.map((task) => {
+                  // 완료 체크는 개인 일정만 가능하다.
+                  // 홈 할 일(todo:)은 제출·투표를 하면 목록에서 자동으로 빠지고, 마감·활동 일정은 서버가 완료 처리를 지원하지 않는다.
+                  const isTodo = task.id.startsWith("todo:");
+                  const canCheck = !isTodo && task.type === "개인 일정";
+
+                  return (
+                    <div
+                      key={task.id}
+                      className="flex items-center justify-between rounded-2xl border border-gray-50 bg-gray-50/50 p-4"
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <input
+                          type="checkbox"
+                          aria-label={`${task.title} 완료`}
+                          checked={Boolean(task.completed)}
+                          disabled={!canCheck}
+                          onChange={() => onToggleEvent?.(task.id)}
+                          title={
+                            isTodo
+                              ? "제출·투표 등을 완료하면 목록에서 자동으로 사라집니다."
+                              : canCheck
+                                ? "완료 상태 변경"
+                                : "개인 일정만 완료 체크할 수 있습니다."
+                          }
+                          className="h-4 w-4 shrink-0 cursor-pointer accent-black disabled:cursor-not-allowed disabled:opacity-40"
+                        />
+                        <div className="min-w-0">
+                          <p
+                            className={`text-xs font-bold text-gray-900 ${task.completed ? "line-through text-gray-400" : ""}`}
+                          >
+                            {task.title}
+                          </p>
+                          <p className="text-[11px] text-gray-400 mt-0.5">
+                            {task.board} · {task.date}
+                          </p>
+                        </div>
                       </div>
+                      <span className="rounded-lg bg-blue-100 px-2.5 py-1 text-[11px] font-bold text-blue-700">
+                        {task.type}
+                      </span>
                     </div>
-                    <span className="rounded-lg bg-blue-100 px-2.5 py-1 text-[11px] font-bold text-blue-700">
-                      {task.type}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
