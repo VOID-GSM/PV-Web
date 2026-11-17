@@ -9,6 +9,7 @@ import {
   proposeTopicCandidate,
   voteTopicCandidate,
   cancelTopicVote,
+  type ActivitySummary,
 } from "../api/activityApi";
 import {
   getPendingAbsences,
@@ -26,6 +27,7 @@ import ActivitySettingsModal from "../components/modals/ActivitySettingsModal";
 import ArticleDetailModal, {
   type ArticleDetailData,
 } from "../components/modals/ArticleDetailModal";
+import ActivitySwitcher from "../components/activity/ActivitySwitcher";
 import bellIcon from "../assets/icons/bell.svg";
 import settingsIcon from "../assets/icons/settings.svg";
 import calendarIcon from "../assets/icons/calendar.svg";
@@ -75,6 +77,7 @@ export default function ActivityDetailPage() {
   const [activityPeriod, setActivityPeriod] = useState("기간 미정");
   const [activityRule, setActivityRule] = useState("규칙 미정");
   const [members, setMembers] = useState<string[]>([]);
+  const [allActivities, setAllActivities] = useState<ActivitySummary[]>([]);
 
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [votes, setVotes] = useState<VoteItem[]>([]);
@@ -113,6 +116,19 @@ export default function ActivityDetailPage() {
 
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  // 활동 선택 칩에 쓸 전체 활동 목록
+  useEffect(() => {
+    let cancelled = false;
+    getActivities()
+      .then((list) => {
+        if (!cancelled) setAllActivities(list ?? []);
+      })
+      .catch((error: unknown) => console.error("활동 목록 조회 실패:", error));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [absenceRequests, setAbsenceRequests] = useState<AbsenceRequest[]>([]);
 
@@ -593,6 +609,13 @@ export default function ActivityDetailPage() {
       />
 
       <div className="flex-1 space-y-6 overflow-y-auto p-8">
+        {/* 활동 선택 칩 (활동이 2개 이상일 때만 표시됨) */}
+        <ActivitySwitcher
+          activities={allActivities}
+          currentId={activityId}
+          onSelect={(nextId) => navigate(`/activity/${nextId}`)}
+        />
+
         <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-xs">
           <div className="flex items-start justify-between gap-4">
             <div>
