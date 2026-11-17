@@ -1,5 +1,5 @@
 // useCallback: 함수를 한 번만 만들어 두고 재사용하게 해주는 기능 (토스트 닫기에 사용)
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { getHomeTodos, type HomeTodoItem } from "./api/homeApi";
 import { MainPage } from "./pages/MainPage";
@@ -34,6 +34,14 @@ import {
 // ★ 토스트 하나의 모양 (id가 바뀌면 같은 문구여도 새로 뜬다)
 type ToastState = { id: number; message: string; type: "success" | "info" };
 
+// 날짜를 "2026-11-17" 모양(로컬 시간 기준)으로 바꾼다
+const formatDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 export default function App() {
   const navigate = useNavigate();
 
@@ -51,44 +59,21 @@ export default function App() {
   // ★ 토스트 닫기 (Toast가 2.5초 뒤 부른다)
   const closeToast = useCallback(() => setToast(null), []);
 
-  useEffect(() => {
-    let cancelled = false;
+  // 서버는 캘린더를 한 번에 최대 92일까지만 조회할 수 있다(넘기면 400).
+  // 그래서 보는 달 기준 앞뒤 7일씩만 요청하고, 이미 불러온 달은 다시 요청하지 않는다.
+  const loadedMonthsRef = useRef<Set<string>>(new Set());
 
-    // 오늘 할 일 조회
-    getHomeTodos()
-      .then((response) => {
-        if (!cancelled) {
-          setHomeTodos(response.items ?? []);
-        }
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          console.error("오늘 할 일 API 조회 실패:", error);
-        }
-      });
+  const loadMonth = useCallback((base: Date) => {
+    const monthKey = `${base.getFullYear()}-${base.getMonth()}`;
+    if (loadedMonthsRef.current.has(monthKey)) return;
+    loadedMonthsRef.current.add(monthKey);
 
-    const formatDate = (date: Date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      return `${year}-${month}-${day}`;
-    };
+    // 그 달 1일의 7일 전 ~ 그 달 말일의 7일 뒤
+    const fromDate = new Date(base.getFullYear(), base.getMonth(), -6);
+    const toDate = new Date(base.getFullYear(), base.getMonth() + 1, 7);
 
-    const now = new Date();
-    const fromDate = new Date(now);
-    const toDate = new Date(now);
-
-    fromDate.setFullYear(fromDate.getFullYear() - 1);
-    toDate.setFullYear(toDate.getFullYear() + 2);
-
-    const from = formatDate(fromDate);
-    const to = formatDate(toDate);
-
-    // 캘린더 일정 조회
-    getCalendarEvents(from, to)
+    getCalendarEvents(formatDate(fromDate), formatDate(toDate))
       .then((data) => {
-        if (cancelled) return;
-
         const loadedEvents: CalendarEvent[] = data.map((event) => ({
           id: String(event.id),
           title: event.title,
@@ -108,11 +93,39 @@ export default function App() {
           isMyEvent: true,
         }));
 
-        setEvents(loadedEvents);
+        // 같은 id는 새 값으로 덮어쓰고, 새 일정은 추가한다.
+        // (달을 옮겨도 먼저 불러온 달의 일정이 사라지지 않는다)
+        setEvents((prev) => {
+          const merged = new Map(prev.map((item) => [item.id, item]));
+          loadedEvents.forEach((item) => merged.set(item.id, item));
+          return Array.from(merged.values());
+        });
+      })
+      .catch((error: unknown) => {
+        // 실패하면 다음에 다시 시도할 수 있게 표시를 지운다
+        loadedMonthsRef.current.delete(monthKey);
+        console.error("캘린더 API 조회 실패:", error);
+      });
+  }, []);
+
+  // 처음에는 이번 달만 불러온다
+  useEffect(() => {
+    loadMonth(new Date());
+  }, [loadMonth]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    // 오늘 할 일 조회
+    getHomeTodos()
+      .then((response) => {
+        if (!cancelled) {
+          setHomeTodos(response.items ?? []);
+        }
       })
       .catch((error: unknown) => {
         if (!cancelled) {
-          console.error("캘린더 API 조회 실패:", error);
+          console.error("오늘 할 일 API 조회 실패:", error);
         }
       });
 
@@ -326,6 +339,7 @@ export default function App() {
                 onAddEvent={handleAddEvent}
                 onDeleteEvent={handleDeleteEvent}
                 onUpdateEvent={handleUpdateEvent}
+                onMonthChange={loadMonth}
               />
             }
           />
