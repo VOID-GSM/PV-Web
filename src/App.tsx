@@ -63,6 +63,9 @@ export default function App() {
   // 그래서 보는 달 기준 앞뒤 7일씩만 요청하고, 이미 불러온 달은 다시 요청하지 않는다.
   const loadedMonthsRef = useRef<Set<string>>(new Set());
 
+  // 완료 체크를 서버에 저장하는 중인 일정 id (같은 일정을 연타해도 한 번만 처리)
+  const pendingToggleRef = useRef<Set<string>>(new Set());
+
   const loadMonth = useCallback((base: Date) => {
     const monthKey = `${base.getFullYear()}-${base.getMonth()}`;
     if (loadedMonthsRef.current.has(monthKey)) return;
@@ -90,6 +93,8 @@ export default function App() {
           endDate: event.endsAt.slice(0, 10),
           time: event.allDay ? undefined : event.startsAt.slice(11, 16),
           description: event.memo ?? "",
+          // 서버에 저장된 완료 여부 (새로고침해도 체크가 유지된다)
+          completed: event.completed ?? false,
           isMyEvent: true,
         }));
 
@@ -211,6 +216,7 @@ export default function App() {
                   ? undefined
                   : updated.startsAt.slice(11, 16),
                 description: updated.memo ?? updatedEvent.description,
+                completed: updated.completed ?? updatedEvent.completed,
               }
             : event,
         ),
@@ -242,14 +248,43 @@ export default function App() {
     }
   };
 
-  const handleToggleEvent = (eventId: string) => {
-    setEvents((prev) =>
-      prev.map((event) =>
-        event.id === eventId
-          ? { ...event, completed: !event.completed }
-          : event,
-      ),
-    );
+  // 오늘 할 일 체크박스: 화면을 먼저 바꾸고 서버에 저장한다. 저장에 실패하면 되돌리고 토스트로 알린다.
+  // 서버는 본인의 개인 일정만 완료 처리할 수 있다(마감·활동 일정은 불가).
+  const handleToggleEvent = async (eventId: string) => {
+    const target = events.find((event) => event.id === eventId);
+    if (!target || target.type !== "개인 일정") return;
+    if (pendingToggleRef.current.has(eventId)) return;
+    pendingToggleRef.current.add(eventId);
+
+    const nextCompleted = !target.completed;
+    const setCompleted = (value: boolean) =>
+      setEvents((prev) =>
+        prev.map((event) =>
+          event.id === eventId ? { ...event, completed: value } : event,
+        ),
+      );
+
+    setCompleted(nextCompleted);
+
+    try {
+      const updated = await updateCalendarEvent(Number(eventId), {
+        completed: nextCompleted,
+      });
+      // 서버가 돌려준 값이 있으면 그 값으로 맞춘다
+      if (typeof updated.completed === "boolean") {
+        setCompleted(updated.completed);
+      }
+    } catch (error) {
+      console.error("일정 완료 상태 저장 실패:", error);
+      setCompleted(!nextCompleted);
+      showToast(
+        error instanceof Error
+          ? error.message
+          : "완료 상태를 저장하지 못했습니다.",
+      );
+    } finally {
+      pendingToggleRef.current.delete(eventId);
+    }
   };
 
   const todayStr = new Date().toLocaleDateString("sv-SE");
