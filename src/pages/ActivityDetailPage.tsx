@@ -35,6 +35,8 @@ import clockIcon from "../assets/icons/clock.svg";
 import checkCircleIcon from "../assets/icons/check-circle.svg";
 import plusIcon from "../assets/icons/plus.svg";
 import MarkdownPreview from "../components/common/MarkdownPreview";
+// ★ 내 회원 번호 (이 활동 참여자인지 확인용)
+import { useMyName } from "../hooks/useMyName";
 
 interface SessionItem {
   id: string;
@@ -65,10 +67,17 @@ type ActivityNotice = NoticeItem & {
 
 const TABS = ["회차", "참여자", "출석 현황", "정리글", "공지"];
 
+// ★ 에러를 토스트에 띄울 글자로 바꾸기 (Error면 그 메시지, 아니면 기본 문구)
+const toErrorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
+
 export default function ActivityDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const activityId = Number(id);
+
+  // ★ 내 회원 번호 (못 불러왔으면 null)
+  const { myId } = useMyName();
 
   const [activeTab, setActiveTab] = useState("회차");
 
@@ -77,6 +86,8 @@ export default function ActivityDetailPage() {
   const [activityPeriod, setActivityPeriod] = useState("기간 미정");
   const [activityRule, setActivityRule] = useState("규칙 미정");
   const [members, setMembers] = useState<string[]>([]);
+  // ★ 참여자 회원 번호들 (내가 참여자인지 확인용)
+  const [memberIds, setMemberIds] = useState<number[]>([]);
   const [allActivities, setAllActivities] = useState<ActivitySummary[]>([]);
 
   const [sessions, setSessions] = useState<SessionItem[]>([]);
@@ -116,6 +127,9 @@ export default function ActivityDetailPage() {
 
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  // ★ 내가 이 활동 참여자인지 (내 번호를 아직 못 불러왔으면 false)
+  const isParticipant = myId !== null && memberIds.includes(myId);
 
   // 활동 선택 칩에 쓸 전체 활동 목록
   useEffect(() => {
@@ -327,6 +341,8 @@ export default function ActivityDetailPage() {
           detail.topicModeLabel || detail.topicMode || "규칙 미정",
         );
         setMembers(apiMembers.map((member) => member.name));
+        // ★ 참여자 회원 번호도 같이 기억
+        setMemberIds(apiMembers.map((member) => member.memberId));
 
         const mappedSessions: SessionItem[] = apiSessions.map((session) => ({
           id: String(session.id),
@@ -440,6 +456,11 @@ export default function ActivityDetailPage() {
       showToast("주제를 제안할 회차가 없습니다.");
       return;
     }
+    // ★ 참여자가 아니면 창을 열지 않고 안내
+    if (!isParticipant) {
+      showToast("활동 참여자만 주제를 제안할 수 있습니다.");
+      return;
+    }
 
     setTopicTitle("");
     setIsTopicModalOpen(true);
@@ -474,9 +495,7 @@ export default function ActivityDetailPage() {
     } catch (error) {
       console.error("주제 제안 실패:", error);
 
-      showToast(
-        error instanceof Error ? error.message : "주제를 제안하지 못했습니다.",
-      );
+      showToast(toErrorMessage(error, "주제를 제안하지 못했습니다."));
     } finally {
       setIsSubmittingTopic(false);
     }
@@ -484,11 +503,18 @@ export default function ActivityDetailPage() {
 
   const handleVoteCandidate = async () => {
     if (!id || !sessions[0]) {
-      alert("투표할 회차가 없습니다.");
+      // ★ alert → 토스트
+      showToast("투표할 회차가 없습니다.");
+      return;
+    }
+    // ★ 참여자가 아니면 서버에 보내지 않고 안내
+    if (!isParticipant) {
+      showToast("활동 참여자만 투표할 수 있습니다.");
       return;
     }
     if (selectedVoteOption === null) {
-      alert("투표할 주제를 선택해 주세요.");
+      // ★ alert → 토스트
+      showToast("투표할 주제를 선택해 주세요.");
       return;
     }
 
@@ -516,11 +542,15 @@ export default function ActivityDetailPage() {
       }
 
       await refreshTopicCandidates(activityId, sessionId);
+      // ★ 성공 안내
+      showToast(
+        selectedCandidate.voted ? "투표를 취소했습니다." : "투표했습니다.",
+        "success",
+      );
     } catch (error) {
       console.error("주제 투표 실패:", error);
-      alert(
-        error instanceof Error ? error.message : "투표를 저장하지 못했습니다.",
-      );
+      // ★ alert → 토스트
+      showToast(toErrorMessage(error, "투표를 저장하지 못했습니다."));
     } finally {
       setIsVoting(false);
     }
@@ -532,13 +562,12 @@ export default function ActivityDetailPage() {
       setAbsenceRequests((previous) =>
         previous.filter((item) => item.id !== absenceId),
       );
+      // ★ 성공 안내
+      showToast("불참 요청을 승인했습니다.", "success");
     } catch (error) {
       console.error("결석 요청 승인 실패:", error);
-      alert(
-        error instanceof Error
-          ? error.message
-          : "결석 요청을 승인하지 못했습니다.",
-      );
+      // ★ alert → 토스트
+      showToast(toErrorMessage(error, "결석 요청을 승인하지 못했습니다."));
     }
   };
 
@@ -551,13 +580,12 @@ export default function ActivityDetailPage() {
       setAbsenceRequests((previous) =>
         previous.filter((item) => item.id !== absenceId),
       );
+      // ★ 성공 안내
+      showToast("불참 요청을 거절했습니다.", "success");
     } catch (error) {
       console.error("결석 요청 거절 실패:", error);
-      alert(
-        error instanceof Error
-          ? error.message
-          : "결석 요청을 거절하지 못했습니다.",
-      );
+      // ★ alert → 토스트
+      showToast(toErrorMessage(error, "결석 요청을 거절하지 못했습니다."));
     }
   };
 
@@ -593,11 +621,8 @@ export default function ActivityDetailPage() {
       );
     } catch (error) {
       console.error("정리글 피드백 작성 실패:", error);
-      alert(
-        error instanceof Error
-          ? error.message
-          : "피드백을 저장하지 못했습니다.",
-      );
+      // ★ alert → 토스트
+      showToast(toErrorMessage(error, "피드백을 저장하지 못했습니다."));
     }
   };
 
@@ -978,12 +1003,22 @@ export default function ActivityDetailPage() {
                 <button
                   type="button"
                   onClick={handleProposeTopic}
-                  disabled={isSubmittingTopic || sessions.length === 0}
+                  // ★ 참여자가 아니면 잠금
+                  disabled={
+                    isSubmittingTopic || sessions.length === 0 || !isParticipant
+                  }
                   className="rounded-xl bg-black px-3 py-2 text-[11px] font-bold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {isSubmittingTopic ? "등록 중..." : "+ 주제 제안"}
                 </button>
               </div>
+
+              {/* ★ 참여자가 아니면 미리 안내 (회차가 있을 때만) */}
+              {!isParticipant && sessions.length > 0 && (
+                <p className="rounded-xl bg-blue-50 px-3 py-2.5 text-[11px] font-semibold text-blue-700">
+                  활동에 참여하면 주제를 제안하고 투표할 수 있어요.
+                </p>
+              )}
 
               {sessions.length === 0 ? (
                 <div className="py-8 text-center text-gray-400">
@@ -1005,7 +1040,8 @@ export default function ActivityDetailPage() {
                       <button
                         key={item.id}
                         type="button"
-                        disabled={isVoting}
+                        // ★ 참여자가 아니면 고르지 못하게
+                        disabled={isVoting || !isParticipant}
                         onClick={() => setSelectedVoteOption(index)}
                         className={`flex w-full items-center justify-between rounded-xl border p-3 text-left transition disabled:opacity-60 ${
                           selectedVoteOption === index
@@ -1039,15 +1075,20 @@ export default function ActivityDetailPage() {
                   <button
                     type="button"
                     onClick={handleVoteCandidate}
-                    disabled={isVoting || selectedVoteOption === null}
+                    // ★ 참여자가 아니면 잠금
+                    disabled={
+                      isVoting || selectedVoteOption === null || !isParticipant
+                    }
                     className="w-full rounded-xl bg-black py-3 font-bold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
                   >
                     {isVoting
                       ? "처리 중..."
-                      : selectedVoteOption !== null &&
-                          votes[selectedVoteOption]?.voted
-                        ? "선택한 투표 취소하기"
-                        : "선택한 주제에 투표하기"}
+                      : !isParticipant
+                        ? "참여자만 투표할 수 있어요"
+                        : selectedVoteOption !== null &&
+                            votes[selectedVoteOption]?.voted
+                          ? "선택한 투표 취소하기"
+                          : "선택한 주제에 투표하기"}
                   </button>
                 </>
               )}
@@ -1242,13 +1283,12 @@ export default function ActivityDetailPage() {
               ...current,
             ]);
             setIsCreateArticleOpen(false);
+            // ★ 성공 안내
+            showToast("정리글을 작성했습니다.", "success");
           } catch (error) {
             console.error("활동 정리글 생성 실패:", error);
-            alert(
-              error instanceof Error
-                ? error.message
-                : "정리글을 생성하지 못했습니다.",
-            );
+            // ★ alert → 토스트
+            showToast(toErrorMessage(error, "정리글을 생성하지 못했습니다."));
           }
         }}
       />
