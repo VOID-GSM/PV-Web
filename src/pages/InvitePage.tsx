@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import logoWhite from "../assets/images/logo-white.png";
 import linkIcon from "../assets/icons/link.svg";
@@ -16,6 +16,8 @@ import {
   type InviteInfo,
 } from "../api/authApi";
 import { SelectionChip } from "../components/invite/SelectionChip";
+// ★ 브라우저 alert 대신 쓸 토스트
+import Toast from "../components/common/Toast";
 import type { CalendarEvent } from "../types/calendar";
 
 export interface InvitePageProps {
@@ -26,15 +28,23 @@ export interface InvitePageProps {
   onAddEvent?: (newEvent: CalendarEvent) => void;
 }
 
+// ★ 토스트 하나의 모양 (id가 바뀌면 같은 문구여도 새로 뜬다)
+type ToastState = { id: number; message: string; type: "success" | "info" };
+
 const InvitePage: React.FC<InvitePageProps> = () => {
   const navigate = useNavigate();
   const { code } = useParams<{ code: string }>();
 
   const [inviteInfo, setInviteInfo] = useState<InviteInfo | null>(null);
+  // ★ 초대 정보를 불러오지 못했을 때의 안내 문구 (없으면 "")
+  const [inviteError, setInviteError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // ★ 입장(또는 승인 요청)을 마친 뒤 버튼에 보여줄 문구 (아직이면 "")
+  const [doneLabel, setDoneLabel] = useState("");
 
   const [isReEntryOpen, setIsReEntryOpen] = useState(false);
   const [reEntryCode, setReEntryCode] = useState("");
+  const [reEntryError, setReEntryError] = useState("");
   const [isReEntering, setIsReEntering] = useState(false);
 
   const [name, setName] = useState("");
@@ -47,6 +57,32 @@ const InvitePage: React.FC<InvitePageProps> = () => {
     departments: false,
   });
 
+  // ★ 지금 떠 있는 토스트 (null이면 안 보임)
+  const [toast, setToast] = useState<ToastState | null>(null);
+
+  // ★ 토스트 띄우기: 이전 번호 + 1로 새 토스트를 만든다
+  const showToast = (message: string, type: "success" | "info" = "info") => {
+    setToast((prev) => ({ id: (prev?.id ?? 0) + 1, message, type }));
+  };
+  // ★ 토스트 닫기 (Toast가 2.5초 뒤 부른다)
+  const closeToast = useCallback(() => setToast(null), []);
+
+  // ★ 입장 후 안내 토스트를 잠깐 보여주고 오늘 할 일 화면으로 이동한다
+  const redirectTimerRef = useRef<number | null>(null);
+  const goToToday = () => {
+    redirectTimerRef.current = window.setTimeout(
+      () => navigate("/today"),
+      1000,
+    );
+  };
+  useEffect(() => {
+    return () => {
+      if (redirectTimerRef.current !== null) {
+        window.clearTimeout(redirectTimerRef.current);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     if (!code) return;
 
@@ -54,13 +90,16 @@ const InvitePage: React.FC<InvitePageProps> = () => {
 
     getInvite(code)
       .then((info) => {
-        if (!cancelled) setInviteInfo(info);
+        if (cancelled) return;
+        setInviteInfo(info);
+        setInviteError("");
       })
       .catch((error: unknown) => {
         console.error("초대 정보 조회 실패:", error);
 
+        // ★ alert → 화면 안내 문구
         if (!cancelled) {
-          alert(
+          setInviteError(
             error instanceof Error
               ? error.message
               : "초대 정보를 불러오지 못했습니다.",
@@ -72,6 +111,11 @@ const InvitePage: React.FC<InvitePageProps> = () => {
       cancelled = true;
     };
   }, [code]);
+
+  // ★ 초대 링크 없이 들어왔거나, 링크 정보를 불러오지 못했을 때 폼 위에 보여줄 안내
+  const inviteNotice = !code
+    ? "유효한 초대 링크로 접속해 주세요. 초대 링크를 받은 분만 입장할 수 있습니다."
+    : inviteError;
 
   const generationOptions =
     inviteInfo?.generations?.map((item) => `${item.number}기`) ??
@@ -117,7 +161,7 @@ const InvitePage: React.FC<InvitePageProps> = () => {
     if (nameError || generationError || departmentsError) return;
 
     if (!code || !inviteInfo) {
-      alert("유효한 초대 링크로 접속해 주세요.");
+      showToast("유효한 초대 링크로 접속해 주세요.");
       return;
     }
 
@@ -126,7 +170,7 @@ const InvitePage: React.FC<InvitePageProps> = () => {
     );
 
     if (!selectedGeneration) {
-      alert("초대 링크에서 제공한 기수를 선택해 주세요.");
+      showToast("초대 링크에서 제공한 기수를 선택해 주세요.");
       return;
     }
 
@@ -175,15 +219,21 @@ const InvitePage: React.FC<InvitePageProps> = () => {
       );
 
       if (result.status === "JOINED") {
-        alert("팀 입장이 완료되었습니다.");
-        navigate("/today");
+        setDoneLabel("입장 완료");
+        showToast("팀 입장이 완료되었습니다.", "success");
+        goToToday();
       } else {
-        alert("가입 요청을 보냈습니다. 팀 관리자의 승인을 기다려 주세요.");
+        // 승인 대기: 버튼을 "승인 대기 중"으로 바꿔서 중복 요청을 막는다
+        setDoneLabel("승인 대기 중");
+        showToast(
+          "가입 요청을 보냈습니다. 팀 관리자의 승인을 기다려 주세요.",
+          "success",
+        );
       }
     } catch (error) {
       console.error("초대 가입 요청 실패:", error);
 
-      alert(
+      showToast(
         error instanceof Error
           ? error.message
           : "가입 요청을 보내지 못했습니다.",
@@ -194,17 +244,18 @@ const InvitePage: React.FC<InvitePageProps> = () => {
   };
 
   const handleReEntry = async () => {
-    const code = reEntryCode.trim();
+    const enteredCode = reEntryCode.trim();
 
-    if (!code) {
-      alert("재입장 코드를 입력해 주세요.");
+    if (!enteredCode) {
+      setReEntryError("재입장 코드를 입력해 주세요.");
       return;
     }
 
+    setReEntryError("");
     setIsReEntering(true);
 
     try {
-      const result = await reEntryLink(code);
+      const result = await reEntryLink(enteredCode);
       localStorage.setItem("pvweb:memberId", String(result.memberId));
 
       if (result.accessToken) {
@@ -215,17 +266,22 @@ const InvitePage: React.FC<InvitePageProps> = () => {
         localStorage.setItem("pvweb:refreshToken", result.refreshToken);
       }
 
+      setIsReEntryOpen(false);
+
       if (result.status === "JOINED") {
-        setIsReEntryOpen(false);
-        alert("재입장이 완료되었습니다.");
-        navigate("/today");
+        showToast("재입장이 완료되었습니다.", "success");
+        goToToday();
       } else {
-        alert("재입장 요청을 보냈습니다. 팀 관리자의 승인을 기다려 주세요.");
+        showToast(
+          "재입장 요청을 보냈습니다. 팀 관리자의 승인을 기다려 주세요.",
+          "success",
+        );
       }
     } catch (error) {
       console.error("재입장 실패:", error);
 
-      alert(
+      // ★ 모달 안에 오류 문구를 보여준다 (모달을 닫지 않고 다시 입력할 수 있게)
+      setReEntryError(
         error instanceof Error
           ? error.message
           : "재입장에 실패했습니다. 코드를 확인해 주세요.",
@@ -283,12 +339,19 @@ const InvitePage: React.FC<InvitePageProps> = () => {
               <img src={linkIcon} alt="" className="h-5 w-5" />
 
               <span>
-                {inviteInfo?.teamName ?? "초대 링크 확인 중"} ·{" "}
+                {/* ★ 링크 없이 들어왔을 때 "확인 중"이 계속 뜨지 않게 문구를 나눈다 */}
+                {inviteInfo?.teamName ??
+                  (code ? "초대 링크 확인 중" : "초대 링크 없음")}{" "}
+                ·{" "}
                 {inviteInfo
                   ? inviteInfo.approvalRequired
                     ? "관리자 승인 후 입장"
                     : "바로 입장 가능"
-                  : "초대 정보를 불러오는 중입니다"}
+                  : !code
+                    ? "초대 링크로 접속해 주세요"
+                    : inviteError
+                      ? "초대 링크를 확인해 주세요"
+                      : "초대 정보를 불러오는 중입니다"}
               </span>
             </div>
           </div>
@@ -303,6 +366,14 @@ const InvitePage: React.FC<InvitePageProps> = () => {
             <p className="mt-2 text-[11px] text-[#999]">
               별도 로그인이 없습니다. 입장하면 이 기기에 인증 토큰이 저장돼요.
             </p>
+
+            {/* ★ 초대 링크가 없거나 잘못됐을 때 안내 (alert 대신) */}
+            {inviteNotice && (
+              <div className="mt-5 flex gap-3 rounded-[8px] bg-[#fff1f0] px-4 py-3 text-[11px] leading-[1.5] text-[#c0392b]">
+                <img src={alertIcon} alt="" className="mt-[1px] h-4 w-4" />
+                <p>{inviteNotice}</p>
+              </div>
+            )}
 
             <div className="mt-8">
               <label className="text-[12px] font-medium">이름</label>
@@ -399,11 +470,11 @@ const InvitePage: React.FC<InvitePageProps> = () => {
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="mt-6 flex h-[46px] w-full cursor-pointer items-center justify-center gap-2 rounded-[7px] bg-black text-[13px] font-medium text-white transition hover:bg-[#222] active:scale-[0.99] disabled:opacity-50"
+              disabled={isSubmitting || doneLabel !== "" || !inviteInfo}
+              className="mt-6 flex h-[46px] w-full cursor-pointer items-center justify-center gap-2 rounded-[7px] bg-black text-[13px] font-medium text-white transition hover:bg-[#222] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isSubmitting ? "입장 중..." : "입장하기"}
-              <span className="text-[17px]">→</span>
+              {isSubmitting ? "입장 중..." : doneLabel || "입장하기"}
+              {doneLabel === "" && <span className="text-[17px]">→</span>}
             </button>
 
             <div className="mt-5 text-center text-[10px] text-[#aaa]">
@@ -413,6 +484,7 @@ const InvitePage: React.FC<InvitePageProps> = () => {
                 type="button"
                 onClick={() => {
                   setReEntryCode("");
+                  setReEntryError("");
                   setIsReEntryOpen(true);
                 }}
                 className="cursor-pointer font-medium text-[#555] underline underline-offset-2"
@@ -443,7 +515,10 @@ const InvitePage: React.FC<InvitePageProps> = () => {
             <input
               autoFocus
               value={reEntryCode}
-              onChange={(e) => setReEntryCode(e.target.value)}
+              onChange={(e) => {
+                setReEntryCode(e.target.value);
+                if (reEntryError) setReEntryError("");
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !isReEntering) {
                   void handleReEntry();
@@ -452,6 +527,11 @@ const InvitePage: React.FC<InvitePageProps> = () => {
               placeholder="재입장 코드"
               className="mt-6 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm outline-none focus:border-black"
             />
+
+            {/* ★ alert 대신 모달 안에 오류 문구 표시 */}
+            {reEntryError && (
+              <p className="mt-2 text-xs text-red-500">{reEntryError}</p>
+            )}
 
             <div className="mt-5 flex gap-3">
               <button
@@ -474,6 +554,16 @@ const InvitePage: React.FC<InvitePageProps> = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ★ 입장·재입장 결과 토스트 */}
+      {toast && (
+        <Toast
+          key={toast.id}
+          message={toast.message}
+          type={toast.type}
+          onClose={closeToast}
+        />
       )}
     </div>
   );
