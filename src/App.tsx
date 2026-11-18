@@ -9,6 +9,8 @@ import ArchivePage from "./pages/ArchivePage";
 import ArticleEditorPage from "./pages/ArticleEditorPage";
 import WeeklyReportPage from "./pages/WeeklyReportPage";
 import InvitePage from "./pages/InvitePage";
+// ★ 재입장 링크로 들어왔을 때 보여줄 화면
+import ReEntryPage from "./pages/ReEntryPage";
 import SettingsPage from "./pages/SettingsPage";
 import WorklogPage from "./pages/WorklogPage";
 import RetrospectivePage from "./pages/RetrospectivePage";
@@ -19,7 +21,7 @@ import { apiRequest } from "./api/client";
 
 import SidebarLayout from "./components/layout/SidebarLayout";
 import { AddEventModal } from "./components/calendar/AddEventModal";
-// ★ 브라우저 alert 대신 쓸 토스트
+// 브라우저 alert 대신 쓸 토스트
 import Toast from "./components/common/Toast";
 import type { CalendarEvent } from "./types/calendar";
 import {
@@ -31,7 +33,7 @@ import {
   type ApiBoard,
 } from "./api/calendarApi";
 
-// ★ 토스트 하나의 모양 (id가 바뀌면 같은 문구여도 새로 뜬다)
+// 토스트 하나의 모양 (id가 바뀌면 같은 문구여도 새로 뜬다)
 type ToastState = { id: number; message: string; type: "success" | "info" };
 
 // 날짜를 "2026-11-17" 모양(로컬 시간 기준)으로 바꾼다
@@ -49,14 +51,14 @@ export default function App() {
   const [boards, setBoards] = useState<ApiBoard[]>([]);
   const [homeTodos, setHomeTodos] = useState<HomeTodoItem[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  // ★ 지금 떠 있는 토스트 (null이면 안 보임)
+  // 지금 떠 있는 토스트 (null이면 안 보임)
   const [toast, setToast] = useState<ToastState | null>(null);
 
-  // ★ 토스트 띄우기: 이전 번호 + 1로 새 토스트를 만든다
+  // 토스트 띄우기: 이전 번호 + 1로 새 토스트를 만든다
   const showToast = (message: string, type: "success" | "info" = "info") => {
     setToast((prev) => ({ id: (prev?.id ?? 0) + 1, message, type }));
   };
-  // ★ 토스트 닫기 (Toast가 2.5초 뒤 부른다)
+  // 토스트 닫기 (Toast가 2.5초 뒤 부른다)
   const closeToast = useCallback(() => setToast(null), []);
 
   // 서버는 캘린더를 한 번에 최대 92일까지만 조회할 수 있다(넘기면 400).
@@ -180,11 +182,9 @@ export default function App() {
       setEvents((prev) => [...prev, { ...newEvent, id: String(created.id) }]);
 
       setIsAddModalOpen(false);
-      // ★ 성공 안내
       showToast("일정을 추가했습니다", "success");
     } catch (error) {
       console.error("일정 생성 실패:", error);
-      // ★ alert → 토스트
       showToast(
         error instanceof Error ? error.message : "일정을 저장하지 못했습니다.",
       );
@@ -221,11 +221,9 @@ export default function App() {
             : event,
         ),
       );
-      // ★ 성공 안내
       showToast("일정을 수정했습니다", "success");
     } catch (error) {
       console.error("일정 수정 실패:", error);
-      // ★ alert → 토스트
       showToast(
         error instanceof Error ? error.message : "일정을 수정하지 못했습니다.",
       );
@@ -237,11 +235,9 @@ export default function App() {
       await deleteCalendarEvent(Number(eventId));
 
       setEvents((prev) => prev.filter((event) => event.id !== eventId));
-      // ★ 성공 안내
       showToast("일정을 삭제했습니다", "success");
     } catch (error) {
       console.error("일정 삭제 실패:", error);
-      // ★ alert → 토스트
       showToast(
         error instanceof Error ? error.message : "일정을 삭제하지 못했습니다.",
       );
@@ -399,6 +395,8 @@ export default function App() {
 
         <Route path="/invite" element={<InvitePage />} />
         <Route path="/invite/:code" element={<InvitePage />} />
+        {/* ★ 재입장 링크 (사이드바 밖: 아직 토큰이 없는 사람이 들어오는 주소라서) */}
+        <Route path="/re-entry/:code" element={<ReEntryPage />} />
       </Routes>
 
       <AddEventModal
@@ -407,7 +405,7 @@ export default function App() {
         onAddEvent={handleAddEvent}
       />
 
-      {/* ★ 일정 추가·수정·삭제 결과 토스트 (어느 페이지에서든 뜬다) */}
+      {/* 일정 추가·수정·삭제 결과 토스트 (어느 페이지에서든 뜬다) */}
       {toast && (
         <Toast
           key={toast.id}
