@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import logoWhite from "../assets/images/logo-white.png";
 import linkIcon from "../assets/icons/link.svg";
 import alertIcon from "../assets/icons/alert.svg";
@@ -16,7 +16,7 @@ import {
   type InviteInfo,
 } from "../api/authApi";
 import { SelectionChip } from "../components/invite/SelectionChip";
-// ★ 브라우저 alert 대신 쓸 토스트
+// 브라우저 alert 대신 쓸 토스트
 import Toast from "../components/common/Toast";
 import type { CalendarEvent } from "../types/calendar";
 
@@ -28,18 +28,17 @@ export interface InvitePageProps {
   onAddEvent?: (newEvent: CalendarEvent) => void;
 }
 
-// ★ 토스트 하나의 모양 (id가 바뀌면 같은 문구여도 새로 뜬다)
+// 토스트 하나의 모양 (id가 바뀌면 같은 문구여도 새로 뜬다)
 type ToastState = { id: number; message: string; type: "success" | "info" };
 
 const InvitePage: React.FC<InvitePageProps> = () => {
-  const navigate = useNavigate();
   const { code } = useParams<{ code: string }>();
 
   const [inviteInfo, setInviteInfo] = useState<InviteInfo | null>(null);
-  // ★ 초대 정보를 불러오지 못했을 때의 안내 문구 (없으면 "")
+  // 초대 정보를 불러오지 못했을 때의 안내 문구 (없으면 "")
   const [inviteError, setInviteError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // ★ 입장(또는 승인 요청)을 마친 뒤 버튼에 보여줄 문구 (아직이면 "")
+  // 입장(또는 승인 요청)을 마친 뒤 버튼에 보여줄 문구 (아직이면 "")
   const [doneLabel, setDoneLabel] = useState("");
 
   const [isReEntryOpen, setIsReEntryOpen] = useState(false);
@@ -57,21 +56,23 @@ const InvitePage: React.FC<InvitePageProps> = () => {
     departments: false,
   });
 
-  // ★ 지금 떠 있는 토스트 (null이면 안 보임)
+  // 지금 떠 있는 토스트 (null이면 안 보임)
   const [toast, setToast] = useState<ToastState | null>(null);
 
-  // ★ 토스트 띄우기: 이전 번호 + 1로 새 토스트를 만든다
+  // 토스트 띄우기: 이전 번호 + 1로 새 토스트를 만든다
   const showToast = (message: string, type: "success" | "info" = "info") => {
     setToast((prev) => ({ id: (prev?.id ?? 0) + 1, message, type }));
   };
-  // ★ 토스트 닫기 (Toast가 2.5초 뒤 부른다)
+  // 토스트 닫기 (Toast가 2.5초 뒤 부른다)
   const closeToast = useCallback(() => setToast(null), []);
 
-  // ★ 입장 후 안내 토스트를 잠깐 보여주고 오늘 할 일 화면으로 이동한다
+  // 입장 후 안내 토스트를 잠깐 보여주고 오늘 할 일 화면으로 이동한다
   const redirectTimerRef = useRef<number | null>(null);
   const goToToday = () => {
     redirectTimerRef.current = window.setTimeout(
-      () => navigate("/today"),
+      // ★ navigate 대신 페이지를 새로 열며 이동한다
+      // (입장 화면에서는 토큰이 없어 일정·할 일·내 정보를 못 불러온 상태라, 새 토큰으로 처음부터 다시 불러오게)
+      () => window.location.replace("/today"),
       1000,
     );
   };
@@ -97,7 +98,7 @@ const InvitePage: React.FC<InvitePageProps> = () => {
       .catch((error: unknown) => {
         console.error("초대 정보 조회 실패:", error);
 
-        // ★ alert → 화면 안내 문구
+        // alert → 화면 안내 문구
         if (!cancelled) {
           setInviteError(
             error instanceof Error
@@ -112,7 +113,7 @@ const InvitePage: React.FC<InvitePageProps> = () => {
     };
   }, [code]);
 
-  // ★ 초대 링크 없이 들어왔거나, 링크 정보를 불러오지 못했을 때 폼 위에 보여줄 안내
+  // 초대 링크 없이 들어왔거나, 링크 정보를 불러오지 못했을 때 폼 위에 보여줄 안내
   const inviteNotice = !code
     ? "유효한 초대 링크로 접속해 주세요. 초대 링크를 받은 분만 입장할 수 있습니다."
     : inviteError;
@@ -280,7 +281,7 @@ const InvitePage: React.FC<InvitePageProps> = () => {
     } catch (error) {
       console.error("재입장 실패:", error);
 
-      // ★ 모달 안에 오류 문구를 보여준다 (모달을 닫지 않고 다시 입력할 수 있게)
+      // 모달 안에 오류 문구를 보여준다 (모달을 닫지 않고 다시 입력할 수 있게)
       setReEntryError(
         error instanceof Error
           ? error.message
@@ -339,7 +340,7 @@ const InvitePage: React.FC<InvitePageProps> = () => {
               <img src={linkIcon} alt="" className="h-5 w-5" />
 
               <span>
-                {/* ★ 링크 없이 들어왔을 때 "확인 중"이 계속 뜨지 않게 문구를 나눈다 */}
+                {/* 링크 없이 들어왔을 때 "확인 중"이 계속 뜨지 않게 문구를 나눈다 */}
                 {inviteInfo?.teamName ??
                   (code ? "초대 링크 확인 중" : "초대 링크 없음")}{" "}
                 ·{" "}
@@ -367,7 +368,7 @@ const InvitePage: React.FC<InvitePageProps> = () => {
               별도 로그인이 없습니다. 입장하면 이 기기에 인증 토큰이 저장돼요.
             </p>
 
-            {/* ★ 초대 링크가 없거나 잘못됐을 때 안내 (alert 대신) */}
+            {/* 초대 링크가 없거나 잘못됐을 때 안내 (alert 대신) */}
             {inviteNotice && (
               <div className="mt-5 flex gap-3 rounded-[8px] bg-[#fff1f0] px-4 py-3 text-[11px] leading-[1.5] text-[#c0392b]">
                 <img src={alertIcon} alt="" className="mt-[1px] h-4 w-4" />
@@ -525,10 +526,14 @@ const InvitePage: React.FC<InvitePageProps> = () => {
                 }
               }}
               placeholder="재입장 코드"
-              className="mt-6 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm outline-none focus:border-black"
+              className={`mt-6 h-11 w-full rounded-lg border px-3 text-sm outline-none ${
+                reEntryError
+                  ? "border-red-500 focus:border-red-500"
+                  : "border-gray-300 focus:border-black"
+              }`}
             />
 
-            {/* ★ alert 대신 모달 안에 오류 문구 표시 */}
+            {/* alert 대신 모달 안에 오류 문구 표시 */}
             {reEntryError && (
               <p className="mt-2 text-xs text-red-500">{reEntryError}</p>
             )}
@@ -556,7 +561,7 @@ const InvitePage: React.FC<InvitePageProps> = () => {
         </div>
       )}
 
-      {/* ★ 입장·재입장 결과 토스트 */}
+      {/* 입장·재입장 결과 토스트 */}
       {toast && (
         <Toast
           key={toast.id}
