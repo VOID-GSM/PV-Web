@@ -1,4 +1,5 @@
 // Navigate: 화면에 그려지는 순간 다른 주소로 보내주는 부품
+import { useEffect } from "react";
 import { Navigate, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 
@@ -30,6 +31,27 @@ export default function SidebarLayout({
 }: SidebarLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
+
+  // ★ 이 레이아웃은 화면 높이(h-screen)에 딱 맞고, 스크롤은 안쪽 영역이 맡는다.
+  // 그래서 이 레이아웃이 떠 있는 동안에는 브라우저 페이지 전체 스크롤을 막아서,
+  // 레이아웃 아래에 흰 빈 공간이 생기지 않게 한다.
+  // (입장 화면 같은 다른 페이지에는 영향이 없도록, 이 화면을 떠날 때 원래대로 돌려둔다)
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    // 이미 아래로 스크롤된 상태에서 막히면 레이아웃이 위로 밀려 보이므로 맨 위로 돌려둔다
+    window.scrollTo(0, 0);
+
+    return () => {
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+    };
+  }, []);
 
   // ★ 문지기: 토큰이 없으면(입장 전) 입장 화면으로 보낸다
   // replace: 뒤로 가기를 눌러도 이 화면으로 다시 오지 않게 기록을 바꿔치기한다
@@ -109,7 +131,8 @@ export default function SidebarLayout({
   };
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-[#f7f7f8] font-pretendard">
+    // relative: 이 레이아웃 안의 absolute 요소가 바깥으로 삐져나가 페이지 높이를 늘리지 못하게 한다
+    <div className="relative flex h-screen w-full overflow-hidden bg-[#f7f7f8] font-pretendard">
       <Sidebar
         activeMenu={getActiveMenu(location.pathname)}
         todayTaskCount={todayTaskCount}
