@@ -1,8 +1,13 @@
 // src/pages/ArchivePage.tsx
-import { useState, useRef, useEffect } from "react";
+// ★ useCallback: 토스트 닫기 함수를 한 번만 만들어 두려고
+import { useCallback, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+// ★ 다른 화면과 같은 공통 헤더 (진짜 알림 · 새로 만들기 메뉴)
+import { Header } from "../components/layout/Header";
 import Dropdown from "../components/common/Dropdown";
 import MarkdownPreview from "../components/common/MarkdownPreview";
+// ★ 브라우저 alert 대신 쓸 토스트
+import Toast from "../components/common/Toast";
 import { getArticles, saveArticles } from "../utils/articles";
 import type { Article } from "../types/article";
 import {
@@ -25,17 +30,20 @@ interface Comment {
 
 type ArchiveTab = "all" | "my" | "compare" | "feedback";
 
+// ★ 토스트 하나의 모양 (id가 바뀌면 같은 문구여도 새로 뜬다)
+type ToastState = { id: number; message: string; type: "success" | "info" };
+
 const activityFilterOptions = ["활동 선택", "등록된 활동 없음"];
 const periodFilterOptions = ["기간 선택", "전체"];
+
+// ★ 에러를 토스트 문구로 바꾸기 (Error면 그 메시지, 아니면 기본 문구)
+const toErrorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
 
 export default function ArchivePage() {
   const navigate = useNavigate();
 
-  const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
-  const [isNoticeOpen, setIsNoticeOpen] = useState(false);
-  const [noticeTab, setNoticeTab] = useState<"all" | "unread" | "mention">(
-    "all",
-  );
+  // ★ 가짜 알림 창·새로 만들기 메뉴 상태는 지웠다 (공통 Header가 대신한다)
 
   const [selectedTab, setSelectedTab] = useState<ArchiveTab>("all");
 
@@ -60,8 +68,12 @@ export default function ArchivePage() {
   const [commentList, setCommentList] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
 
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const noticeRef = useRef<HTMLDivElement>(null);
+  // ★ 지금 떠 있는 토스트 (null이면 안 보임)
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const showToast = (message: string, type: "success" | "info" = "info") => {
+    setToast((prev) => ({ id: (prev?.id ?? 0) + 1, message, type }));
+  };
+  const closeToast = useCallback(() => setToast(null), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -191,11 +203,8 @@ export default function ArchivePage() {
           setSelectedArticleId(null);
           setCommentList([]);
 
-          alert(
-            error instanceof Error
-              ? error.message
-              : "정리글을 불러오지 못했습니다.",
-          );
+          // ★ alert → 토스트
+          showToast(toErrorMessage(error, "정리글을 불러오지 못했습니다."));
         }
       }
     };
@@ -211,8 +220,6 @@ export default function ArchivePage() {
     if (!selectedArticleId || !/^\d+$/.test(selectedArticleId)) {
       return;
     }
-
-    // 나머지 코드는 그대로 유지
 
     let cancelled = false;
 
@@ -239,24 +246,7 @@ export default function ArchivePage() {
     };
   }, [selectedArticleId]);
 
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      ) {
-        setIsCreateMenuOpen(false);
-      }
-
-      if (noticeRef.current && !noticeRef.current.contains(e.target as Node)) {
-        setIsNoticeOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  // ★ 가짜 메뉴 바깥 클릭 감지 코드는 지웠다 (공통 Header가 직접 처리한다)
 
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -289,10 +279,8 @@ export default function ArchivePage() {
       setNewComment("");
     } catch (error) {
       console.error("정리글 댓글 작성 실패:", error);
-
-      alert(
-        error instanceof Error ? error.message : "댓글을 작성하지 못했습니다.",
-      );
+      // ★ alert → 토스트
+      showToast(toErrorMessage(error, "댓글을 작성하지 못했습니다."));
     }
   };
 
@@ -300,7 +288,8 @@ export default function ArchivePage() {
     if (!window.confirm("이 정리글을 삭제할까요?")) return;
 
     if (!/^\d+$/.test(articleId)) {
-      alert("서버에 저장된 정리글 ID가 올바르지 않습니다.");
+      // ★ alert → 토스트
+      showToast("서버에 저장된 정리글 ID가 올바르지 않습니다.");
       return;
     }
 
@@ -314,14 +303,12 @@ export default function ArchivePage() {
       saveArticles(nextArticles);
       setArticles(nextArticles);
       setSelectedArticleId(null);
+      // ★ 성공 안내
+      showToast("정리글을 삭제했습니다.", "success");
     } catch (error) {
       console.error("정리글 삭제 실패:", error);
-
-      alert(
-        error instanceof Error
-          ? error.message
-          : "정리글을 삭제하지 못했습니다.",
-      );
+      // ★ alert → 토스트
+      showToast(toErrorMessage(error, "정리글을 삭제하지 못했습니다."));
     }
   };
 
@@ -349,314 +336,13 @@ export default function ArchivePage() {
 
   return (
     <div className="flex-1 flex flex-col h-screen bg-[#f8f9fa] overflow-hidden font-pretendard">
-      <header className="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center shrink-0">
-        <div>
-          <h1 className="text-lg font-extrabold text-gray-900">
-            정리글 아카이브
-          </h1>
-          <p className="text-xs text-gray-400 mt-0.5">
-            모든 정리글은 팀 전체에 공개됩니다 · 총 {articles.length}개
-          </p>
-        </div>
+      {/* ★ 가짜 헤더 대신 공통 헤더 (진짜 알림 · 새로 만들기 메뉴) */}
+      <Header
+        title="정리글 아카이브"
+        subtitle={`모든 정리글은 팀 전체에 공개됩니다 · 총 ${articles.length}개`}
+      />
 
-        <div className="flex items-center gap-3">
-          <div className="relative w-64">
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="정리글 · 질문 · 팀원 검색"
-              className="w-full pl-8 pr-3 py-1.5 bg-gray-100/80 rounded-lg text-xs focus:outline-none focus:bg-white border border-transparent focus:border-gray-300 transition"
-            />
-
-            <svg
-              className="w-4 h-4 text-gray-400 absolute left-2.5 top-2"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-          </div>
-
-          <div className="relative" ref={noticeRef}>
-            <button
-              onClick={() => setIsNoticeOpen((prev) => !prev)}
-              className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition relative"
-              aria-label="알림 목록 보기"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                />
-              </svg>
-            </button>
-
-            {isNoticeOpen && (
-              <div className="absolute right-0 top-11 w-96 bg-white rounded-3xl shadow-2xl border border-gray-100 p-5 z-50 animate-in fade-in duration-100">
-                <div className="flex justify-between items-center mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base font-extrabold text-gray-900">
-                      알림
-                    </span>
-                    <span className="bg-[#ef4444] text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full">
-                      안 읽음 0
-                    </span>
-                  </div>
-
-                  <button className="text-xs text-gray-400 hover:text-gray-600 font-medium">
-                    모두 읽음
-                  </button>
-                </div>
-
-                <div className="flex gap-4 border-b border-gray-100 text-xs font-bold text-gray-400">
-                  <button
-                    onClick={() => setNoticeTab("all")}
-                    className={`pb-2 transition relative ${
-                      noticeTab === "all"
-                        ? "text-gray-900 border-b-2 border-black"
-                        : "hover:text-gray-600"
-                    }`}
-                  >
-                    전체
-                  </button>
-
-                  <button
-                    onClick={() => setNoticeTab("unread")}
-                    className={`pb-2 transition relative ${
-                      noticeTab === "unread"
-                        ? "text-gray-900 border-b-2 border-black"
-                        : "hover:text-gray-600"
-                    }`}
-                  >
-                    안 읽음
-                  </button>
-
-                  <button
-                    onClick={() => setNoticeTab("mention")}
-                    className={`pb-2 transition relative ${
-                      noticeTab === "mention"
-                        ? "text-gray-900 border-b-2 border-black"
-                        : "hover:text-gray-600"
-                    }`}
-                  >
-                    멘션
-                  </button>
-                </div>
-
-                <div className="py-12 text-center text-xs font-medium text-gray-400">
-                  새로운 알림이 없습니다.
-                </div>
-
-                <div className="pt-3 border-t border-gray-100 flex justify-between items-center text-[11px] text-gray-400">
-                  <span>디스코드에서도 함께 받고 있습니다</span>
-                  <button className="font-bold text-gray-800 hover:text-black">
-                    알림 설정
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={() => setIsCreateMenuOpen(!isCreateMenuOpen)}
-              className="px-4 py-2 bg-[#191f28] text-white text-xs font-bold rounded-xl hover:bg-gray-800 transition flex items-center gap-1.5 shadow-sm"
-            >
-              <svg
-                className="w-3.5 h-3.5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2.5}
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-              <span>새로 만들기</span>
-            </button>
-
-            {isCreateMenuOpen && (
-              <div className="absolute right-0 top-11 w-60 bg-white rounded-2xl shadow-xl border border-gray-100 p-2.5 z-50 animate-in fade-in duration-100">
-                <div className="text-[11px] font-bold text-gray-400 px-3 py-1.5">
-                  새로 만들기
-                </div>
-
-                <div className="space-y-0.5">
-                  <button
-                    onClick={() => setIsCreateMenuOpen(false)}
-                    className="w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 rounded-xl transition"
-                  >
-                    <svg
-                      className="w-4 h-4 text-gray-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
-                    </svg>
-                    <span>일정 추가</span>
-                  </button>
-
-                  <button
-                    onClick={() => setIsCreateMenuOpen(false)}
-                    className="w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 rounded-xl transition"
-                  >
-                    <svg
-                      className="w-4 h-4 text-gray-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18c1.746 0 3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                      />
-                    </svg>
-                    <span>활동 개설</span>
-                  </button>
-
-                  <button
-                    onClick={() => setIsCreateMenuOpen(false)}
-                    className="w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 rounded-xl transition"
-                  >
-                    <svg
-                      className="w-4 h-4 text-gray-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 00-2-2v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                      />
-                    </svg>
-                    <span>공지 보내기</span>
-                  </button>
-
-                  <button
-                    onClick={() => setIsCreateMenuOpen(false)}
-                    className="w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 rounded-xl transition"
-                  >
-                    <svg
-                      className="w-4 h-4 text-gray-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                      />
-                    </svg>
-                    <span>과제 출제</span>
-                  </button>
-                </div>
-
-                <div className="my-2 border-t border-gray-100" />
-
-                <div className="text-[11px] font-bold text-gray-400 px-3 py-1.5">
-                  내 기록
-                </div>
-
-                <div className="space-y-0.5">
-                  <button
-                    onClick={() => {
-                      setIsCreateMenuOpen(false);
-                      navigate("/editor");
-                    }}
-                    className="w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 rounded-xl transition"
-                  >
-                    <svg
-                      className="w-4 h-4 text-gray-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                      />
-                    </svg>
-                    <span>정리글 작성</span>
-                  </button>
-
-                  <button
-                    onClick={() => setIsCreateMenuOpen(false)}
-                    className="w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 rounded-xl transition"
-                  >
-                    <svg
-                      className="w-4 h-4 text-gray-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 002 2h2a2 2 0 002-2"
-                      />
-                    </svg>
-                    <span>업무일지 쓰기</span>
-                  </button>
-
-                  <button
-                    onClick={() => setIsCreateMenuOpen(false)}
-                    className="w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 rounded-xl transition"
-                  >
-                    <svg
-                      className="w-4 h-4 text-gray-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 00-3-3V5a3 3 0 016 0v6a3 3 0 01-3 3"
-                      />
-                    </svg>
-                    <span>면접 답변 남기기</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
-
-      <div className="bg-white border-b border-gray-200 px-8 py-3 flex justify-between items-center shrink-0">
+      <div className="bg-white border-b border-gray-200 px-8 py-3 flex justify-between items-center gap-3 shrink-0">
         <div className="flex gap-1.5 text-xs font-semibold">
           <button
             onClick={() => handleTabChange("all")}
@@ -704,6 +390,31 @@ export default function ArchivePage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* ★ 검색창을 헤더에서 이 줄로 옮겼다 */}
+          <div className="relative w-56">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="정리글 검색"
+              className="w-full pl-8 pr-3 py-2 bg-gray-100/80 rounded-lg text-xs focus:outline-none focus:bg-white border border-transparent focus:border-gray-300 transition"
+            />
+
+            <svg
+              className="w-4 h-4 text-gray-400 absolute left-2.5 top-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+          </div>
+
           <Dropdown
             options={activityFilterOptions}
             value={selectedActivity}
@@ -988,6 +699,16 @@ export default function ArchivePage() {
           </form>
         </div>
       </div>
+
+      {/* ★ 정리글 목록·댓글·삭제 결과 토스트 */}
+      {toast && (
+        <Toast
+          key={toast.id}
+          message={toast.message}
+          type={toast.type}
+          onClose={closeToast}
+        />
+      )}
     </div>
   );
 }
