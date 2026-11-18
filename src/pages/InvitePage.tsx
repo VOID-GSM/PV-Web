@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import logoWhite from "../assets/images/logo-white.png";
 import linkIcon from "../assets/icons/link.svg";
 import alertIcon from "../assets/icons/alert.svg";
@@ -26,8 +26,18 @@ export interface InvitePageProps {
   onAddEvent?: (newEvent: CalendarEvent) => void;
 }
 
+// ★ 카드 안 안내 상자 하나의 모양 (빨강: 실패 / 파랑: 안내)
+type FormNotice = { type: "error" | "info"; text: string };
+
+// ★ 에러를 안내 문구로 바꾸기 (Error면 그 메시지, 아니면 기본 문구)
+const toErrorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
+
+// ★ 입장에 성공하면 페이지를 새로 열며 이동한다
+// (입장 화면에서는 토큰이 없어 일정·할 일을 못 불러온 상태라, 새 토큰으로 처음부터 다시 불러오게)
+const goToMain = () => window.location.replace("/today");
+
 const InvitePage: React.FC<InvitePageProps> = () => {
-  const navigate = useNavigate();
   const { code } = useParams<{ code: string }>();
 
   const [inviteInfo, setInviteInfo] = useState<InviteInfo | null>(null);
@@ -36,6 +46,11 @@ const InvitePage: React.FC<InvitePageProps> = () => {
   const [isReEntryOpen, setIsReEntryOpen] = useState(false);
   const [reEntryCode, setReEntryCode] = useState("");
   const [isReEntering, setIsReEntering] = useState(false);
+  // ★ 재입장 창 안에 띄울 실패 문구
+  const [reEntryError, setReEntryError] = useState("");
+
+  // ★ 카드 안 안내 상자 (null이면 안 보임)
+  const [formNotice, setFormNotice] = useState<FormNotice | null>(null);
 
   const [name, setName] = useState("");
   const [generation, setGeneration] = useState("");
@@ -60,11 +75,11 @@ const InvitePage: React.FC<InvitePageProps> = () => {
         console.error("초대 정보 조회 실패:", error);
 
         if (!cancelled) {
-          alert(
-            error instanceof Error
-              ? error.message
-              : "초대 정보를 불러오지 못했습니다.",
-          );
+          // ★ alert → 카드 안 빨간 안내
+          setFormNotice({
+            type: "error",
+            text: toErrorMessage(error, "초대 정보를 불러오지 못했습니다."),
+          });
         }
       });
 
@@ -117,7 +132,8 @@ const InvitePage: React.FC<InvitePageProps> = () => {
     if (nameError || generationError || departmentsError) return;
 
     if (!code || !inviteInfo) {
-      alert("유효한 초대 링크로 접속해 주세요.");
+      // ★ alert → 카드 안 빨간 안내
+      setFormNotice({ type: "error", text: "유효한 초대 링크로 접속해 주세요." });
       return;
     }
 
@@ -126,7 +142,8 @@ const InvitePage: React.FC<InvitePageProps> = () => {
     );
 
     if (!selectedGeneration) {
-      alert("초대 링크에서 제공한 기수를 선택해 주세요.");
+      // ★ alert → 카드 안 빨간 안내
+      setFormNotice({ type: "error", text: "초대 링크에서 제공한 기수를 선택해 주세요." });
       return;
     }
 
@@ -141,6 +158,8 @@ const InvitePage: React.FC<InvitePageProps> = () => {
     };
 
     setIsSubmitting(true);
+    // ★ 새로 보낼 때는 이전 안내를 지운다
+    setFormNotice(null);
 
     try {
       const result = await createJoinRequest(code, {
@@ -175,19 +194,22 @@ const InvitePage: React.FC<InvitePageProps> = () => {
       );
 
       if (result.status === "JOINED") {
-        alert("팀 입장이 완료되었습니다.");
-        navigate("/today");
+        // ★ alert 없이 바로 이동
+        goToMain();
       } else {
-        alert("가입 요청을 보냈습니다. 팀 관리자의 승인을 기다려 주세요.");
+        // ★ alert → 카드 안 파란 안내
+        setFormNotice({
+          type: "info",
+          text: "가입 요청을 보냈습니다. 팀 관리자의 승인을 기다려 주세요.",
+        });
       }
     } catch (error) {
       console.error("초대 가입 요청 실패:", error);
-
-      alert(
-        error instanceof Error
-          ? error.message
-          : "가입 요청을 보내지 못했습니다.",
-      );
+      // ★ alert → 카드 안 빨간 안내
+      setFormNotice({
+        type: "error",
+        text: toErrorMessage(error, "가입 요청을 보내지 못했습니다."),
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -197,11 +219,13 @@ const InvitePage: React.FC<InvitePageProps> = () => {
     const code = reEntryCode.trim();
 
     if (!code) {
-      alert("재입장 코드를 입력해 주세요.");
+      // ★ alert → 재입장 창 안 빨간 글씨
+      setReEntryError("재입장 코드를 입력해 주세요.");
       return;
     }
 
     setIsReEntering(true);
+    setReEntryError("");
 
     try {
       const result = await reEntryLink(code);
@@ -216,19 +240,21 @@ const InvitePage: React.FC<InvitePageProps> = () => {
       }
 
       if (result.status === "JOINED") {
-        setIsReEntryOpen(false);
-        alert("재입장이 완료되었습니다.");
-        navigate("/today");
+        // ★ alert 없이 바로 이동
+        goToMain();
       } else {
-        alert("재입장 요청을 보냈습니다. 팀 관리자의 승인을 기다려 주세요.");
+        // ★ 창을 닫고 카드 안 파란 안내
+        setIsReEntryOpen(false);
+        setFormNotice({
+          type: "info",
+          text: "재입장 요청을 보냈습니다. 팀 관리자의 승인을 기다려 주세요.",
+        });
       }
     } catch (error) {
       console.error("재입장 실패:", error);
-
-      alert(
-        error instanceof Error
-          ? error.message
-          : "재입장에 실패했습니다. 코드를 확인해 주세요.",
+      // ★ alert → 재입장 창 안 빨간 글씨
+      setReEntryError(
+        toErrorMessage(error, "재입장에 실패했습니다. 코드를 확인해 주세요."),
       );
     } finally {
       setIsReEntering(false);
@@ -396,6 +422,19 @@ const InvitePage: React.FC<InvitePageProps> = () => {
               </p>
             </div>
 
+            {/* ★ 실패·승인 대기 안내 상자 (alert 대신) */}
+            {formNotice && (
+              <p
+                className={`mt-4 rounded-[8px] px-4 py-3 text-[12px] font-medium leading-[1.5] ${
+                  formNotice.type === "error"
+                    ? "bg-red-50 text-red-600"
+                    : "bg-[#eaf3ff] text-[#4d78a8]"
+                }`}
+              >
+                {formNotice.text}
+              </p>
+            )}
+
             <button
               type="button"
               onClick={handleSubmit}
@@ -413,6 +452,8 @@ const InvitePage: React.FC<InvitePageProps> = () => {
                 type="button"
                 onClick={() => {
                   setReEntryCode("");
+                  // ★ 창을 열 때 이전 실패 문구 지우기
+                  setReEntryError("");
                   setIsReEntryOpen(true);
                 }}
                 className="cursor-pointer font-medium text-[#555] underline underline-offset-2"
@@ -443,15 +484,28 @@ const InvitePage: React.FC<InvitePageProps> = () => {
             <input
               autoFocus
               value={reEntryCode}
-              onChange={(e) => setReEntryCode(e.target.value)}
+              onChange={(e) => {
+                setReEntryCode(e.target.value);
+                // ★ 다시 입력하면 실패 문구 지우기
+                setReEntryError("");
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !isReEntering) {
                   void handleReEntry();
                 }
               }}
               placeholder="재입장 코드"
-              className="mt-6 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm outline-none focus:border-black"
+              className={`mt-6 h-11 w-full rounded-lg border px-3 text-sm outline-none ${
+                reEntryError
+                  ? "border-red-500 focus:border-red-500"
+                  : "border-gray-300 focus:border-black"
+              }`}
             />
+
+            {/* ★ 재입장 실패 문구 (alert 대신) */}
+            {reEntryError && (
+              <p className="mt-2 text-xs text-red-500">{reEntryError}</p>
+            )}
 
             <div className="mt-5 flex gap-3">
               <button
