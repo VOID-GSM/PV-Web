@@ -4,6 +4,8 @@ import React from "react";
 // → 서버 요청은 한 번만, 설정에서 이름을 바꾸면 사이드바도 바로 바뀐다
 import { useMyProfile } from "../../hooks/useMembers";
 import { MAJOR_LABEL } from "../../apis/interviews";
+// 프로필 사진(없으면 이름 첫 글자)
+import Avatar from "../common/Avatar";
 
 import logo from "../../assets/images/logo.svg";
 import homeIcon from "../../assets/icons/home.svg";
@@ -79,7 +81,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const displayName = me?.name ?? (saved.name?.trim() || "사용자");
   const displaySub = me
     ? `${me.generation}기 · ${me.majors.map((m) => MAJOR_LABEL[m]).join(", ")}`
-    : [saved.generation, saved.departments?.join(", ")].filter(Boolean).join(" · ");
+    : [saved.generation, saved.departments?.join(", ")]
+        .filter(Boolean)
+        .join(" · ");
 
   const currentActiveMenu =
     activeMenu || PATH_TO_MENU[location.pathname] || "오늘 할 일";
@@ -356,14 +360,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="mt-auto border-t border-gray-100 pt-3">
         <div className="flex items-center px-1">
           <div className="flex min-w-0 items-center gap-2.5">
-            {/* 이름 첫 글자 */}
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black text-xs font-bold text-white">
-              {displayName.charAt(0)}
-            </div>
+            {/* 프로필 사진 (없으면 이름 첫 글자) */}
+            <Avatar
+              memberId={me?.memberId}
+              name={displayName}
+              className="h-7 w-7 text-xs"
+            />
 
             {/* min-w-0 + truncate: 이름·전공이 길면 ...으로 줄인다 */}
             <div className="min-w-0">
-              <p className="truncate text-xs font-bold text-gray-900">{displayName}</p>
+              <p className="truncate text-xs font-bold text-gray-900">
+                {displayName}
+              </p>
               <p className="truncate text-[10px] text-gray-400">{displaySub}</p>
             </div>
           </div>
