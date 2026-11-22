@@ -1,3 +1,9 @@
+import {
+  goToPendingPage,
+  isPendingMemberError,
+  refreshSession,
+} from "./session";
+
 export const API_BASE_URL = "/api";
 
 export class ApiError extends Error {
@@ -15,38 +21,6 @@ export class ApiError extends Error {
 type RequestOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
 };
-
-let refreshPromise: Promise<boolean> | null = null;
-
-async function refreshAccessToken(): Promise<boolean> {
-  const refreshToken = localStorage.getItem("pvweb:refreshToken");
-
-  if (!refreshToken) return false;
-
-  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refreshToken }),
-  });
-
-  if (!response.ok) {
-    localStorage.removeItem("pvweb:accessToken");
-    localStorage.removeItem("pvweb:refreshToken");
-    return false;
-  }
-
-  const result = (await response.json()) as {
-    accessToken: string;
-    refreshToken: string;
-  };
-
-  if (!result.accessToken || !result.refreshToken) return false;
-
-  localStorage.setItem("pvweb:accessToken", result.accessToken);
-  localStorage.setItem("pvweb:refreshToken", result.refreshToken);
-
-  return true;
-}
 
 export async function apiRequest<T>(
   path: string,
@@ -80,16 +54,12 @@ export async function apiRequest<T>(
 
   let response = await sendRequest();
 
+  // 출입증이 만료됐으면(401) 한 번 재발급하고 다시 보낸다. (재발급 요청 자체는 제외)
+  // 재발급은 session.ts의 공용 함수를 쓴다. 서버가 안 열렸을 때는 토큰을 지우지 않는다.
   if (response.status === 401 && !path.endsWith("/auth/refresh")) {
-    if (!refreshPromise) {
-      refreshPromise = refreshAccessToken().finally(() => {
-        refreshPromise = null;
-      });
-    }
+    const result = await refreshSession();
 
-    const refreshed = await refreshPromise;
-
-    if (refreshed) {
+    if (result === "ok") {
       response = await sendRequest();
     }
   }
@@ -106,6 +76,13 @@ export async function apiRequest<T>(
       typeof payload === "object" && payload !== null && "message" in payload
         ? String((payload as { message: unknown }).message)
         : `API 요청에 실패했습니다. (${response.status})`;
+
+    // 가입 승인 대기 중인 사람은 승인 대기 화면으로 보낸다.
+    // 화면이 넘어가는 동안 에러가 화면에 전달되지 않게, 끝나지 않는 약속을 돌려준다.
+    if (isPendingMemberError(response.status, message)) {
+      goToPendingPage();
+      return new Promise<T>(() => {});
+    }
 
     throw new ApiError(message, response.status, payload);
   }
