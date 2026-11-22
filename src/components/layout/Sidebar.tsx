@@ -16,6 +16,7 @@ import fileTextIcon from "../../assets/icons/file-text.svg";
 import clipboardIcon from "../../assets/icons/clipboard.svg";
 import trendingUpIcon from "../../assets/icons/trending-up.svg";
 import usersIcon from "../../assets/icons/users.svg";
+import settingsIcon from "../../assets/icons/settings.svg";
 
 // 입장할 때 이 기기에 저장해 둔 프로필 (친구 코드)
 interface InviteProfile {
@@ -48,6 +49,7 @@ const MENU_TO_PATH: Record<string, string> = {
   "정리글 아카이브": "/archive",
   "주간 리포트": "/weekly-report",
   "팀원 관리": "/members",
+  설정: "/settings",
 };
 
 const PATH_TO_MENU: Record<string, string> = {
@@ -57,6 +59,7 @@ const PATH_TO_MENU: Record<string, string> = {
   "/archive": "정리글 아카이브",
   "/weekly-report": "주간 리포트",
   "/members": "팀원 관리",
+  "/settings": "설정",
 };
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -356,10 +359,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
       </div>
 
-      {/* ★ 아래 프로필: 들어온 사람의 정보 (필터 버튼은 친구 코드처럼 뺐다) */}
+      {/* ★ 아래 프로필: 들어온 사람의 정보. 누르면 설정(내 프로필·재입장 코드 등)으로 간다 */}
       <div className="mt-auto border-t border-gray-100 pt-3">
-        <div className="flex items-center px-1">
-          <div className="flex min-w-0 items-center gap-2.5">
+        <button
+          type="button"
+          onClick={() => handleMenuClick("설정")}
+          title="내 프로필 · 설정"
+          className={`flex w-full items-center justify-between gap-2 rounded-xl px-1.5 py-1.5 text-left transition hover:bg-gray-100 ${
+            currentActiveMenu === "설정" ? "bg-gray-100" : ""
+          }`}
+        >
+          <span className="flex min-w-0 items-center gap-2.5">
             {/* 프로필 사진 (없으면 이름 첫 글자) */}
             <Avatar
               memberId={me?.memberId}
@@ -368,14 +378,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
             />
 
             {/* min-w-0 + truncate: 이름·전공이 길면 ...으로 줄인다 */}
-            <div className="min-w-0">
-              <p className="truncate text-xs font-bold text-gray-900">
+            <span className="min-w-0">
+              <span className="block truncate text-xs font-bold text-gray-900">
                 {displayName}
-              </p>
-              <p className="truncate text-[10px] text-gray-400">{displaySub}</p>
-            </div>
-          </div>
-        </div>
+              </span>
+              <span className="block truncate text-[10px] text-gray-400">
+                {displaySub}
+              </span>
+            </span>
+          </span>
+
+          {/* 눌러서 설정으로 갈 수 있다는 표시 */}
+          <img
+            src={settingsIcon}
+            alt=""
+            className="h-4 w-4 shrink-0 opacity-40"
+          />
+        </button>
       </div>
     </aside>
   );

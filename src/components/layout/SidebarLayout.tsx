@@ -75,8 +75,8 @@ export default function SidebarLayout({
     if (pathname.startsWith("/weekly-report") || pathname.startsWith("/report"))
       return "주간 리포트";
     if (pathname.startsWith("/invite")) return "팀원 초대";
-    // 설정 화면은 사이드바에 "설정" 메뉴가 없어서 "팀원 관리"에 불을 켠다
-    if (pathname.startsWith("/settings")) return "팀원 관리";
+    // 설정 화면은 사이드바 아래 내 프로필 영역으로 들어가서 거기에 불을 켠다
+    if (pathname.startsWith("/settings")) return "설정";
     return "";
   };
 
