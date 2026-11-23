@@ -9,8 +9,20 @@ import {
   proposeTopicCandidate,
   voteTopicCandidate,
   cancelTopicVote,
+  getActivityApplications,
+  applyToActivity,
+  cancelActivityApplication,
+  approveActivityApplication,
+  rejectActivityApplication,
+  updateActivity,
+  type ActivityApplication,
+  type ActivityDetail,
+  type ActivityMember,
   type ActivitySummary,
+  type ActivityUpdateRequest,
+  type ApplicationStatus,
 } from "../api/activityApi";
+import { ApiError } from "../api/client";
 import {
   getPendingAbsences,
   approveAbsence,
@@ -19,7 +31,14 @@ import {
 import { createComment } from "../api/commentApi";
 import { createPost, getPost, getPosts } from "../api/postApi";
 import { getNotice, getNotices, type NoticeItem } from "../api/noticeApi";
+import { useMyProfile } from "../hooks/useMembers";
+import {
+  formatActivityPeriod,
+  formatActivitySchedule,
+  formatTopicRule,
+} from "../utils/activitySchedule";
 import { Header } from "../components/layout/Header";
+import ConfirmModal from "../components/common/ConfirmModal";
 import CreateNoticeModal from "../components/modals/CreateNoticeModal";
 import AbsenceRequestModal from "../components/modals/AbsenceRequestModal";
 import CreateArticleModal from "../components/modals/CreateArticleModal";
@@ -65,18 +84,31 @@ type ActivityNotice = NoticeItem & {
 
 const TABS = ["회차", "참여자", "출석 현황", "정리글", "공지"];
 
+const PAGE_SUBTITLE = "모든 보드의 마감·회의·활동을 한 화면에서";
+
 export default function ActivityDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const activityId = Number(id);
 
+  // 내 정보 (내 회원 번호와 부장 여부를 알기 위해 쓴다)
+  const profileQuery = useMyProfile();
+  const me = profileQuery.data;
+
   const [activeTab, setActiveTab] = useState("회차");
+
+  // 서버에서 받은 활동 상세 (설정 창과 권한 판단에 쓴다)
+  const [detail, setDetail] = useState<ActivityDetail | null>(null);
+  // notFound: 대상이 아니거나 없는 활동(404) / failed: 그 밖의 오류
+  const [loadError, setLoadError] = useState<"notFound" | "failed" | null>(
+    null,
+  );
 
   const [activityTitle, setActivityTitle] = useState("활동 제목 없음");
   const [activitySchedule, setActivitySchedule] = useState("일정 미정");
   const [activityPeriod, setActivityPeriod] = useState("기간 미정");
   const [activityRule, setActivityRule] = useState("규칙 미정");
-  const [members, setMembers] = useState<string[]>([]);
+  const [members, setMembers] = useState<ActivityMember[]>([]);
   const [allActivities, setAllActivities] = useState<ActivitySummary[]>([]);
 
   const [sessions, setSessions] = useState<SessionItem[]>([]);
@@ -150,6 +182,241 @@ export default function ActivityDetailPage() {
   const [isCreateArticleOpen, setIsCreateArticleOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
+  // ─────────────────────────────────────────────
+  // 참여 신청 (신청하기 / 신청 취소 / 나가기 / 스터디장의 승인·거절)
+  // ─────────────────────────────────────────────
+  // 스터디장이 보는 참여 신청 목록 (어느 활동의 목록인지 같이 기억해서 다른 활동 것이 섞이지 않게 한다)
+  const [applicationsState, setApplicationsState] = useState<{
+    activityId: number;
+    items: ActivityApplication[];
+  } | null>(null);
+  // 서버가 내 신청 상태를 아직 안 줄 때를 위해, 신청 직후 응답으로 알게 된 상태를 임시로 기억한다
+  const [localApplication, setLocalApplication] = useState<{
+    activityId: number;
+    status: ApplicationStatus;
+  } | null>(null);
+  const [isApplying, setIsApplying] = useState(false);
+  const [processingApplicationId, setProcessingApplicationId] = useState<
+    number | null
+  >(null);
+  // 확인 창: leave(활동 나가기) / cancel(신청 취소)
+  const [confirmAction, setConfirmAction] = useState<"leave" | "cancel" | null>(
+    null,
+  );
+  const closeConfirm = useCallback(() => setConfirmAction(null), []);
+
+  // 지금 보고 있는 활동의 상세 (다른 활동 상세가 잠깐 남아 있어도 섞이지 않게 번호를 확인한다)
+  const currentDetail =
+    detail && detail.summary.id === activityId ? detail : null;
+
+  // 내 권한
+  // - 부장: 내 정보의 roles에 LEADER가 있다
+  // - 스터디장: 이 활동 참여자 목록에서 내 role이 LEADER다
+  const myId = me?.memberId;
+  const isSystemLeader = me?.roles.includes("LEADER") ?? false;
+  const myActivityRole = members.find(
+    (member) => member.memberId === myId,
+  )?.role;
+  const canManage = isSystemLeader || myActivityRole === "LEADER";
+  // 이 활동에 참여 중인지 (서버가 알려주는 값을 우선한다)
+  const isMember =
+    currentDetail?.summary.isMember ??
+    members.some((member) => member.memberId === myId);
+
+  // 내 신청 상태: 서버 값이 있으면 그걸 쓰고, 없으면 신청 직후 응답으로 기억한 값을 쓴다
+  const serverApplicationStatus =
+    currentDetail?.summary.myApplicationStatus ??
+    currentDetail?.myApplicationStatus;
+  const myApplicationStatus: ApplicationStatus | null =
+    serverApplicationStatus ??
+    (localApplication?.activityId === activityId
+      ? localApplication.status
+      : null);
+
+  const applications =
+    applicationsState?.activityId === activityId ? applicationsState.items : [];
+  const pendingApplications = applications.filter(
+    (application) => application.status === "PENDING",
+  );
+
+  // 서버에서 받은 활동 상세를 화면에 반영한다
+  const applyDetail = useCallback((nextDetail: ActivityDetail) => {
+    setDetail(nextDetail);
+    setLoadError(null);
+    setActivityTitle(nextDetail.summary.name);
+    setActivitySchedule(formatActivitySchedule(nextDetail));
+    setActivityPeriod(formatActivityPeriod(nextDetail.summary));
+    setActivityRule(formatTopicRule(nextDetail));
+  }, []);
+
+  // 활동 상세와 참여자만 다시 불러온다 (신청·승인·설정 저장 뒤에 쓴다)
+  const refreshActivityInfo = useCallback(async () => {
+    if (!Number.isFinite(activityId)) return;
+
+    try {
+      const [nextDetail, nextMembers] = await Promise.all([
+        getActivity(activityId),
+        getActivityMembers(activityId),
+      ]);
+      applyDetail(nextDetail);
+      setMembers(nextMembers);
+    } catch (error) {
+      console.error("활동 정보 새로고침 실패:", error);
+    }
+  }, [activityId, applyDetail]);
+
+  // 스터디장·부장일 때만 참여 신청 목록을 불러온다 (다른 사람은 서버가 403을 준다)
+  useEffect(() => {
+    if (!canManage || !id || !Number.isFinite(activityId)) return;
+
+    let cancelled = false;
+
+    getActivityApplications(activityId)
+      .then((list) => {
+        if (!cancelled) {
+          setApplicationsState({ activityId, items: list ?? [] });
+        }
+      })
+      .catch((error: unknown) =>
+        console.error("참여 신청 목록 조회 실패:", error),
+      );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canManage, id, activityId]);
+
+  const handleApply = async () => {
+    if (!Number.isFinite(activityId)) return;
+
+    try {
+      setIsApplying(true);
+      const result = await applyToActivity(activityId);
+      const status =
+        (result?.status as ApplicationStatus | undefined) ?? "PENDING";
+
+      setLocalApplication({ activityId, status });
+      await refreshActivityInfo();
+
+      showToast(
+        status === "APPROVED"
+          ? "활동에 참여했습니다."
+          : "참여 신청을 보냈습니다. 스터디장의 승인을 기다려 주세요.",
+        "success",
+      );
+    } catch (error) {
+      console.error("참여 신청 실패:", error);
+      // 이미 신청했거나 정원이 찬 경우(409) 등은 서버가 보낸 메시지를 그대로 보여준다
+      showToast(
+        error instanceof Error
+          ? error.message
+          : "참여 신청을 보내지 못했습니다.",
+      );
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
+  // 신청 취소 / 활동 나가기 (서버에서는 같은 API: 참여 중이면 나가기도 된다)
+  const handleCancelApplication = async () => {
+    if (!Number.isFinite(activityId)) return;
+    const wasMember = isMember;
+
+    try {
+      setIsApplying(true);
+      await cancelActivityApplication(activityId);
+
+      setLocalApplication(null);
+      await refreshActivityInfo();
+
+      showToast(
+        wasMember ? "활동에서 나갔습니다." : "참여 신청을 취소했습니다.",
+        "success",
+      );
+    } catch (error) {
+      console.error("신청 취소 실패:", error);
+      showToast(
+        error instanceof Error ? error.message : "요청을 처리하지 못했습니다.",
+      );
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
+  // 스터디장의 승인 / 거절 (대기 중이 아니거나 정원이 차면 서버가 409를 준다)
+  const handleApplicationDecision = async (
+    application: ActivityApplication,
+    decision: "approve" | "reject",
+  ) => {
+    try {
+      setProcessingApplicationId(application.id);
+
+      if (decision === "approve") {
+        await approveActivityApplication(activityId, application.id);
+      } else {
+        await rejectActivityApplication(activityId, application.id);
+      }
+
+      // 처리한 신청을 목록에서 대기 중이 아닌 것으로 바꾼다
+      setApplicationsState((prev) =>
+        prev && prev.activityId === activityId
+          ? {
+              ...prev,
+              items: prev.items.map((item) =>
+                item.id === application.id
+                  ? {
+                      ...item,
+                      status: decision === "approve" ? "APPROVED" : "REJECTED",
+                    }
+                  : item,
+              ),
+            }
+          : prev,
+      );
+
+      // 승인하면 참여자와 인원 수가 바뀐다
+      if (decision === "approve") await refreshActivityInfo();
+
+      showToast(
+        decision === "approve"
+          ? `${application.name}님의 참여를 승인했습니다.`
+          : `${application.name}님의 신청을 거절했습니다.`,
+        "success",
+      );
+    } catch (error) {
+      console.error("참여 신청 처리 실패:", error);
+      showToast(
+        error instanceof Error ? error.message : "요청을 처리하지 못했습니다.",
+      );
+    } finally {
+      setProcessingApplicationId(null);
+    }
+  };
+
+  // 활동 설정 저장 (바뀐 항목만 넘어온다)
+  const handleSaveSettings = async (changes: ActivityUpdateRequest) => {
+    try {
+      await updateActivity(activityId, changes);
+      await refreshActivityInfo();
+      // 활동 선택 칩의 이름·상태도 바뀔 수 있어서 목록을 다시 불러온다
+      getActivities()
+        .then((list) => setAllActivities(list ?? []))
+        .catch((error: unknown) =>
+          console.error("활동 목록 조회 실패:", error),
+        );
+      showToast("활동 설정을 저장했습니다.", "success");
+      return true;
+    } catch (error) {
+      console.error("활동 설정 저장 실패:", error);
+      showToast(
+        error instanceof Error
+          ? error.message
+          : "활동 설정을 저장하지 못했습니다.",
+      );
+      return false;
+    }
+  };
+
   const refreshNotices = useCallback(async () => {
     if (!id || !Number.isFinite(activityId)) return;
 
@@ -198,14 +465,14 @@ export default function ActivityDetailPage() {
         return next;
       });
 
-      const detail = await getNotice(noticeId);
+      const noticeDetail = await getNotice(noticeId);
       setNotices((previous) =>
         previous.map((notice) =>
-          notice.id === noticeId ? { ...notice, ...detail } : notice,
+          notice.id === noticeId ? { ...notice, ...noticeDetail } : notice,
         ),
       );
 
-      if (!detail.content?.trim()) {
+      if (!noticeDetail.content?.trim()) {
         setNoticeDetailErrors((previous) => ({
           ...previous,
           [noticeId]: "상세 조회 응답에 공지 내용(content)이 없습니다.",
@@ -304,29 +571,21 @@ export default function ActivityDetailPage() {
 
     const loadActivity = async () => {
       try {
-        const [detail, apiSessions, apiMembers, absences] = await Promise.all([
-          getActivity(currentActivityId),
-          getActivitySessions(currentActivityId),
-          getActivityMembers(currentActivityId),
-          getPendingAbsences().catch((error: unknown) => {
-            console.error("결석 요청 조회 실패:", error);
-            return [];
-          }),
-        ]);
+        const [nextDetail, apiSessions, apiMembers, absences] =
+          await Promise.all([
+            getActivity(currentActivityId),
+            getActivitySessions(currentActivityId),
+            getActivityMembers(currentActivityId),
+            getPendingAbsences().catch((error: unknown) => {
+              console.error("결석 요청 조회 실패:", error);
+              return [];
+            }),
+          ]);
 
         if (cancelled) return;
 
-        setActivityTitle(detail.summary.name);
-        setActivitySchedule(
-          detail.summary.statusLabel || detail.summary.status || "일정 미정",
-        );
-        setActivityPeriod(
-          `${detail.summary.startDate ?? ""} ~ ${detail.summary.endDate ?? ""}`,
-        );
-        setActivityRule(
-          detail.topicModeLabel || detail.topicMode || "규칙 미정",
-        );
-        setMembers(apiMembers.map((member) => member.name));
+        applyDetail(nextDetail);
+        setMembers(apiMembers);
 
         const mappedSessions: SessionItem[] = apiSessions.map((session) => ({
           id: String(session.id),
@@ -423,7 +682,13 @@ export default function ActivityDetailPage() {
       } catch (error) {
         console.error("활동 상세 API 조회 실패:", error);
         if (!cancelled) {
-          setActivityTitle("활동 정보를 불러오지 못했습니다");
+          // 대상이 아닌 사람이 주소로 들어오면 서버가 404를 준다
+          if (error instanceof ApiError && error.status === 404) {
+            setLoadError("notFound");
+          } else {
+            setLoadError("failed");
+            setActivityTitle("활동 정보를 불러오지 못했습니다");
+          }
         }
       }
     };
@@ -433,7 +698,7 @@ export default function ActivityDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, navigate, refreshTopicCandidates]);
+  }, [id, navigate, refreshTopicCandidates, applyDetail]);
 
   const handleProposeTopic = () => {
     if (!id || !sessions[0]) {
@@ -484,11 +749,11 @@ export default function ActivityDetailPage() {
 
   const handleVoteCandidate = async () => {
     if (!id || !sessions[0]) {
-      alert("투표할 회차가 없습니다.");
+      showToast("투표할 회차가 없습니다.");
       return;
     }
     if (selectedVoteOption === null) {
-      alert("투표할 주제를 선택해 주세요.");
+      showToast("투표할 주제를 선택해 주세요.");
       return;
     }
 
@@ -518,7 +783,7 @@ export default function ActivityDetailPage() {
       await refreshTopicCandidates(activityId, sessionId);
     } catch (error) {
       console.error("주제 투표 실패:", error);
-      alert(
+      showToast(
         error instanceof Error ? error.message : "투표를 저장하지 못했습니다.",
       );
     } finally {
@@ -534,7 +799,7 @@ export default function ActivityDetailPage() {
       );
     } catch (error) {
       console.error("결석 요청 승인 실패:", error);
-      alert(
+      showToast(
         error instanceof Error
           ? error.message
           : "결석 요청을 승인하지 못했습니다.",
@@ -553,7 +818,7 @@ export default function ActivityDetailPage() {
       );
     } catch (error) {
       console.error("결석 요청 거절 실패:", error);
-      alert(
+      showToast(
         error instanceof Error
           ? error.message
           : "결석 요청을 거절하지 못했습니다.",
@@ -593,7 +858,7 @@ export default function ActivityDetailPage() {
       );
     } catch (error) {
       console.error("정리글 피드백 작성 실패:", error);
-      alert(
+      showToast(
         error instanceof Error
           ? error.message
           : "피드백을 저장하지 못했습니다.",
@@ -601,12 +866,105 @@ export default function ActivityDetailPage() {
     }
   };
 
+  // 참여 상태에 따라 보여줄 버튼 (참여 신청 / 승인 대기 + 신청 취소 / 활동 나가기)
+  const membershipControl = (() => {
+    if (!currentDetail) return null;
+
+    const isRecruiting = currentDetail.summary.status === "RECRUITING";
+
+    // 참여 중: 일반 팀원은 나갈 수 있다. 스터디장은 서버가 409를 줘서 버튼을 숨긴다.
+    if (isMember) {
+      if (myActivityRole === "LEADER") return null;
+      return (
+        <button
+          type="button"
+          onClick={() => setConfirmAction("leave")}
+          disabled={isApplying}
+          className="cursor-pointer rounded-xl border border-gray-200 px-4 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        >
+          활동 나가기
+        </button>
+      );
+    }
+
+    if (myApplicationStatus === "PENDING") {
+      return (
+        <>
+          <span className="rounded-xl bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
+            승인 대기 중
+          </span>
+          <button
+            type="button"
+            onClick={() => setConfirmAction("cancel")}
+            disabled={isApplying}
+            className="cursor-pointer rounded-xl border border-gray-200 px-4 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            신청 취소
+          </button>
+        </>
+      );
+    }
+
+    if (!isRecruiting) {
+      return (
+        <span className="text-xs font-medium text-gray-400">
+          모집이 끝난 활동입니다
+        </span>
+      );
+    }
+
+    return (
+      <>
+        {myApplicationStatus === "REJECTED" && (
+          <span className="rounded-xl bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600">
+            신청이 거절되었습니다
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => void handleApply()}
+          disabled={isApplying}
+          className="cursor-pointer rounded-xl bg-black px-4 py-2 text-xs font-bold text-white hover:bg-gray-800 disabled:opacity-50"
+        >
+          {isApplying
+            ? "처리 중..."
+            : myApplicationStatus === "REJECTED"
+              ? "다시 신청"
+              : "참여 신청"}
+        </button>
+      </>
+    );
+  })();
+
+  // 대상이 아니거나 없는 활동(404)
+  if (loadError === "notFound") {
+    return (
+      <div className="flex h-screen flex-1 flex-col overflow-hidden bg-[#f8f9fa] font-pretendard select-none">
+        <Header title="활동" subtitle={PAGE_SUBTITLE} />
+
+        <div className="flex-1 space-y-6 overflow-y-auto p-8">
+          <ActivitySwitcher
+            activities={allActivities}
+            currentId={activityId}
+            onSelect={(nextId) => navigate(`/activity/${nextId}`)}
+          />
+
+          <div className="rounded-3xl border border-gray-100 bg-white p-16 text-center shadow-xs">
+            <p className="text-base font-bold text-gray-900">
+              볼 수 없는 활동입니다
+            </p>
+            <p className="mt-2 text-xs text-gray-400">
+              대상이 아니거나 삭제된 활동이에요. 다른 활동을 선택해 주세요.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen flex-1 flex-col overflow-hidden bg-[#f8f9fa] font-pretendard select-none">
-      <Header
-        title={activityTitle}
-        subtitle="모든 보드의 마감·회의·활동을 한 화면에서"
-      />
+      <Header title={activityTitle} subtitle={PAGE_SUBTITLE} />
 
       <div className="flex-1 space-y-6 overflow-y-auto p-8">
         {/* 활동 선택 칩 (활동이 2개 이상일 때만 표시됨) */}
@@ -619,9 +977,23 @@ export default function ActivityDetailPage() {
         <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-xs">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-black text-gray-900">
-                {activityTitle}
-              </h1>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-black text-gray-900">
+                  {activityTitle}
+                </h1>
+                {currentDetail && (
+                  <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-bold text-gray-600">
+                    {currentDetail.summary.statusLabel ||
+                      currentDetail.summary.status}
+                  </span>
+                )}
+              </div>
+
+              {currentDetail?.description?.trim() && (
+                <p className="mt-2 max-w-[560px] text-xs leading-relaxed text-gray-500">
+                  {currentDetail.description}
+                </p>
+              )}
 
               <div className="mt-3 flex flex-wrap items-center gap-4 text-xs font-medium text-gray-400">
                 <span className="flex items-center gap-1.5">
@@ -653,15 +1025,17 @@ export default function ActivityDetailPage() {
               <div className="mt-4 flex items-center gap-2 text-xs">
                 <span className="font-bold text-gray-700">
                   참여자 {members.length}명
+                  {currentDetail &&
+                    ` / 정원 ${currentDetail.summary.capacity}명`}
                 </span>
                 {members.length > 0 && (
                   <div className="flex -space-x-1.5">
-                    {members.map((member, index) => (
+                    {members.map((member) => (
                       <div
-                        key={`${member}-${index}`}
+                        key={member.memberId}
                         className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-black text-[10px] font-bold text-white"
                       >
-                        {member[0] ?? "?"}
+                        {member.name[0] ?? "?"}
                       </div>
                     ))}
                   </div>
@@ -669,30 +1043,42 @@ export default function ActivityDetailPage() {
               </div>
             </div>
 
-            <div className="flex shrink-0 items-center gap-3">
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-3">
               <span className="rounded-xl bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-600">
                 평균 출석률 0%
               </span>
-              <button
-                type="button"
-                onClick={() => setIsNoticeModalOpen(true)}
-                className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-gray-200 px-4 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50"
-              >
-                <img src={bellIcon} alt="" className="h-3.5 w-3.5 opacity-70" />
-                공지 보내기
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsSettingsModalOpen(true)}
-                className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-gray-200 px-4 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50"
-              >
-                <img
-                  src={settingsIcon}
-                  alt=""
-                  className="h-3.5 w-3.5 opacity-70"
-                />
-                활동 설정
-              </button>
+
+              {membershipControl}
+
+              {/* 공지·설정은 부장과 이 활동의 스터디장만 쓸 수 있다 (서버도 403으로 막는다) */}
+              {canManage && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setIsNoticeModalOpen(true)}
+                    className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-gray-200 px-4 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50"
+                  >
+                    <img
+                      src={bellIcon}
+                      alt=""
+                      className="h-3.5 w-3.5 opacity-70"
+                    />
+                    공지 보내기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsSettingsModalOpen(true)}
+                    className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-gray-200 px-4 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50"
+                  >
+                    <img
+                      src={settingsIcon}
+                      alt=""
+                      className="h-3.5 w-3.5 opacity-70"
+                    />
+                    활동 설정
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -765,17 +1151,22 @@ export default function ActivityDetailPage() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-3">
-                    {members.map((member, index) => (
+                    {members.map((member) => (
                       <div
-                        key={`${member}-${index}`}
+                        key={member.memberId}
                         className="flex items-center gap-3 rounded-2xl bg-gray-50 p-3"
                       >
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-black text-xs font-bold text-white">
-                          {member[0] ?? "?"}
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black text-xs font-bold text-white">
+                          {member.name[0] ?? "?"}
                         </div>
-                        <span className="text-xs font-bold text-gray-800">
-                          {member}
+                        <span className="min-w-0 truncate text-xs font-bold text-gray-800">
+                          {member.name}
                         </span>
+                        {member.role === "LEADER" && (
+                          <span className="ml-auto shrink-0 rounded-full bg-black px-2 py-0.5 text-[10px] font-bold text-white">
+                            {member.roleLabel || "스터디장"}
+                          </span>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -848,14 +1239,20 @@ export default function ActivityDetailPage() {
                   <h3 className="text-sm font-bold text-gray-900">
                     공지사항 ({notices.length})
                   </h3>
-                  <button
-                    type="button"
-                    onClick={() => setIsNoticeModalOpen(true)}
-                    className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-black px-4 py-2 text-xs font-bold text-white transition hover:bg-gray-800"
-                  >
-                    <img src={plusIcon} alt="" className="h-3.5 w-3.5 invert" />
-                    공지 작성
-                  </button>
+                  {canManage && (
+                    <button
+                      type="button"
+                      onClick={() => setIsNoticeModalOpen(true)}
+                      className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-black px-4 py-2 text-xs font-bold text-white transition hover:bg-gray-800"
+                    >
+                      <img
+                        src={plusIcon}
+                        alt=""
+                        className="h-3.5 w-3.5 invert"
+                      />
+                      공지 작성
+                    </button>
+                  )}
                 </div>
 
                 {isLoadingNotices ? (
@@ -1053,6 +1450,77 @@ export default function ActivityDetailPage() {
               )}
             </div>
 
+            {/* 참여 신청 대기: 부장과 이 활동의 스터디장에게만 보인다 */}
+            {canManage && (
+              <div className="space-y-3 rounded-3xl border border-gray-100 bg-white p-5 text-xs shadow-xs">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-gray-900">
+                    참여 신청 대기
+                  </h3>
+                  <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                    {pendingApplications.length}건
+                  </span>
+                </div>
+
+                {pendingApplications.length === 0 ? (
+                  <p className="py-8 text-center text-gray-400">
+                    대기 중인 참여 신청이 없습니다.
+                  </p>
+                ) : (
+                  pendingApplications.map((application) => (
+                    <div
+                      key={application.id}
+                      className="space-y-2 rounded-2xl border border-gray-100 bg-gray-50 p-4"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-black text-[10px] font-bold text-white">
+                          {application.name[0] ?? "?"}
+                        </div>
+                        <span className="min-w-0 truncate font-bold text-gray-900">
+                          {application.name}
+                        </span>
+                        <span className="ml-auto shrink-0 text-gray-400">
+                          {application.createdAt
+                            ? new Date(
+                                application.createdAt,
+                              ).toLocaleDateString("ko-KR")
+                            : ""}
+                        </span>
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          type="button"
+                          disabled={processingApplicationId !== null}
+                          onClick={() =>
+                            void handleApplicationDecision(
+                              application,
+                              "approve",
+                            )
+                          }
+                          className="flex-1 rounded-xl bg-black py-1.5 font-bold text-white transition hover:bg-gray-800 disabled:opacity-50"
+                        >
+                          승인
+                        </button>
+                        <button
+                          type="button"
+                          disabled={processingApplicationId !== null}
+                          onClick={() =>
+                            void handleApplicationDecision(
+                              application,
+                              "reject",
+                            )
+                          }
+                          className="flex-1 rounded-xl border border-gray-200 py-1.5 font-bold text-gray-600 transition hover:bg-gray-100 disabled:opacity-50"
+                        >
+                          거절
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
             <div className="space-y-3 rounded-3xl border border-gray-100 bg-white p-5 text-xs shadow-xs">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold text-gray-900">
@@ -1167,6 +1635,28 @@ export default function ActivityDetailPage() {
         </div>
       )}
 
+      {/* 활동 나가기 / 신청 취소 확인 창 */}
+      {confirmAction && (
+        <ConfirmModal
+          title={
+            confirmAction === "leave"
+              ? "활동에서 나갈까요?"
+              : "참여 신청을 취소할까요?"
+          }
+          message={
+            confirmAction === "leave"
+              ? "나간 뒤에 다시 참여하려면 새로 신청해야 합니다."
+              : "취소한 뒤에도 다시 신청할 수 있습니다."
+          }
+          confirmLabel={confirmAction === "leave" ? "나가기" : "신청 취소"}
+          onConfirm={() => {
+            setConfirmAction(null);
+            void handleCancelApplication();
+          }}
+          onCancel={closeConfirm}
+        />
+      )}
+
       {/* Toast 알림 */}
       {toast && (
         <div
@@ -1244,7 +1734,7 @@ export default function ActivityDetailPage() {
             setIsCreateArticleOpen(false);
           } catch (error) {
             console.error("활동 정리글 생성 실패:", error);
-            alert(
+            showToast(
               error instanceof Error
                 ? error.message
                 : "정리글을 생성하지 못했습니다.",
@@ -1256,12 +1746,8 @@ export default function ActivityDetailPage() {
       <ActivitySettingsModal
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
-        onSave={(data) => {
-          if (data.title) setActivityTitle(data.title);
-          if (data.schedule) setActivitySchedule(data.schedule);
-          if (data.period) setActivityPeriod(data.period);
-          if (data.rule) setActivityRule(data.rule);
-        }}
+        activity={currentDetail}
+        onSave={handleSaveSettings}
       />
 
       <ArticleDetailModal
