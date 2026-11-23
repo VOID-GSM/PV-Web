@@ -1,5 +1,9 @@
 import { useState } from "react";
-import { useProfileImageUrl } from "../../hooks/useProfileImage";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  profileImageKeys,
+  useProfileImageUrl,
+} from "../../hooks/useProfileImage";
 
 interface AvatarProps {
   // 멤버 번호. 없으면 서버에 묻지 않고 이름 첫 글자만 보여준다
@@ -21,11 +25,26 @@ export default function Avatar({
   name,
   className = "h-8 w-8 text-xs",
 }: AvatarProps) {
+  const queryClient = useQueryClient();
   const url = useProfileImageUrl(memberId);
 
   // 사진 주소가 막혔거나(만료) 깨졌을 때 이름 첫 글자로 돌아가기 위해 실패한 주소를 기억한다
   // 새 주소를 받으면 (실패한 주소와 달라지므로) 다시 사진을 보여준다
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  // 깨졌을 때 새 주소를 받아 보는 건 아바타당 한 번만 한다 (계속 실패하는 사진으로 반복 요청하지 않게)
+  const [hasRetried, setHasRetried] = useState(false);
+
+  const handleImageError = () => {
+    setFailedUrl(url);
+
+    if (!hasRetried && typeof memberId === "number") {
+      setHasRetried(true);
+      // 서버에서 새 주소를 다시 받는다 (만료된 주소가 원인일 때 복구된다)
+      void queryClient.invalidateQueries({
+        queryKey: profileImageKeys.one(memberId),
+      });
+    }
+  };
 
   return (
     <div
@@ -36,7 +55,7 @@ export default function Avatar({
           src={url}
           alt=""
           draggable={false}
-          onError={() => setFailedUrl(url)}
+          onError={handleImageError}
           className="h-full w-full object-cover"
         />
       ) : (

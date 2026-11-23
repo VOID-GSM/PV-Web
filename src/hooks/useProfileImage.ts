@@ -28,7 +28,7 @@ export function useProfileImageUrl(
 ): string | null {
   const id = typeof memberId === "number" ? memberId : null;
 
-  const query = useQuery<ProfileImageEntry>({
+  const query = useQuery<ProfileImageEntry, Error, string | null>({
     queryKey: profileImageKeys.one(id ?? 0),
     queryFn: () => loadProfileImage(id as number),
     // 멤버 번호가 없으면 서버에 묻지 않는다
@@ -44,7 +44,10 @@ export function useProfileImageUrl(
       const entry = q.state.data;
       return entry?.url ? Math.max(30_000, msUntilRefresh(entry)) : false;
     },
+    // 이미 만료된 주소로 사진을 불러오면 403으로 깨지므로, 만료된 주소는 화면에 쓰지 않는다
+    select: (entry) =>
+      entry.url !== null && entry.expiresAt > Date.now() ? entry.url : null,
   });
 
-  return query.data?.url ?? null;
+  return query.data ?? null;
 }
