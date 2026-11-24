@@ -37,7 +37,6 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
   const [generations, setGenerations] = useState<string[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
   const [memberCount, setMemberCount] = useState("");
-  const [discordEnabled, setDiscordEnabled] = useState(false);
 
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -124,7 +123,6 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
       return;
     }
 
-
     onCreateSuccess?.({
       title,
       type,
@@ -140,26 +138,8 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
       discordEnabled,
     });
 
-
-    if (onCreateSuccess) {
-      onCreateSuccess({
-        title,
-        type,
-        generations,
-        departments,
-        memberCount,
-        startDate,
-        endDate,
-        repeatRule,
-        topicMode,
-        voteTime,
-        confirmMode,
-        discordEnabled,
-      });
-    }
     onClose();
   };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 font-pretendard select-none">
       <div className="relative w-full max-w-[620px] max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-7 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
@@ -466,39 +446,25 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
 
           {/* 디스코드 알림 설정 */}
 
+          {/* 디스코드 알림 설정 */}
           <label className="flex items-center gap-3 rounded-xl border border-gray-200 p-4 cursor-pointer hover:bg-gray-50 transition">
-
-          <label className="flex items-start gap-3 rounded-xl border border-gray-200 p-4 cursor-pointer">
-
             <input
               type="checkbox"
               checked={discordEnabled}
               onChange={(e) => setDiscordEnabled(e.target.checked)}
-
               className="h-4 w-4 accent-black"
             />
 
             <span className="flex flex-col gap-1">
               <span className="font-bold text-gray-800">
-                디스코드 알림 전송
+                디스코드로 모집 공지 전송
               </span>
 
               <span className="text-[11px] text-gray-500">
-                활동 개설 시 디스코드 채널에도 알림을 전송합니다.
-
-              className="mt-0.5 h-4 w-4 accent-black"
-            />
-            <span>
-              <span className="block font-bold text-gray-800">
-                디스코드로 모집 공지 전송
-              </span>
-              <span className="mt-1 block text-[11px] leading-relaxed text-gray-500">
                 체크하면 활동 개설 시 디스코드에도 알림을 전송합니다.
-
               </span>
             </span>
           </label>
-
 
           {error && (
             <p className="rounded-xl bg-red-50 px-4 py-3 font-semibold text-red-600">
