@@ -27,6 +27,8 @@ import Toast from "./components/common/Toast";
 import type { CalendarEvent } from "./types/calendar";
 import {
   createCalendarEvent,
+  // ☆ 보드 마감 만들기
+  createDeadline,
   deleteCalendarEvent,
   getBoards,
   getCalendarEvents,
@@ -98,6 +100,9 @@ function AppContent() {
           description: event.memo ?? "",
           // 서버에 저장된 완료 여부 (새로고침해도 체크가 유지된다)
           completed: event.completed ?? false,
+          // ☆ 보드 마감이면 보드 번호와 담당자 번호들
+          boardId: event.boardId,
+          assigneeIds: event.assigneeIds ?? [],
           isMyEvent: true,
         }));
 
@@ -115,6 +120,17 @@ function AppContent() {
         console.error("캘린더 API 조회 실패:", error);
       });
   }, []);
+
+  // ☆ 어떤 날짜가 속한 달을 서버에서 다시 불러온다 (마감을 만든 뒤 캘린더에 바로 보이게)
+  const reloadMonthOf = useCallback(
+    (dateStr: string) => {
+      // "2026-11-30" → 그 날짜 정오 (시간대 때문에 날짜가 밀리지 않게)
+      const base = new Date(`${dateStr}T12:00:00`);
+      loadedMonthsRef.current.delete(`${base.getFullYear()}-${base.getMonth()}`);
+      loadMonth(base);
+    },
+    [loadMonth],
+  );
 
   // 처음에는 이번 달만 불러온다
   useEffect(() => {
@@ -162,6 +178,34 @@ function AppContent() {
   }, []);
 
   const handleAddEvent = async (newEvent: CalendarEvent) => {
+    // ☆ 보드 마감 (부장이 마감 + 보드를 고른 경우): 보드 마감 API로 저장
+    if (newEvent.type === "마감" && newEvent.boardId) {
+      try {
+        await createDeadline(newEvent.boardId, {
+          name: newEvent.title,
+          date: newEvent.date,
+          assigneeIds: newEvent.assigneeIds ?? [],
+          // 설명이 비어 있으면 보내지 않는다
+          description: newEvent.description || undefined,
+        });
+
+        // 서버가 캘린더에 마감을 넣어주니, 그 달을 다시 불러와서 보여준다
+        reloadMonthOf(newEvent.date);
+
+        setIsAddModalOpen(false);
+        showToast("보드 마감을 등록했습니다", "success");
+      } catch (error) {
+        console.error("보드 마감 생성 실패:", error);
+        showToast(
+          error instanceof Error
+            ? error.message
+            : "보드 마감을 등록하지 못했습니다.",
+        );
+      }
+      return;
+    }
+
+    // 그 외(개인 일정 등): 기존처럼 내 일정으로 저장
     try {
       const startsAt = newEvent.time
         ? `${newEvent.date}T${newEvent.time}:00`
@@ -405,6 +449,8 @@ function AppContent() {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onAddEvent={handleAddEvent}
+        // ☆ 부장이면 마감을 보드에 등록할 수 있게 (끝난 보드는 빼고)
+        boards={boards.filter((board) => board.status !== "CLOSED")}
       />
 
       {/* 일정 추가·수정·삭제 결과 토스트 (어느 페이지에서든 뜬다) */}
