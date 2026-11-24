@@ -1,12 +1,11 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { createNotice, type NoticeScope } from "../../api/noticeApi";
-
-import bellIcon from "../../assets/icons/bell.svg";
 import messageIcon from "../../assets/icons/message.svg";
 
 interface CreateNoticeModalProps {
   isOpen: boolean;
-  activityId: number;
+  mode: "global" | "activity";
+  activityId?: number;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -18,28 +17,30 @@ const majorMap: Record<string, string> = {
   Design: "DESIGN",
 };
 
+const globalScopes = ["팀 전체", "특정 기수 · 전공"] as const;
+const activityScopes = ["이 활동 참여자"] as const;
+
 const scopeMap: Record<string, NoticeScope> = {
   "팀 전체": "ALL",
-  "특정 보드 참여자": "BOARD",
   "이 활동 참여자": "ACTIVITY",
   "특정 기수 · 전공": "TARGET",
 };
 
 const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
   isOpen,
+  mode,
   activityId,
   onClose,
   onSuccess,
 }) => {
-  const [targetRange, setTargetRange] = useState("이 활동 참여자");
+  const defaultTargetRange = mode === "activity" ? "이 활동 참여자" : "팀 전체";
+
+  const [targetRange, setTargetRange] = useState(defaultTargetRange);
   const [selectedGenerations, setSelectedGenerations] = useState<string[]>([]);
   const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [webPush, setWebPush] = useState(true);
-  const [discord, setDiscord] = useState(true);
-  const [readCheck, setReadCheck] = useState(true);
-  const [scheduled, setScheduled] = useState(false);
+  const [discordEnabled, setDiscordEnabled] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -61,18 +62,19 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
     );
   };
 
-  const handleClose = () => {
-    if (isSubmitting) return;
-    setTargetRange("이 활동 참여자");
+  const resetForm = () => {
+    setTargetRange(defaultTargetRange);
     setSelectedGenerations([]);
     setSelectedDepartments([]);
     setTitle("");
     setContent("");
+    setDiscordEnabled(true);
     setErrorMessage("");
-    setWebPush(true);
-    setDiscord(true);
-    setReadCheck(true);
-    setScheduled(false);
+  };
+
+  const handleClose = () => {
+    if (isSubmitting) return;
+    resetForm();
     onClose();
   };
 
@@ -99,28 +101,25 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
       return;
     }
 
-    if (scheduled) {
-      setErrorMessage("예약 발송은 아직 지원하지 않습니다.");
-      return;
-    }
-
     if (targetRange === "특정 기수 · 전공") {
       setErrorMessage(
-        "기수별 대상 ID 연결이 필요합니다. 현재는 활동 전체 공지를 이용해 주세요.",
+        "기수별 대상 ID 연결이 필요합니다. 현재는 팀 전체 공지를 이용해 주세요.",
       );
       return;
     }
 
-    if (targetRange === "특정 보드 참여자") {
-      setErrorMessage(
-        "보드 ID 연결이 필요합니다. 현재는 활동 전체 공지를 이용해 주세요.",
-      );
+    if (mode === "activity" && !activityId) {
+      setErrorMessage("활동 정보를 확인할 수 없습니다.");
       return;
     }
 
     const body = {
       scope: scopeMap[targetRange],
-      activityId: targetRange === "이 활동 참여자" ? activityId : undefined,
+      activityId:
+        mode === "activity" && targetRange === "이 활동 참여자"
+          ? activityId
+          : undefined,
+      discordEnabled,
       title: title.trim(),
       content: content.trim(),
     };
@@ -131,9 +130,9 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
 
       await createNotice(body);
 
-      // ★ alert 삭제: 성공 안내는 부모(Header)가 onSuccess에서 토스트로 띄운다
+      resetForm();
       onSuccess();
-      handleClose();
+      onClose();
     } catch (error) {
       console.error("공지 생성 실패:", error);
       setErrorMessage(
@@ -148,7 +147,7 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 font-pretendard">
-      <div className="relative w-full max-w-[580px] max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-7 shadow-2xl">
+      <div className="relative max-h-[90vh] w-full max-w-[580px] overflow-y-auto rounded-3xl bg-white p-7 shadow-2xl">
         <div className="flex items-start justify-between border-b border-gray-100 pb-4">
           <div>
             <h2 className="text-xl font-bold text-gray-900">공지 보내기</h2>
@@ -174,30 +173,32 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
             </label>
 
             <div className="space-y-2">
-              {Object.keys(scopeMap).map((range) => (
-                <button
-                  key={range}
-                  type="button"
-                  onClick={() => setTargetRange(range)}
-                  className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left ${
-                    targetRange === range
-                      ? "border-black bg-white ring-1 ring-black font-bold"
-                      : "border-gray-200 bg-gray-50 text-gray-600"
-                  }`}
-                >
-                  <span
-                    className={`h-3.5 w-3.5 rounded-full border border-black ${
-                      targetRange === range ? "bg-black" : "bg-white"
+              {(mode === "activity" ? activityScopes : globalScopes).map(
+                (range) => (
+                  <button
+                    key={range}
+                    type="button"
+                    onClick={() => setTargetRange(range)}
+                    className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left ${
+                      targetRange === range
+                        ? "border-black bg-white font-bold ring-1 ring-black"
+                        : "border-gray-200 bg-gray-50 text-gray-600"
                     }`}
-                  />
-                  {range}
-                </button>
-              ))}
+                  >
+                    <span
+                      className={`h-3.5 w-3.5 rounded-full border border-black ${
+                        targetRange === range ? "bg-black" : "bg-white"
+                      }`}
+                    />
+                    {range}
+                  </button>
+                ),
+              )}
             </div>
           </div>
 
           {targetRange === "특정 기수 · 전공" && (
-            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+            <div className="space-y-3 rounded-2xl border border-gray-200 bg-gray-50 p-4">
               <div>
                 <p className="mb-2 font-bold">기수 선택</p>
                 <div className="flex gap-2">
@@ -274,55 +275,22 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
               알림 채널
             </label>
 
-            <div className="space-y-2">
-              <label className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 p-3.5">
-                <span className="flex items-center gap-2">
-                  <img src={bellIcon} alt="" className="h-4 w-4" />
-                  <span className="font-bold">웹 푸시 (PWA)</span>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={webPush}
-                  onChange={(event) => setWebPush(event.target.checked)}
-                  className="h-5 w-5 accent-black"
-                />
-              </label>
+            <label className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 p-3.5">
+              <span className="flex items-center gap-2">
+                <img src={messageIcon} alt="" className="h-4 w-4" />
+                <span className="font-bold">디스코드 웹훅</span>
+              </span>
+              <input
+                type="checkbox"
+                checked={discordEnabled}
+                onChange={(event) => setDiscordEnabled(event.target.checked)}
+                className="h-5 w-5 accent-black"
+              />
+            </label>
 
-              <label className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 p-3.5">
-                <span className="flex items-center gap-2">
-                  <img src={messageIcon} alt="" className="h-4 w-4" />
-                  <span className="font-bold">디스코드 웹훅</span>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={discord}
-                  onChange={(event) => setDiscord(event.target.checked)}
-                  className="h-5 w-5 accent-black"
-                />
-              </label>
-            </div>
-
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <label className="flex items-center gap-2 rounded-xl border border-gray-200 p-3">
-                <input
-                  type="checkbox"
-                  checked={readCheck}
-                  onChange={(event) => setReadCheck(event.target.checked)}
-                  className="accent-black"
-                />
-                읽음 확인 사용
-              </label>
-
-              <label className="flex items-center gap-2 rounded-xl border border-gray-200 p-3">
-                <input
-                  type="checkbox"
-                  checked={scheduled}
-                  onChange={(event) => setScheduled(event.target.checked)}
-                  className="accent-black"
-                />
-                예약 발송
-              </label>
-            </div>
+            <p className="mt-2 text-[11px] text-gray-400">
+              디스코드에는 공지 제목만 전송돼요.
+            </p>
           </div>
 
           {errorMessage && (
