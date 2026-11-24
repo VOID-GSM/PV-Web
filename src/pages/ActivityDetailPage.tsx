@@ -1035,7 +1035,7 @@ export default function ActivityDetailPage() {
                         key={member.memberId}
                         className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-black text-[10px] font-bold text-white"
                       >
-                        {member.name[0] ?? "?"}
+                        {member.name?.[0] ?? "?"}
                       </div>
                     ))}
                   </div>
@@ -1157,7 +1157,7 @@ export default function ActivityDetailPage() {
                         className="flex items-center gap-3 rounded-2xl bg-gray-50 p-3"
                       >
                         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black text-xs font-bold text-white">
-                          {member.name[0] ?? "?"}
+                          {member.name?.[0] ?? "?"}
                         </div>
                         <span className="min-w-0 truncate text-xs font-bold text-gray-800">
                           {member.name}
