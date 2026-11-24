@@ -9,10 +9,9 @@ import ArchivePage from "./pages/ArchivePage";
 import ArticleEditorPage from "./pages/ArticleEditorPage";
 import WeeklyReportPage from "./pages/WeeklyReportPage";
 import InvitePage from "./pages/InvitePage";
-// 재입장 링크로 들어왔을 때 보여줄 화면
-import ReEntryPage from "./pages/ReEntryPage";
-// ★ 부장 승인을 기다리는 화면
 import PendingPage from "./pages/PendingPage";
+// ★ 재입장 링크로 들어왔을 때 보여줄 화면
+import ReEntryPage from "./pages/ReEntryPage";
 import SettingsPage from "./pages/SettingsPage";
 import WorklogPage from "./pages/WorklogPage";
 import RetrospectivePage from "./pages/RetrospectivePage";
@@ -346,6 +345,7 @@ export default function App() {
             />
           }
         >
+          <Route path="/pending" element={<PendingPage />} />
           <Route path="/" element={<Navigate to="/today" replace />} />
 
           <Route
@@ -397,10 +397,8 @@ export default function App() {
 
         <Route path="/invite" element={<InvitePage />} />
         <Route path="/invite/:code" element={<InvitePage />} />
-        {/* 재입장 링크 (사이드바 밖: 아직 토큰이 없는 사람이 들어오는 주소라서) */}
+        {/* ★ 재입장 링크 (사이드바 밖: 아직 토큰이 없는 사람이 들어오는 주소라서) */}
         <Route path="/re-entry/:code" element={<ReEntryPage />} />
-        {/* ★ 부장 승인 대기 화면 (사이드바 밖: 승인 전에는 서비스 메뉴를 쓸 수 없어서) */}
-        <Route path="/pending" element={<PendingPage />} />
       </Routes>
 
       <AddEventModal
