@@ -13,8 +13,7 @@ interface ReEntryResponse {
 }
 
 // 토큰 저장 이름 (tokenStorage.ts, 친구 api/client.ts와 같은 이름)
-const ACCESS_TOKEN_KEY = "pvweb:accessToken";
-const REFRESH_TOKEN_KEY = "pvweb:refreshToken";
+
 
 // 화면 상태: 처리 중 / 승인 대기 / 실패
 type ReEntryState =
@@ -30,7 +29,9 @@ export default function ReEntryPage() {
   // ★ 처음 상태: 코드가 없으면 바로 "실패", 있으면 "처리 중"
   // (useEffect 안에서 바로 setState하면 ESLint 경고가 나서, 처음부터 정해 둔다)
   const [state, setState] = useState<ReEntryState>(() =>
-    code ? { kind: "loading" } : { kind: "error", message: "재입장 코드가 없습니다." },
+    code
+      ? { kind: "loading" }
+      : { kind: "error", message: "재입장 코드가 없습니다." },
   );
 
   // 개발 모드에서 화면이 두 번 그려져도 요청은 한 번만 보내려고 기억해 둔다
@@ -44,12 +45,14 @@ export default function ReEntryPage() {
     const reEnter = async () => {
       try {
         // encodeURIComponent: 코드에 특수문자가 있어도 주소가 깨지지 않게
-        const { data } = await api.post<ReEntryResponse>(`/auth/re-entry/${encodeURIComponent(code)}`);
+        const { data } = await api.post<ReEntryResponse>(
+          `/auth/re-entry/${encodeURIComponent(code)}`,
+        );
 
         // 받은 토큰을 이 기기에 저장
-        localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
-        localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
-
+        localStorage.setItem("pvweb:memberId", String(data.memberId));
+        localStorage.setItem("pvweb:accessToken", data.accessToken);
+        localStorage.setItem("pvweb:refreshToken", data.refreshToken);
         if (data.status === "PENDING") {
           // 아직 부장 승인 전이면 안내만 보여준다 (await 뒤라 경고 없음)
           setState({ kind: "pending" });
@@ -73,23 +76,33 @@ export default function ReEntryPage() {
 
         {state.kind === "loading" && (
           <>
-            <p className="mt-6 text-sm font-semibold text-gray-800">재입장하는 중입니다...</p>
+            <p className="mt-6 text-sm font-semibold text-gray-800">
+              재입장하는 중입니다...
+            </p>
             <p className="mt-1 text-xs text-gray-400">잠시만 기다려 주세요</p>
           </>
         )}
 
         {state.kind === "pending" && (
           <>
-            <p className="mt-6 text-sm font-semibold text-gray-800">부장 승인을 기다리고 있어요</p>
-            <p className="mt-1 text-xs text-gray-400">승인되면 다시 이 링크로 들어와 주세요</p>
+            <p className="mt-6 text-sm font-semibold text-gray-800">
+              부장 승인을 기다리고 있어요
+            </p>
+            <p className="mt-1 text-xs text-gray-400">
+              승인되면 다시 이 링크로 들어와 주세요
+            </p>
           </>
         )}
 
         {state.kind === "error" && (
           <>
-            <p className="mt-6 text-sm font-semibold text-red-500">재입장하지 못했습니다</p>
+            <p className="mt-6 text-sm font-semibold text-red-500">
+              재입장하지 못했습니다
+            </p>
             <p className="mt-1 text-xs text-gray-500">{state.message}</p>
-            <p className="mt-1 text-xs text-gray-400">링크가 맞는지 확인하거나 부장에게 새 링크를 요청해 주세요</p>
+            <p className="mt-1 text-xs text-gray-400">
+              링크가 맞는지 확인하거나 부장에게 새 링크를 요청해 주세요
+            </p>
             <button
               type="button"
               onClick={() => navigate("/invite", { replace: true })}
