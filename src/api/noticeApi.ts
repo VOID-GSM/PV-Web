@@ -10,6 +10,7 @@ export interface NoticeCreateRequest {
   majors?: string[];
   title: string;
   content: string;
+  discordEnabled: boolean;
 }
 
 export interface NoticeItem {
