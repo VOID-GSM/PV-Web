@@ -50,6 +50,9 @@ export default function CalendarPage({
   );
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
+  // ★ 날짜 칸을 눌러서 일정을 추가할 날짜 ("2026-11-24"). null이면 추가 창이 닫혀 있다
+  const [addDate, setAddDate] = useState<string | null>(null);
+
   // 보드는 미리 만들어 두지 않고, 실제 일정에 입력된 보드만 표시한다.
   const [uncheckedBoards, setUncheckedBoards] = useState<
     Record<string, boolean>
@@ -169,6 +172,8 @@ export default function CalendarPage({
             events={filteredEvents}
             viewMode={viewMode}
             onSelectEvent={(evt) => setSelectedEvent(evt)}
+            // ★ 날짜 칸을 누르면 그 날짜로 일정 추가 창 열기
+            onSelectDate={(dateStr) => setAddDate(dateStr)}
           />
         </div>
 
@@ -206,6 +211,14 @@ export default function CalendarPage({
           }}
         />
       )}
+
+      {/* ★ 날짜 칸을 눌러서 여는 일정 추가 창 (그 날짜가 미리 채워진다) */}
+      <AddEventModal
+        isOpen={addDate !== null}
+        initialDate={addDate ?? undefined}
+        onAddEvent={onAddEvent}
+        onClose={() => setAddDate(null)}
+      />
     </div>
   );
 }
