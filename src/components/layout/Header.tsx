@@ -216,6 +216,7 @@ export const Header: React.FC<HeaderProps> = ({
         topicOpenDaysBefore: Number.isFinite(topicOpenDaysBefore)
           ? topicOpenDaysBefore
           : 3,
+        discordEnabled: form.discordEnabled,
       });
 
       showToast(
