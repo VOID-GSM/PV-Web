@@ -16,7 +16,12 @@ interface AddEventModalProps {
   onAddEvent?: (newEvent: CalendarEvent) => void;
   initialEvent?: CalendarEvent | null;
   onUpdateEvent?: (updatedEvent: CalendarEvent) => void;
+  // ☆ 새 일정을 만들 때 날짜 칸에 미리 넣어 둘 날짜 (캘린더에서 날짜를 눌렀을 때)
+  initialDate?: string;
 }
+
+// ☆ 설명 최대 글자 수 (서버 memo 칸 길이)
+const MAX_DESCRIPTION = 2000;
 
 export const AddEventModal: React.FC<AddEventModalProps> = ({
   isOpen,
@@ -24,6 +29,7 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
   onAddEvent,
   initialEvent = null,
   onUpdateEvent,
+  initialDate,
 }) => {
   const [type, setType] = useState<"마감" | "회의" | "활동" | "개인 일정">(
     initialEvent?.type ?? "마감",
@@ -31,9 +37,14 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
   const [title, setTitle] = useState(initialEvent?.title ?? "");
   const [board, setBoard] = useState(initialEvent?.board ?? "");
   const [repeat, setRepeat] = useState("반복 없음");
-  const [date, setDate] = useState(initialEvent?.date ?? "");
+  // ☆ 수정이면 그 일정 날짜, 새로 만들면 눌렀던 날짜, 둘 다 없으면 빈칸
+  const [date, setDate] = useState(initialEvent?.date ?? initialDate ?? "");
   const [time, setTime] = useState(initialEvent?.time ?? "");
   const [endDate, setEndDate] = useState(initialEvent?.endDate ?? "");
+  // ☆ 상세 설명 (서버에는 memo로 저장된다)
+  const [description, setDescription] = useState(
+    initialEvent?.description ?? "",
+  );
   const [assignees, setAssignees] = useState<string[]>(
     initialEvent?.assignees ?? [],
   );
@@ -62,9 +73,12 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
       setTitle(initialEvent?.title ?? "");
       setBoard(initialEvent?.board ?? "");
       setRepeat("반복 없음");
-      setDate(initialEvent?.date ?? "");
+      // ☆ 다시 열 때도 같은 규칙으로 날짜 채우기
+      setDate(initialEvent?.date ?? initialDate ?? "");
       setTime(initialEvent?.time ?? "");
       setEndDate(initialEvent?.endDate ?? "");
+      // ☆ 설명도 초기화
+      setDescription(initialEvent?.description ?? "");
       setAssignees(initialEvent?.assignees ?? []);
       setAlerts([]);
       // ★ 창을 다시 열면 팀원 목록은 닫힌 상태로
@@ -103,6 +117,8 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
       date: date || new Date().toLocaleDateString("sv-SE"),
       time: time || undefined,
       endDate: endDate || undefined,
+      // ☆ 설명 (앞뒤 빈칸 제거, App에서 서버 memo로 보낸다)
+      description: description.trim(),
       assignees,
       isMyEvent: true,
     };
@@ -248,6 +264,25 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
                 className="w-full rounded-xl border border-gray-200 p-2.5 outline-none focus:border-black font-medium bg-white"
               />
             </div>
+          </div>
+
+          {/* ☆ 상세 설명 */}
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <label className="font-bold text-gray-700">상세 설명</label>
+              {/* ☆ 지금 글자 수 / 최대 */}
+              <span className="text-[10px] text-gray-400">
+                {description.length} / {MAX_DESCRIPTION}
+              </span>
+            </div>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              maxLength={MAX_DESCRIPTION}
+              placeholder="장소, 준비물, 참고 링크 등을 적어 주세요 (선택)"
+              className="w-full resize-none rounded-xl border border-gray-200 p-3 leading-relaxed outline-none focus:border-black"
+            />
           </div>
 
           {/* 담당자 */}
