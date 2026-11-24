@@ -35,6 +35,8 @@ export interface Member {
   majors: Major[];
   roles: Role[];
   status: MemberStatus;
+  // 내 프로필 사진 파일 번호 (GET /members/me에만 온다. 없으면 null → 기본 이미지)
+  profileImageFileId?: number | null;
 }
 
 // 내 프로필 수정할 때 보낼 것 (PATCH /members/me)
@@ -67,6 +69,17 @@ export const updateMyProfile = async (body: MyProfileUpdateRequest) => {
   return data;
 };
 
+// 내 프로필 사진 등록·변경 — PUT /members/me/profile-image
+// fileId는 파일 업로드(api/fileApi.ts의 uploadImage)로 먼저 받는다. png / jpeg / webp만 가능하다.
+export const setMyProfileImage = async (fileId: number) => {
+  await api.put("/members/me/profile-image", { fileId });
+};
+
+// 내 프로필 사진 삭제 — DELETE /members/me/profile-image
+export const deleteMyProfileImage = async () => {
+  await api.delete("/members/me/profile-image");
+};
+
 // ─────────────────────────────────────────────
 // 4) 팀원 관리 (부장)
 // ─────────────────────────────────────────────
@@ -78,7 +91,10 @@ export const getMembers = async () => {
 };
 
 // 팀원 정보 수정 — POST /members/{memberId} (주의: PATCH가 아니라 POST)
-export const updateMember = async (memberId: number, body: MemberUpdateRequest) => {
+export const updateMember = async (
+  memberId: number,
+  body: MemberUpdateRequest,
+) => {
   const { data } = await api.post<Member>(`/members/${memberId}`, body);
   return data;
 };
