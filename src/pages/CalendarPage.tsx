@@ -50,8 +50,11 @@ export default function CalendarPage({
   );
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
-  // ★ 날짜 칸을 눌러서 일정을 추가할 날짜 ("2026-11-24"). null이면 추가 창이 닫혀 있다
+  // 날짜 칸을 눌러서 일정을 추가할 날짜 ("2026-11-24"). null이면 추가 창이 닫혀 있다
   const [addDate, setAddDate] = useState<string | null>(null);
+
+  // ☆ 마감을 걸 수 있는 보드 (진행 중인 것만). App이 부장일 때만 보드를 불러와서, 부장이 아니면 빈 목록
+  const deadlineBoards = boards.filter((board) => board.status !== "CLOSED");
 
   // 보드는 미리 만들어 두지 않고, 실제 일정에 입력된 보드만 표시한다.
   const [uncheckedBoards, setUncheckedBoards] = useState<
@@ -172,7 +175,7 @@ export default function CalendarPage({
             events={filteredEvents}
             viewMode={viewMode}
             onSelectEvent={(evt) => setSelectedEvent(evt)}
-            // ★ 날짜 칸을 누르면 그 날짜로 일정 추가 창 열기
+            // 날짜 칸을 누르면 그 날짜로 일정 추가 창 열기
             onSelectDate={(dateStr) => setAddDate(dateStr)}
           />
         </div>
@@ -205,6 +208,8 @@ export default function CalendarPage({
           isOpen={isEditModalOpen}
           initialEvent={selectedEvent}
           onUpdateEvent={onUpdateEvent}
+          // ☆ 수정 창에도 보드 목록 (마감 화면을 똑같이 보여주려고)
+          boards={deadlineBoards}
           onClose={() => {
             setIsEditModalOpen(false);
             setSelectedEvent(null);
@@ -212,11 +217,13 @@ export default function CalendarPage({
         />
       )}
 
-      {/* ★ 날짜 칸을 눌러서 여는 일정 추가 창 (그 날짜가 미리 채워진다) */}
+      {/* 날짜 칸을 눌러서 여는 일정 추가 창 (그 날짜가 미리 채워진다) */}
       <AddEventModal
         isOpen={addDate !== null}
         initialDate={addDate ?? undefined}
         onAddEvent={onAddEvent}
+        // ☆ 부장이면 마감을 보드에 등록할 수 있게 보드 목록 넘기기
+        boards={deadlineBoards}
         onClose={() => setAddDate(null)}
       />
     </div>
