@@ -14,16 +14,15 @@ interface ReEntryResponse {
   refreshToken: string;
 }
 
-
-
-
 const MEMBER_ID_KEY = "pvweb:memberId";
 // 입장할 때 기기에 저장해 둔 프로필 (사이드바가 서버 정보 전에 잠깐 보여준다)
 const INVITE_PROFILE_KEY = "pvweb:invite-profile:v1";
 
-
 // ★ 화면 상태: 처리 중 / 실패 (승인 대기는 /pending 화면이 맡는다)
-type ReEntryState = { kind: "loading" } | { kind: "error"; message: string };
+type ReEntryState =
+  | { kind: "loading" }
+  | { kind: "pending" }
+  | { kind: "error"; message: string };
 
 export default function ReEntryPage() {
   // 주소의 :code 부분 (예: /re-entry/2d6252... → "2d6252...")
@@ -54,7 +53,6 @@ export default function ReEntryPage() {
           `/auth/re-entry/${encodeURIComponent(code)}`,
         );
 
-
         // 받은 토큰을 이 기기에 저장
         localStorage.setItem("pvweb:memberId", String(data.memberId));
         localStorage.setItem("pvweb:accessToken", data.accessToken);
@@ -72,11 +70,10 @@ export default function ReEntryPage() {
         // 예전 계정의 저장 프로필을 지운다 (사이드바에 다른 사람 이름이 보이지 않게)
         localStorage.removeItem(INVITE_PROFILE_KEY);
 
-
         // ★ 승인 대기면 /pending, 가입 완료면 /today
         // window.location.replace: 페이지를 새로 열어서, 새 토큰으로 모든 정보를 처음부터 불러오게 한다
         // (navigate로 이동하면 App이 들고 있던 예전 계정의 일정·할 일이 남을 수 있다)
-        window.location.replace(data.status === "PENDING" ? "/pending" : "/today");
+        window.location.replace("/today");
       } catch (error) {
         setState({ kind: "error", message: getErrorMessage(error) });
       }
@@ -99,7 +96,6 @@ export default function ReEntryPage() {
           </>
         )}
 
-
         {state.kind === "pending" && (
           <>
             <p className="mt-6 text-sm font-semibold text-gray-800">
@@ -110,7 +106,6 @@ export default function ReEntryPage() {
             </p>
           </>
         )}
-
 
         {state.kind === "error" && (
           <>
