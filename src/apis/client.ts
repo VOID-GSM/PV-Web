@@ -27,10 +27,16 @@ const ENTRY_PATH = "/invite";
 // 2) 요청 보내기 직전에 출입증 자동 첨부
 // ─────────────────────────────────────────────
 api.interceptors.request.use((config) => {
-  const token = tokenStorage.getAccess();
-  if (token) {
-    config.headers.set(AUTH_HEADER, toAuthValue(token));
+  const isReEntryRequest = config.url?.includes("/auth/re-entry/");
+
+  if (!isReEntryRequest) {
+    const token = tokenStorage.getAccess();
+
+    if (token) {
+      config.headers.set(AUTH_HEADER, toAuthValue(token));
+    }
   }
+
   return config;
 });
 
@@ -49,7 +55,10 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const original = error.config as RetryConfig | undefined;
     const status = error.response?.status;
-
+    // 재입장 요청은 기존 계정의 refresh 처리 대상이 아님
+    if (original?.url?.includes("/auth/re-entry/")) {
+      return Promise.reject(error);
+    }
     // ★ 가입 승인 대기 중인 사람: 승인 대기 화면으로 보낸다
     // (일반 권한 부족 403과 섞이지 않게 메시지까지 확인한다)
     if (status === 403 && !original?.url?.includes("/auth/refresh")) {
