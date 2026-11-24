@@ -1494,7 +1494,7 @@ export default function ActivityDetailPage() {
                     >
                       <div className="flex items-center gap-2">
                         <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-black text-[10px] font-bold text-white">
-                          {application.name[0] ?? "?"}
+                          {application.name?.[0] ?? "?"}
                         </div>
                         <span className="min-w-0 truncate font-bold text-gray-900">
                           {application.name}

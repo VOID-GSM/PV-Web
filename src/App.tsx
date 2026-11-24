@@ -19,7 +19,7 @@ import QuestionBankPage from "./pages/QuestionBankPage";
 import AssignmentPage from "./pages/AssignmentPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import { apiRequest } from "./api/client";
-
+import { refreshSession } from "./api/session";
 import SidebarLayout from "./components/layout/SidebarLayout";
 import { AddEventModal } from "./components/calendar/AddEventModal";
 // 브라우저 alert 대신 쓸 토스트
@@ -45,7 +45,7 @@ const formatDate = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
-export default function App() {
+function AppContent() {
   const navigate = useNavigate();
 
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -418,4 +418,88 @@ export default function App() {
       )}
     </>
   );
+}
+
+// 로그인 상태 확인을 담당하는 최상위 App 컴포넌트
+export default function App() {
+  const isReEntry = window.location.pathname.startsWith("/re-entry/");
+
+  const [authState, setAuthState] = useState<"checking" | "ready" | "failed">(
+    isReEntry ? "ready" : "checking",
+  );
+
+  useEffect(() => {
+    const pathname = window.location.pathname;
+
+    // 재입장 링크는 기존 계정의 refresh보다 먼저 처리
+    if (pathname.startsWith("/re-entry/")) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const checkSession = async () => {
+      const result = await refreshSession();
+
+      if (cancelled) return;
+
+      if (result === "ok") {
+        if (pathname.startsWith("/invite") || pathname === "/") {
+          window.location.replace("/today");
+          return;
+        }
+
+        setAuthState("ready");
+        return;
+      }
+
+      if (result === "invalid") {
+        if (pathname.startsWith("/invite")) {
+          setAuthState("ready");
+        } else {
+          window.location.replace("/invite");
+        }
+        return;
+      }
+
+      if (result === "pending") return;
+
+      setAuthState("failed");
+    };
+
+    void checkSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (authState === "checking") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#f7f7f8] font-pretendard">
+        <p className="text-sm text-gray-500">
+          로그인 상태를 확인하고 있어요...
+        </p>
+      </div>
+    );
+  }
+
+  if (authState === "failed") {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#f7f7f8] font-pretendard">
+        <p className="text-sm text-gray-600">
+          로그인 상태를 확인하지 못했습니다.
+        </p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="rounded-lg bg-black px-5 py-3 text-sm text-white"
+        >
+          다시 시도하기
+        </button>
+      </div>
+    );
+  }
+
+  return <AppContent />;
 }

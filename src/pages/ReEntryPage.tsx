@@ -14,13 +14,15 @@ interface ReEntryResponse {
   refreshToken: string;
 }
 
-// 토큰 말고 같이 정리할 저장 이름 (친구 InvitePage와 같은 이름)
 const MEMBER_ID_KEY = "pvweb:memberId";
 // 입장할 때 기기에 저장해 둔 프로필 (사이드바가 서버 정보 전에 잠깐 보여준다)
 const INVITE_PROFILE_KEY = "pvweb:invite-profile:v1";
 
 // ★ 화면 상태: 처리 중 / 실패 (승인 대기는 /pending 화면이 맡는다)
-type ReEntryState = { kind: "loading" } | { kind: "error"; message: string };
+type ReEntryState =
+  | { kind: "loading" }
+  | { kind: "pending" }
+  | { kind: "error"; message: string };
 
 export default function ReEntryPage() {
   // 주소의 :code 부분 (예: /re-entry/2d6252... → "2d6252...")
@@ -30,7 +32,9 @@ export default function ReEntryPage() {
   // 처음 상태: 코드가 없으면 바로 "실패", 있으면 "처리 중"
   // (useEffect 안에서 바로 setState하면 ESLint 경고가 나서, 처음부터 정해 둔다)
   const [state, setState] = useState<ReEntryState>(() =>
-    code ? { kind: "loading" } : { kind: "error", message: "재입장 코드가 없습니다." },
+    code
+      ? { kind: "loading" }
+      : { kind: "error", message: "재입장 코드가 없습니다." },
   );
 
   // 개발 모드(StrictMode)에서 화면이 두 번 그려져도 요청은 한 번만 보내려고 기억해 둔다
@@ -45,7 +49,19 @@ export default function ReEntryPage() {
     const reEnter = async () => {
       try {
         // encodeURIComponent: 코드에 특수문자가 있어도 주소가 깨지지 않게
-        const { data } = await api.post<ReEntryResponse>(`/auth/re-entry/${encodeURIComponent(code)}`);
+        const { data } = await api.post<ReEntryResponse>(
+          `/auth/re-entry/${encodeURIComponent(code)}`,
+        );
+
+        // 받은 토큰을 이 기기에 저장
+        localStorage.setItem("pvweb:memberId", String(data.memberId));
+        localStorage.setItem("pvweb:accessToken", data.accessToken);
+        localStorage.setItem("pvweb:refreshToken", data.refreshToken);
+        if (data.status === "PENDING") {
+          // 아직 부장 승인 전이면 안내만 보여준다 (await 뒤라 경고 없음)
+          setState({ kind: "pending" });
+          return;
+        }
 
         // 성공했을 때만 이 기기의 계정 정보를 새 계정으로 덮어쓴다
         // (실패하면 지금 쓰던 계정은 그대로 남는다)
@@ -57,7 +73,7 @@ export default function ReEntryPage() {
         // ★ 승인 대기면 /pending, 가입 완료면 /today
         // window.location.replace: 페이지를 새로 열어서, 새 토큰으로 모든 정보를 처음부터 불러오게 한다
         // (navigate로 이동하면 App이 들고 있던 예전 계정의 일정·할 일이 남을 수 있다)
-        window.location.replace(data.status === "PENDING" ? "/pending" : "/today");
+        window.location.replace("/today");
       } catch (error) {
         setState({ kind: "error", message: getErrorMessage(error) });
       }
@@ -73,16 +89,33 @@ export default function ReEntryPage() {
 
         {state.kind === "loading" && (
           <>
-            <p className="mt-6 text-sm font-semibold text-gray-800">재입장하는 중입니다...</p>
+            <p className="mt-6 text-sm font-semibold text-gray-800">
+              재입장하는 중입니다...
+            </p>
             <p className="mt-1 text-xs text-gray-400">잠시만 기다려 주세요</p>
+          </>
+        )}
+
+        {state.kind === "pending" && (
+          <>
+            <p className="mt-6 text-sm font-semibold text-gray-800">
+              부장 승인을 기다리고 있어요
+            </p>
+            <p className="mt-1 text-xs text-gray-400">
+              승인되면 다시 이 링크로 들어와 주세요
+            </p>
           </>
         )}
 
         {state.kind === "error" && (
           <>
-            <p className="mt-6 text-sm font-semibold text-red-500">재입장하지 못했습니다</p>
+            <p className="mt-6 text-sm font-semibold text-red-500">
+              재입장하지 못했습니다
+            </p>
             <p className="mt-1 text-xs text-gray-500">{state.message}</p>
-            <p className="mt-1 text-xs text-gray-400">링크가 맞는지 확인하거나 부장에게 새 링크를 요청해 주세요</p>
+            <p className="mt-1 text-xs text-gray-400">
+              링크가 맞는지 확인하거나 부장에게 새 링크를 요청해 주세요
+            </p>
             <button
               type="button"
               onClick={() => navigate("/invite", { replace: true })}
