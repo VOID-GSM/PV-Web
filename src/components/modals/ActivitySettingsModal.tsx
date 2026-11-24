@@ -16,10 +16,9 @@ import {
 interface ActivitySettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  // 지금 서버에 저장된 활동 정보 (창을 열 때 이 값으로 채운다)
   activity: ActivityDetail | null;
-  // 바뀐 항목만 넘어온다. 저장에 성공하면 true, 실패하면 false를 돌려준다 (실패하면 창을 닫지 않는다)
   onSave: (changes: ActivityUpdateRequest) => Promise<boolean>;
+  onDelete: () => void;
 }
 
 // 서버 규칙
@@ -42,6 +41,7 @@ export const ActivitySettingsModal: React.FC<ActivitySettingsModalProps> = ({
   onClose,
   activity,
   onSave,
+  onDelete,
 }) => {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -303,22 +303,34 @@ export const ActivitySettingsModal: React.FC<ActivitySettingsModalProps> = ({
             </p>
           )}
 
-          <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
+          <div className="flex items-center justify-between border-t border-gray-100 pt-4">
             <button
               type="button"
-              onClick={onClose}
+              onClick={onDelete}
               disabled={isSaving}
-              className="cursor-pointer rounded-xl border border-gray-200 px-4 py-2 font-bold text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
+              className="cursor-pointer rounded-xl border border-red-200 px-4 py-2 font-bold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
             >
-              취소
+              활동 삭제
             </button>
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="cursor-pointer rounded-xl bg-black px-5 py-2 font-bold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isSaving ? "저장 중..." : "설정 저장"}
-            </button>
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={isSaving}
+                className="cursor-pointer rounded-xl border border-gray-200 px-4 py-2 font-bold text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
+              >
+                취소
+              </button>
+
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="cursor-pointer rounded-xl bg-black px-5 py-2 font-bold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isSaving ? "저장 중..." : "설정 저장"}
+              </button>
+            </div>
           </div>
         </form>
       </div>
