@@ -18,6 +18,8 @@ import { createPost } from "../../api/postApi";
 import CreateNoticeModal from "../modals/CreateNoticeModal";
 import CreateArticleModal from "../modals/CreateArticleModal";
 import Toast from "../common/Toast";
+// ★ 활동 목록이 바뀌었다고 알리는 신호
+import { notifyActivitiesChanged } from "../../utils/activityEvents";
 
 import {
   getNotifications,
@@ -218,10 +220,11 @@ export const Header: React.FC<HeaderProps> = ({
           : 3,
       });
 
-      showToast(
-        "활동을 생성했습니다. 활동 페이지를 새로고침해 주세요.",
-        "success",
-      );
+      // ★ 활동 화면에 "목록 다시 불러와!" 신호 보내기 (새로고침 안 해도 바로 보인다)
+      notifyActivitiesChanged();
+
+      // ★ "새로고침해 주세요" 문구 삭제
+      showToast("활동을 만들었습니다.", "success");
     } catch (error) {
       console.error("활동 생성 실패:", error);
 
