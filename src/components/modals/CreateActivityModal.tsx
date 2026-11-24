@@ -37,7 +37,6 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
   const [generations, setGenerations] = useState<string[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
   const [memberCount, setMemberCount] = useState("");
-  const [discordEnabled, setDiscordEnabled] = useState(false);
 
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -50,6 +49,10 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
   const [confirmMode, setConfirmMode] = useState<"스터디장 승인" | "선착순">(
     "스터디장 승인",
   );
+
+  const [discordEnabled, setDiscordEnabled] = useState(false);
+  // ★ 저장을 눌렀을 때 빈 칸이 있으면 보여줄 안내 (없으면 "")
+
   const [error, setError] = useState("");
 
   // 모달을 새로 열 때 폼 초기화
@@ -71,6 +74,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
       setTopicMode("투표형");
       setVoteTime("회차 3일 전");
       setConfirmMode("스터디장 승인");
+      setDiscordEnabled(false);
       setError("");
     }
   }
@@ -136,7 +140,6 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
 
     onClose();
   };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 font-pretendard select-none">
       <div className="relative w-full max-w-[620px] max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-7 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
@@ -442,6 +445,8 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
           </div>
 
           {/* 디스코드 알림 설정 */}
+
+          {/* 디스코드 알림 설정 */}
           <label className="flex items-center gap-3 rounded-xl border border-gray-200 p-4 cursor-pointer hover:bg-gray-50 transition">
             <input
               type="checkbox"
@@ -452,16 +457,15 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
 
             <span className="flex flex-col gap-1">
               <span className="font-bold text-gray-800">
-                디스코드 알림 전송
+                디스코드로 모집 공지 전송
               </span>
 
               <span className="text-[11px] text-gray-500">
-                활동 개설 시 디스코드 채널에도 알림을 전송합니다.
+                체크하면 활동 개설 시 디스코드에도 알림을 전송합니다.
               </span>
             </span>
           </label>
 
-          {/* 빈 칸 안내 */}
           {error && (
             <p className="rounded-xl bg-red-50 px-4 py-3 font-semibold text-red-600">
               {error}
@@ -487,7 +491,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
                 type="submit"
                 className="rounded-xl bg-black px-5 py-2.5 font-bold text-white hover:bg-gray-800 transition cursor-pointer"
               >
-                활동 개설
+                {"활동 개설"}
               </button>
             </div>
           </div>
