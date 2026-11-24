@@ -525,7 +525,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
                 type="submit"
                 className="rounded-xl bg-black px-5 py-2.5 font-bold text-white hover:bg-gray-800 transition cursor-pointer"
               >
-                활동 개설
+                {"활동 개설"}
               </button>
             </div>
           </div>
