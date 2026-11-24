@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { createNotice, type NoticeScope } from "../../api/noticeApi";
 
 import bellIcon from "../../assets/icons/bell.svg";
@@ -7,6 +7,7 @@ import messageIcon from "../../assets/icons/message.svg";
 interface CreateNoticeModalProps {
   isOpen: boolean;
   activityId: number;
+  mode: "global" | "activity";
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -28,10 +29,14 @@ const scopeMap: Record<string, NoticeScope> = {
 const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
   isOpen,
   activityId,
+  mode,
   onClose,
   onSuccess,
 }) => {
-  const [targetRange, setTargetRange] = useState("이 활동 참여자");
+  const [targetRange, setTargetRange] = useState(
+    mode === "activity" ? "이 활동 참여자" : "팀 전체",
+  );
+  const [scheduledAt, setScheduledAt] = useState("");
   const [selectedGenerations, setSelectedGenerations] = useState<string[]>([]);
   const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
   const [title, setTitle] = useState("");
@@ -42,6 +47,15 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
   const [scheduled, setScheduled] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+
+  const scopeOptions =
+    mode === "activity"
+      ? ["팀 전체", "이 활동 참여자", "특정 기수 · 전공"]
+      : ["팀 전체", "특정 보드 참여자", "특정 기수 · 전공"];
+
+  useEffect(() => {
+    setTargetRange(mode === "activity" ? "이 활동 참여자" : "팀 전체");
+  }, [mode]);
 
   if (!isOpen) return null;
 
@@ -63,7 +77,7 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
 
   const handleClose = () => {
     if (isSubmitting) return;
-    setTargetRange("이 활동 참여자");
+    setTargetRange(mode === "activity" ? "이 활동 참여자" : "팀 전체");
     setSelectedGenerations([]);
     setSelectedDepartments([]);
     setTitle("");
@@ -73,6 +87,7 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
     setDiscord(true);
     setReadCheck(true);
     setScheduled(false);
+    setScheduledAt("");
     onClose();
   };
 
@@ -100,7 +115,17 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
     }
 
     if (scheduled) {
-      setErrorMessage("예약 발송은 아직 지원하지 않습니다.");
+      if (!scheduledAt) {
+        setErrorMessage("예약 발송 날짜와 시간을 선택해 주세요.");
+        return;
+      }
+      if (new Date(scheduledAt).getTime() <= Date.now()) {
+        setErrorMessage("예약 발송 시간은 현재 시각 이후로 설정해 주세요.");
+        return;
+      }
+      setErrorMessage(
+        "예약 발송 시간 입력은 준비되었지만, 현재 백엔드 공지 API에서 예약 발송을 지원하지 않아 등록할 수 없습니다.",
+      );
       return;
     }
 
@@ -120,7 +145,10 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
 
     const body = {
       scope: scopeMap[targetRange],
-      activityId: targetRange === "이 활동 참여자" ? activityId : undefined,
+      activityId:
+        mode === "activity" && targetRange === "이 활동 참여자"
+          ? activityId
+          : undefined,
       title: title.trim(),
       content: content.trim(),
     };
@@ -148,7 +176,7 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 font-pretendard">
-      <div className="relative w-full max-w-[580px] max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-7 shadow-2xl">
+      <div className="relative w-full max-w-[580px] max-h-[90vh] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden rounded-3xl bg-white p-7 shadow-2xl">
         <div className="flex items-start justify-between border-b border-gray-100 pb-4">
           <div>
             <h2 className="text-xl font-bold text-gray-900">공지 보내기</h2>
@@ -174,7 +202,7 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
             </label>
 
             <div className="space-y-2">
-              {Object.keys(scopeMap).map((range) => (
+              {scopeOptions.map((range) => (
                 <button
                   key={range}
                   type="button"
@@ -323,6 +351,30 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
                 예약 발송
               </label>
             </div>
+
+            {scheduled && (
+              <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
+                <label
+                  htmlFor="notice-scheduled-at"
+                  className="mb-2 block font-bold text-gray-700"
+                >
+                  예약 발송 날짜 및 시간
+                </label>
+                <input
+                  id="notice-scheduled-at"
+                  type="datetime-local"
+                  value={scheduledAt}
+                  min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+                    .toISOString()
+                    .slice(0, 16)}
+                  onChange={(event) => setScheduledAt(event.target.value)}
+                  className="w-full rounded-lg border border-gray-300 bg-white p-3 outline-none focus:border-black"
+                />
+                <p className="mt-2 text-[10px] leading-4 text-gray-500">
+                  현재 백엔드 API는 예약 발송을 지원하지 않아, 시간 설정 UI만 제공돼.
+                </p>
+              </div>
+            )}
           </div>
 
           {errorMessage && (
