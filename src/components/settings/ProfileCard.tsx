@@ -101,6 +101,7 @@ function ProfileForm({ profile }: { profile: Member }) {
   // 서버 정보가 이미 도착한 상태라, 처음부터 서버 값으로 시작한다
   const [name, setName] = useState(profile.name);
   const [majors, setMajors] = useState<Major[]>(profile.majors);
+  const [isImageChanged, setIsImageChanged] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
 
   const updateMutation = useUpdateMyProfile();
@@ -134,25 +135,32 @@ function ProfileForm({ profile }: { profile: Member }) {
   const isMajorsChanged =
     majors.length !== profile.majors.length ||
     majors.some((m) => !profile.majors.includes(m));
-  const isChanged = isNameChanged || isMajorsChanged;
+  const isChanged = isNameChanged || isMajorsChanged || isImageChanged;
 
   // 서버 규칙: 이름은 비면 안 되고, 전공은 1개 이상
   const isValid = name.trim() !== "" && majors.length > 0;
 
   const handleSave = () => {
+    // 사진만 변경했다면 이미 서버에 저장됐으므로 상태만 초기화
+    if (!isNameChanged && !isMajorsChanged) {
+      setIsImageChanged(false);
+      return;
+    }
+
     updateMutation.mutate(
-      // 바뀐 것만 보낸다 (PATCH = 일부만 고치기)
       {
         ...(isNameChanged && { name: name.trim() }),
         ...(isMajorsChanged && { majors }),
       },
       {
-        onSuccess: () => showToast("프로필을 저장했습니다"),
+        onSuccess: () => {
+          setIsImageChanged(false);
+          showToast("프로필을 저장했습니다");
+        },
         onError: (error) => showToast(getErrorMessage(error), "info"),
       },
     );
   };
-
   // 사진 파일을 골랐을 때: 형식·크기를 확인하고 → 파일 업로드 → 프로필 사진으로 등록
   const handlePickImage = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -179,6 +187,7 @@ function ProfileForm({ profile }: { profile: Member }) {
       setIsUploading(true);
       const fileId = await uploadImage(file, profile.memberId);
       await setImageMutation.mutateAsync(fileId);
+      setIsImageChanged(true);
       showToast("프로필 사진을 변경했습니다");
     } catch (error) {
       showToast(toMessage(error), "info");
@@ -190,7 +199,10 @@ function ProfileForm({ profile }: { profile: Member }) {
   // 사진 삭제 → 기본 이미지(이름 첫 글자)로 돌아간다
   const handleDeleteImage = () => {
     deleteImageMutation.mutate(undefined, {
-      onSuccess: () => showToast("프로필 사진을 삭제했습니다"),
+      onSuccess: () => {
+        setIsImageChanged(true);
+        showToast("프로필 사진을 삭제했습니다");
+      },
       onError: (error) => showToast(toMessage(error), "info"),
     });
   };
