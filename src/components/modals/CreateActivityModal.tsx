@@ -25,7 +25,7 @@ interface CreateActivityModalProps {
   onCreateSuccess?: (activityData: ActivityFormData) => void;
 }
 
-// ★ 서버가 받는 정원 범위 (api-docs: 1 ~ 200)
+// 서버가 받는 정원 범위 (api-docs: 1 ~ 200)
 const MIN_CAPACITY = 1;
 const MAX_CAPACITY = 200;
 
@@ -53,7 +53,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
     "스터디장 승인",
   );
   const [discordEnabled, setDiscordEnabled] = useState(false);
-  // ★ 저장을 눌렀을 때 빈 칸이 있으면 보여줄 안내 (없으면 "")
+  // 저장을 눌렀을 때 빈 칸이 있으면 보여줄 안내 (없으면 "")
   const [error, setError] = useState("");
 
   // 렌더링 단계 폼 초기화
@@ -79,6 +79,9 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
 
   if (!isOpen) return null;
 
+  // ★ 투표형일 때만 "투표 개설 시점"을 보여준다
+  const isVoteMode = topicMode === "투표형";
+
   const toggleGen = (g: string) => {
     setGenerations((prev) =>
       prev.includes(g) ? prev.filter((item) => item !== g) : [...prev, g],
@@ -91,7 +94,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
     );
   };
 
-  // ★ 서버에 보내기 전에 꼭 필요한 칸을 검사한다 (문제가 있으면 안내 문구, 없으면 "")
+  // 서버에 보내기 전에 꼭 필요한 칸을 검사한다 (문제가 있으면 안내 문구, 없으면 "")
   const validate = () => {
     if (title.trim() === "") return "활동명을 입력해 주세요.";
     const count = Number(memberCount);
@@ -114,7 +117,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
     e.preventDefault();
     const message = validate();
     if (message) {
-      // ★ 빈 칸이 있으면 창을 닫지 않고 안내만 보여준다
+      // 빈 칸이 있으면 창을 닫지 않고 안내만 보여준다
       setError(message);
       return;
     }
@@ -253,7 +256,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
               <label className="block font-bold text-gray-700 mb-2">
                 모집 인원
               </label>
-              {/* ★ type="number": 숫자만 입력 가능 ("6명" 같은 글자가 안 들어가게) */}
+              {/* type="number": 숫자만 입력 가능 ("6명" 같은 글자가 안 들어가게) */}
               <input
                 type="number"
                 min={MIN_CAPACITY}
@@ -279,7 +282,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
               <label className="block font-bold text-gray-700 mb-2">
                 종료일
               </label>
-              {/* ★ min: 시작일보다 앞은 못 고르게 */}
+              {/* min: 시작일보다 앞은 못 고르게 */}
               <input
                 type="date"
                 value={endDate}
@@ -377,18 +380,22 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
           </div>
 
           {/* 투표 개설 시점 & 참여 확정 방식 */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block font-bold text-gray-700 mb-2">
-                투표 개설 시점
-              </label>
-              <input
-                type="text"
-                value={voteTime}
-                onChange={(e) => setVoteTime(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 p-3 outline-none focus:border-black"
-              />
-            </div>
+          {/* ★ 투표형이면 두 칸, 지정형이면 참여 확정 방식만 한 줄 전체 */}
+          <div className={isVoteMode ? "grid grid-cols-2 gap-4" : ""}>
+            {/* ★ 투표형일 때만 보인다 */}
+            {isVoteMode && (
+              <div>
+                <label className="block font-bold text-gray-700 mb-2">
+                  투표 개설 시점
+                </label>
+                <input
+                  type="text"
+                  value={voteTime}
+                  onChange={(e) => setVoteTime(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 p-3 outline-none focus:border-black"
+                />
+              </div>
+            )}
 
             <div>
               <label className="block font-bold text-gray-700 mb-2">
@@ -437,7 +444,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
             </span>
           </label>
 
-          {/* ★ 빈 칸 안내 (있을 때만) */}
+          {/* 빈 칸 안내 (있을 때만) */}
           {error && (
             <p className="rounded-xl bg-red-50 px-4 py-3 font-semibold text-red-600">
               {error}
