@@ -70,7 +70,7 @@ const InvitePage: React.FC<InvitePageProps> = () => {
   const redirectTimerRef = useRef<number | null>(null);
   const goToToday = () => {
     redirectTimerRef.current = window.setTimeout(
-      // ★ navigate 대신 페이지를 새로 열며 이동한다
+      // navigate 대신 페이지를 새로 열며 이동한다
       // (입장 화면에서는 토큰이 없어 일정·할 일·내 정보를 못 불러온 상태라, 새 토큰으로 처음부터 다시 불러오게)
       () => window.location.replace("/today"),
       1000,
@@ -293,9 +293,11 @@ const InvitePage: React.FC<InvitePageProps> = () => {
   };
 
   return (
-    <div className="min-h-screen w-full overflow-hidden bg-[#f7f7f7] font-pretendard">
-      <div className="flex min-h-screen w-full">
-        <section className="relative flex min-h-screen w-[41%] min-w-[560px] flex-col bg-black px-[6.5%] py-[5.5%] text-white">
+    // ★ min-h-screen → min-h-dvh (실제 보이는 화면 높이), overflow-hidden 삭제 (내용이 잘리지 않게)
+    <div className="min-h-dvh w-full bg-[#f7f7f7] font-pretendard">
+      <div className="flex min-h-dvh w-full">
+        {/* ★ 왼쪽 검은 영역: 화면 높이만큼 채우고, 아래 상자는 mt-auto로 맨 아래에 붙인다 */}
+        <section className="flex min-h-dvh w-[41%] min-w-[560px] flex-col bg-black px-[6.5%] py-[5.5%] text-white">
           <div className="mb-[5%]">
             <img
               src={logoWhite}
@@ -335,7 +337,8 @@ const InvitePage: React.FC<InvitePageProps> = () => {
             ))}
           </div>
 
-          <div className="absolute bottom-[6%] left-[6.5%] right-[6.5%] rounded-[10px] bg-[#181818] px-5 py-4">
+          {/* ★ absolute(공중에 띄우기) 대신 mt-auto: 남은 공간을 위에 두고 맨 아래에 붙는다 (겹치지 않음) */}
+          <div className="mt-auto rounded-[10px] bg-[#181818] px-5 py-4 pt-4">
             <div className="flex items-center gap-3 text-[13px] text-[#777]">
               <img src={linkIcon} alt="" className="h-5 w-5" />
 
@@ -358,8 +361,10 @@ const InvitePage: React.FC<InvitePageProps> = () => {
           </div>
         </section>
 
-        <section className="relative flex min-h-screen flex-1 items-center justify-center bg-[#f7f7f7]">
-          <div className="w-[520px] rounded-[18px] bg-white p-[44px] shadow-[0_8px_30px_rgba(0,0,0,0.08)]">
+        {/* ★ 오른쪽: 화면 높이만큼 채우고, 카드가 길어도 위아래 여백을 둔다 */}
+        <section className="flex min-h-dvh flex-1 items-center justify-center bg-[#f7f7f7] px-6 py-10">
+          {/* ★ w-[520px] 고정 → w-full max-w-[520px] (좁은 화면에서 넘치지 않게) */}
+          <div className="w-full max-w-[520px] rounded-[18px] bg-white p-[44px] shadow-[0_8px_30px_rgba(0,0,0,0.08)]">
             <h2 className="text-[23px] font-bold tracking-[-0.03em]">
               프로필을 입력하고 입장하세요
             </h2>
