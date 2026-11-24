@@ -16,6 +16,7 @@ export interface ActivityFormData {
   topicMode: "투표형" | "지정형";
   voteTime: string;
   confirmMode: "스터디장 승인" | "선착순";
+  discordEnabled: boolean;
 }
 
 interface CreateActivityModalProps {
@@ -51,6 +52,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
   const [confirmMode, setConfirmMode] = useState<"스터디장 승인" | "선착순">(
     "스터디장 승인",
   );
+  const [discordEnabled, setDiscordEnabled] = useState(false);
   // ★ 저장을 눌렀을 때 빈 칸이 있으면 보여줄 안내 (없으면 "")
   const [error, setError] = useState("");
 
@@ -70,6 +72,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
       setTopicMode("투표형");
       setVoteTime("회차 3일 전");
       setConfirmMode("스터디장 승인");
+      setDiscordEnabled(false);
       setError("");
     }
   }
@@ -93,7 +96,11 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
     if (title.trim() === "") return "활동명을 입력해 주세요.";
     const count = Number(memberCount);
     // Number.isInteger: 소수가 아닌 정수인지
-    if (!Number.isInteger(count) || count < MIN_CAPACITY || count > MAX_CAPACITY) {
+    if (
+      !Number.isInteger(count) ||
+      count < MIN_CAPACITY ||
+      count > MAX_CAPACITY
+    ) {
       return `모집 인원은 ${MIN_CAPACITY}~${MAX_CAPACITY}명 사이 숫자로 입력해 주세요.`;
     }
     if (startDate === "") return "시작일을 선택해 주세요.";
@@ -124,6 +131,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
         topicMode,
         voteTime,
         confirmMode,
+        discordEnabled,
       });
     }
     onClose();
@@ -411,9 +419,29 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
             </div>
           </div>
 
+          {/* 디스코드 알림 설정 */}
+          <label className="flex items-start gap-3 rounded-xl border border-gray-200 p-4 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={discordEnabled}
+              onChange={(e) => setDiscordEnabled(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-black"
+            />
+            <span>
+              <span className="block font-bold text-gray-800">
+                디스코드로 모집 공지 전송
+              </span>
+              <span className="mt-1 block text-[11px] leading-relaxed text-gray-500">
+                체크하면 활동 개설 시 디스코드에도 알림을 전송합니다.
+              </span>
+            </span>
+          </label>
+
           {/* ★ 빈 칸 안내 (있을 때만) */}
           {error && (
-            <p className="rounded-xl bg-red-50 px-4 py-3 font-semibold text-red-600">{error}</p>
+            <p className="rounded-xl bg-red-50 px-4 py-3 font-semibold text-red-600">
+              {error}
+            </p>
           )}
 
           {/* Footer */}
