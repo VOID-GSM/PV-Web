@@ -1,6 +1,5 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { createNotice, type NoticeScope } from "../../api/noticeApi";
-
 import messageIcon from "../../assets/icons/message.svg";
 
 interface CreateNoticeModalProps {
@@ -20,6 +19,7 @@ const majorMap: Record<string, string> = {
 
 const globalScopes = ["팀 전체", "특정 기수 · 전공"] as const;
 const activityScopes = ["이 활동 참여자"] as const;
+
 const scopeMap: Record<string, NoticeScope> = {
   "팀 전체": "ALL",
   "이 활동 참여자": "ACTIVITY",
@@ -34,6 +34,7 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
   onSuccess,
 }) => {
   const defaultTargetRange = mode === "activity" ? "이 활동 참여자" : "팀 전체";
+
   const [targetRange, setTargetRange] = useState(defaultTargetRange);
   const [selectedGenerations, setSelectedGenerations] = useState<string[]>([]);
   const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
@@ -61,15 +62,19 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
     );
   };
 
-  const handleClose = () => {
-    if (isSubmitting) return;
+  const resetForm = () => {
     setTargetRange(defaultTargetRange);
     setSelectedGenerations([]);
     setSelectedDepartments([]);
     setTitle("");
     setContent("");
-    setErrorMessage("");
     setDiscordEnabled(true);
+    setErrorMessage("");
+  };
+
+  const handleClose = () => {
+    if (isSubmitting) return;
+    resetForm();
     onClose();
   };
 
@@ -98,14 +103,22 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
 
     if (targetRange === "특정 기수 · 전공") {
       setErrorMessage(
-        "기수별 대상 ID 연결이 필요합니다. 현재는 활동 전체 공지를 이용해 주세요.",
+        "기수별 대상 ID 연결이 필요합니다. 현재는 팀 전체 공지를 이용해 주세요.",
       );
+      return;
+    }
+
+    if (mode === "activity" && !activityId) {
+      setErrorMessage("활동 정보를 확인할 수 없습니다.");
       return;
     }
 
     const body = {
       scope: scopeMap[targetRange],
-      activityId: targetRange === "이 활동 참여자" ? activityId : undefined,
+      activityId:
+        mode === "activity" && targetRange === "이 활동 참여자"
+          ? activityId
+          : undefined,
       discordEnabled,
       title: title.trim(),
       content: content.trim(),
@@ -117,9 +130,9 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
 
       await createNotice(body);
 
-      // ★ alert 삭제: 성공 안내는 부모(Header)가 onSuccess에서 토스트로 띄운다
+      resetForm();
       onSuccess();
-      handleClose();
+      onClose();
     } catch (error) {
       console.error("공지 생성 실패:", error);
       setErrorMessage(
@@ -134,7 +147,7 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 font-pretendard">
-      <div className="relative w-full max-w-[580px] max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-7 shadow-2xl">
+      <div className="relative max-h-[90vh] w-full max-w-[580px] overflow-y-auto rounded-3xl bg-white p-7 shadow-2xl">
         <div className="flex items-start justify-between border-b border-gray-100 pb-4">
           <div>
             <h2 className="text-xl font-bold text-gray-900">공지 보내기</h2>
@@ -160,30 +173,32 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
             </label>
 
             <div className="space-y-2">
-              {(mode === "activity" ? activityScopes : globalScopes).map((range) => (
-                <button
-                  key={range}
-                  type="button"
-                  onClick={() => setTargetRange(range)}
-                  className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left ${
-                    targetRange === range
-                      ? "border-black bg-white ring-1 ring-black font-bold"
-                      : "border-gray-200 bg-gray-50 text-gray-600"
-                  }`}
-                >
-                  <span
-                    className={`h-3.5 w-3.5 rounded-full border border-black ${
-                      targetRange === range ? "bg-black" : "bg-white"
+              {(mode === "activity" ? activityScopes : globalScopes).map(
+                (range) => (
+                  <button
+                    key={range}
+                    type="button"
+                    onClick={() => setTargetRange(range)}
+                    className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left ${
+                      targetRange === range
+                        ? "border-black bg-white font-bold ring-1 ring-black"
+                        : "border-gray-200 bg-gray-50 text-gray-600"
                     }`}
-                  />
-                  {range}
-                </button>
-              ))}
+                  >
+                    <span
+                      className={`h-3.5 w-3.5 rounded-full border border-black ${
+                        targetRange === range ? "bg-black" : "bg-white"
+                      }`}
+                    />
+                    {range}
+                  </button>
+                ),
+              )}
             </div>
           </div>
 
           {targetRange === "특정 기수 · 전공" && (
-            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+            <div className="space-y-3 rounded-2xl border border-gray-200 bg-gray-50 p-4">
               <div>
                 <p className="mb-2 font-bold">기수 선택</p>
                 <div className="flex gap-2">
@@ -272,6 +287,7 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
                 className="h-5 w-5 accent-black"
               />
             </label>
+
             <p className="mt-2 text-[11px] text-gray-400">
               디스코드에는 공지 제목만 전송돼요.
             </p>
