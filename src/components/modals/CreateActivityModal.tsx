@@ -50,6 +50,10 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
   const [confirmMode, setConfirmMode] = useState<"스터디장 승인" | "선착순">(
     "스터디장 승인",
   );
+
+  const [discordEnabled, setDiscordEnabled] = useState(false);
+  // ★ 저장을 눌렀을 때 빈 칸이 있으면 보여줄 안내 (없으면 "")
+
   const [error, setError] = useState("");
 
   // 모달을 새로 열 때 폼 초기화
@@ -71,6 +75,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
       setTopicMode("투표형");
       setVoteTime("회차 3일 전");
       setConfirmMode("스터디장 승인");
+      setDiscordEnabled(false);
       setError("");
     }
   }
@@ -119,6 +124,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
       return;
     }
 
+
     onCreateSuccess?.({
       title,
       type,
@@ -133,6 +139,24 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
       confirmMode,
       discordEnabled,
     });
+
+
+    if (onCreateSuccess) {
+      onCreateSuccess({
+        title,
+        type,
+        generations,
+        departments,
+        memberCount,
+        startDate,
+        endDate,
+        repeatRule,
+        topicMode,
+        voteTime,
+        confirmMode,
+        discordEnabled,
+      });
+    }
 
     onClose();
   };
@@ -442,11 +466,16 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
           </div>
 
           {/* 디스코드 알림 설정 */}
+
           <label className="flex items-center gap-3 rounded-xl border border-gray-200 p-4 cursor-pointer hover:bg-gray-50 transition">
+
+          <label className="flex items-start gap-3 rounded-xl border border-gray-200 p-4 cursor-pointer">
+
             <input
               type="checkbox"
               checked={discordEnabled}
               onChange={(e) => setDiscordEnabled(e.target.checked)}
+
               className="h-4 w-4 accent-black"
             />
 
@@ -457,11 +486,21 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
 
               <span className="text-[11px] text-gray-500">
                 활동 개설 시 디스코드 채널에도 알림을 전송합니다.
+
+              className="mt-0.5 h-4 w-4 accent-black"
+            />
+            <span>
+              <span className="block font-bold text-gray-800">
+                디스코드로 모집 공지 전송
+              </span>
+              <span className="mt-1 block text-[11px] leading-relaxed text-gray-500">
+                체크하면 활동 개설 시 디스코드에도 알림을 전송합니다.
+
               </span>
             </span>
           </label>
 
-          {/* 빈 칸 안내 */}
+
           {error && (
             <p className="rounded-xl bg-red-50 px-4 py-3 font-semibold text-red-600">
               {error}
