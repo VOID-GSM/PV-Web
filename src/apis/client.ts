@@ -1,11 +1,7 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
 import { tokenStorage } from "./tokenStorage";
 // 재발급은 api/client.ts와 같은 공용 함수를 쓴다 (두 군데가 따로 재발급하지 않게)
-import {
-  goToPendingPage,
-  isPendingMemberError,
-  refreshSession,
-} from "../api/session";
+import { goToPendingPage, refreshSession } from "../api/session";
 
 // ─────────────────────────────────────────────
 // 1) 우리 서버 전용 axios 만들기
@@ -56,13 +52,13 @@ api.interceptors.response.use(
 
     // ★ 가입 승인 대기 중인 사람: 승인 대기 화면으로 보낸다
     // (일반 권한 부족 403과 섞이지 않게 메시지까지 확인한다)
-    const serverMessage = (
-      error.response?.data as { message?: string } | undefined
-    )?.message;
-    if (status === 403 && isPendingMemberError(status, serverMessage)) {
-      goToPendingPage();
-      // 끝나지 않는 약속: 화면이 넘어가는 동안 에러 토스트가 깜빡이지 않게
-      return new Promise(() => {});
+    if (status === 403 && !original?.url?.includes("/auth/refresh")) {
+      const result = await refreshSession();
+
+      if (result === "pending") {
+        goToPendingPage();
+        return new Promise(() => {});
+      }
     }
 
     // ★ 401이고, 아직 재시도 안 한 요청일 때만 (같은 요청을 무한히 재시도하지 않게 _retry로 막는다)

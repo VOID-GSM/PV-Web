@@ -9,6 +9,7 @@ import ArchivePage from "./pages/ArchivePage";
 import ArticleEditorPage from "./pages/ArticleEditorPage";
 import WeeklyReportPage from "./pages/WeeklyReportPage";
 import InvitePage from "./pages/InvitePage";
+import PendingPage from "./pages/PendingPage";
 // ★ 재입장 링크로 들어왔을 때 보여줄 화면
 import ReEntryPage from "./pages/ReEntryPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -344,6 +345,7 @@ export default function App() {
             />
           }
         >
+          <Route path="/pending" element={<PendingPage />} />
           <Route path="/" element={<Navigate to="/today" replace />} />
 
           <Route
