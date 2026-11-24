@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { createNotice, type NoticeScope } from "../../api/noticeApi";
 
 import bellIcon from "../../assets/icons/bell.svg";
@@ -26,6 +26,13 @@ const scopeMap: Record<string, NoticeScope> = {
   "특정 기수 · 전공": "TARGET",
 };
 
+// 모듈 로드 시 한 번 계산해 렌더링 중 Date.now()를 호출하지 않는다.
+const MIN_SCHEDULED_AT = (() => {
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  return now.toISOString().slice(0, 16);
+})();
+
 const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
   isOpen,
   activityId,
@@ -33,9 +40,26 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const [targetRange, setTargetRange] = useState(
-    mode === "activity" ? "이 활동 참여자" : "팀 전체",
-  );
+  const defaultTargetRange = mode === "activity" ? "이 활동 참여자" : "팀 전체";
+
+  const scopeOptions =
+    mode === "activity"
+      ? ["팀 전체", "이 활동 참여자", "특정 기수 · 전공"]
+      : ["팀 전체", "특정 보드 참여자", "특정 기수 · 전공"];
+
+  const [targetRangeState, setTargetRangeState] = useState({
+    mode,
+    value: defaultTargetRange,
+  });
+  // mode가 바뀌면 effect 없이 해당 모드의 기본 범위를 사용한다.
+  const targetRange =
+    targetRangeState.mode === mode
+      ? targetRangeState.value
+      : defaultTargetRange;
+  const setTargetRange = (value: string) =>
+    setTargetRangeState({ mode, value });
+  const activeTargetRange = targetRange;
+
   const [scheduledAt, setScheduledAt] = useState("");
   const [selectedGenerations, setSelectedGenerations] = useState<string[]>([]);
   const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
@@ -47,15 +71,6 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
   const [scheduled, setScheduled] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-
-  const scopeOptions =
-    mode === "activity"
-      ? ["팀 전체", "이 활동 참여자", "특정 기수 · 전공"]
-      : ["팀 전체", "특정 보드 참여자", "특정 기수 · 전공"];
-
-  useEffect(() => {
-    setTargetRange(mode === "activity" ? "이 활동 참여자" : "팀 전체");
-  }, [mode]);
 
   if (!isOpen) return null;
 
@@ -77,7 +92,7 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
 
   const handleClose = () => {
     if (isSubmitting) return;
-    setTargetRange(mode === "activity" ? "이 활동 참여자" : "팀 전체");
+    setTargetRange(defaultTargetRange);
     setSelectedGenerations([]);
     setSelectedDepartments([]);
     setTitle("");
@@ -129,14 +144,14 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
       return;
     }
 
-    if (targetRange === "특정 기수 · 전공") {
+    if (activeTargetRange === "특정 기수 · 전공") {
       setErrorMessage(
         "기수별 대상 ID 연결이 필요합니다. 현재는 활동 전체 공지를 이용해 주세요.",
       );
       return;
     }
 
-    if (targetRange === "특정 보드 참여자") {
+    if (activeTargetRange === "특정 보드 참여자") {
       setErrorMessage(
         "보드 ID 연결이 필요합니다. 현재는 활동 전체 공지를 이용해 주세요.",
       );
@@ -144,9 +159,9 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
     }
 
     const body = {
-      scope: scopeMap[targetRange],
+      scope: scopeMap[activeTargetRange],
       activityId:
-        mode === "activity" && targetRange === "이 활동 참여자"
+        mode === "activity" && activeTargetRange === "이 활동 참여자"
           ? activityId
           : undefined,
       title: title.trim(),
@@ -208,14 +223,14 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
                   type="button"
                   onClick={() => setTargetRange(range)}
                   className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left ${
-                    targetRange === range
+                    activeTargetRange === range
                       ? "border-black bg-white ring-1 ring-black font-bold"
                       : "border-gray-200 bg-gray-50 text-gray-600"
                   }`}
                 >
                   <span
                     className={`h-3.5 w-3.5 rounded-full border border-black ${
-                      targetRange === range ? "bg-black" : "bg-white"
+                      activeTargetRange === range ? "bg-black" : "bg-white"
                     }`}
                   />
                   {range}
@@ -224,7 +239,7 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
             </div>
           </div>
 
-          {targetRange === "특정 기수 · 전공" && (
+          {activeTargetRange === "특정 기수 · 전공" && (
             <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 space-y-3">
               <div>
                 <p className="mb-2 font-bold">기수 선택</p>
@@ -364,14 +379,13 @@ const CreateNoticeModal: React.FC<CreateNoticeModalProps> = ({
                   id="notice-scheduled-at"
                   type="datetime-local"
                   value={scheduledAt}
-                  min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
-                    .toISOString()
-                    .slice(0, 16)}
+                  min={MIN_SCHEDULED_AT}
                   onChange={(event) => setScheduledAt(event.target.value)}
                   className="w-full rounded-lg border border-gray-300 bg-white p-3 outline-none focus:border-black"
                 />
                 <p className="mt-2 text-[10px] leading-4 text-gray-500">
-                  현재 백엔드 API는 예약 발송을 지원하지 않아, 시간 설정 UI만 제공돼.
+                  현재 백엔드 API는 예약 발송을 지원하지 않아, 시간 설정 UI만
+                  제공돼.
                 </p>
               </div>
             )}
