@@ -33,6 +33,7 @@ export interface ActivityDetail {
   repeatDayOfWeek?: string;
   repeatTime?: string;
   topicOpenDaysBefore?: number;
+  discordEnabled?: boolean;
   // summary 안이 아니라 상세 바로 아래로 올 수도 있어서 둘 다 받아 둔다
   myApplicationStatus?: ApplicationStatus;
   members?: ActivityMember[];
@@ -73,6 +74,7 @@ export interface ActivityCreateRequest {
   recruitMode: "FIRST_COME" | "APPROVAL";
   topicMode: "VOTE" | "ASSIGNED";
   topicOpenDaysBefore?: number;
+  discordEnabled?: boolean;
 }
 // 활동 수정 (PATCH). 모두 선택 항목이고, 개설 후에는 아래 항목만 바꿀 수 있다.
 // ⚠ startDate / endDate를 보내면 서버가 400을 준다. 요일·시간도 수정할 수 없다.

@@ -216,6 +216,7 @@ export const Header: React.FC<HeaderProps> = ({
         topicOpenDaysBefore: Number.isFinite(topicOpenDaysBefore)
           ? topicOpenDaysBefore
           : 3,
+        discordEnabled: form.discordEnabled,
       });
 
       showToast(
@@ -535,6 +536,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       <CreateNoticeModal
         isOpen={isNoticeModalOpen}
+        mode="global"
         onClose={() => setIsNoticeModalOpen(false)}
         activityId={0}
         onSuccess={() => {
