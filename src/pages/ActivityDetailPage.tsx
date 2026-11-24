@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   getActivities,
   getActivity,
+  deleteActivity,
   getActivitySessions,
   getActivityMembers,
   getTopicCandidates,
@@ -201,6 +202,8 @@ export default function ActivityDetailPage() {
   const [isAbsenceModalOpen, setIsAbsenceModalOpen] = useState(false);
   const [isCreateArticleOpen, setIsCreateArticleOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isDeletingActivity, setIsDeletingActivity] = useState(false);
 
   // ─────────────────────────────────────────────
   // 참여 신청 (신청하기 / 신청 취소 / 나가기 / 스터디장의 승인·거절)
@@ -434,6 +437,31 @@ export default function ActivityDetailPage() {
           : "활동 설정을 저장하지 못했습니다.",
       );
       return false;
+    }
+  };
+  const handleDeleteActivity = async () => {
+    if (!canManage || !Number.isFinite(activityId) || isDeletingActivity) {
+      return;
+    }
+
+    try {
+      setIsDeletingActivity(true);
+
+      await deleteActivity(activityId);
+
+      setIsDeleteConfirmOpen(false);
+      setIsSettingsModalOpen(false);
+
+      showToast("활동을 삭제했습니다.", "success");
+
+      navigate("/activity", { replace: true });
+    } catch (error) {
+      console.error("활동 삭제 실패:", error);
+      showToast(
+        error instanceof Error ? error.message : "활동을 삭제하지 못했습니다.",
+      );
+    } finally {
+      setIsDeletingActivity(false);
     }
   };
 
@@ -1769,7 +1797,23 @@ export default function ActivityDetailPage() {
         onClose={() => setIsSettingsModalOpen(false)}
         activity={currentDetail}
         onSave={handleSaveSettings}
+        onDelete={() => setIsDeleteConfirmOpen(true)}
       />
+      {isDeleteConfirmOpen && (
+        <ConfirmModal
+          title="활동을 삭제할까요?"
+          message="활동을 삭제하면 되돌릴 수 없습니다. 정말 삭제하시겠습니까?"
+          confirmLabel={isDeletingActivity ? "삭제 중..." : "삭제하기"}
+          cancelLabel="취소"
+          danger
+          onConfirm={() => void handleDeleteActivity()}
+          onCancel={() => {
+            if (!isDeletingActivity) {
+              setIsDeleteConfirmOpen(false);
+            }
+          }}
+        />
+      )}
 
       <ArticleDetailModal
         article={selectedArticle}
