@@ -218,6 +218,7 @@ export const Header: React.FC<HeaderProps> = ({
         topicOpenDaysBefore: Number.isFinite(topicOpenDaysBefore)
           ? topicOpenDaysBefore
           : 3,
+        discordEnabled: form.discordEnabled,
       });
 
       // ★ 활동 화면에 "목록 다시 불러와!" 신호 보내기 (새로고침 안 해도 바로 보인다)
@@ -538,6 +539,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       <CreateNoticeModal
         isOpen={isNoticeModalOpen}
+        mode="global"
         onClose={() => setIsNoticeModalOpen(false)}
         activityId={0}
         onSuccess={() => {

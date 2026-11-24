@@ -1,4 +1,3 @@
-// src/components/modals/CreateActivityModal.tsx
 import React, { useState } from "react";
 
 import alertIcon from "../../assets/icons/alert.svg";
@@ -25,7 +24,6 @@ interface CreateActivityModalProps {
   onCreateSuccess?: (activityData: ActivityFormData) => void;
 }
 
-// 서버가 받는 정원 범위 (api-docs: 1 ~ 200)
 const MIN_CAPACITY = 1;
 const MAX_CAPACITY = 200;
 
@@ -40,7 +38,6 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
   const [departments, setDepartments] = useState<string[]>([]);
   const [memberCount, setMemberCount] = useState("");
 
-  // 시작일 / 종료일 분리 및 날짜 선택 지원
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
@@ -52,20 +49,25 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
   const [confirmMode, setConfirmMode] = useState<"스터디장 승인" | "선착순">(
     "스터디장 승인",
   );
+
   const [discordEnabled, setDiscordEnabled] = useState(false);
-  // 저장을 눌렀을 때 빈 칸이 있으면 보여줄 안내 (없으면 "")
+  // ★ 저장을 눌렀을 때 빈 칸이 있으면 보여줄 안내 (없으면 "")
+
   const [error, setError] = useState("");
 
-  // 렌더링 단계 폼 초기화
+  // 모달을 새로 열 때 폼 초기화
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+
   if (isOpen !== prevIsOpen) {
     setPrevIsOpen(isOpen);
+
     if (isOpen) {
       setType("스터디");
       setTitle("");
       setGenerations([]);
       setDepartments([]);
       setMemberCount("");
+      setDiscordEnabled(false);
       setStartDate("");
       setEndDate("");
       setRepeatRule("매주 수요일 16:00 · 전공동아리 시간");
@@ -79,7 +81,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
 
   if (!isOpen) return null;
 
-  // ★ 투표형일 때만 "투표 개설 시점"을 보여준다
+  // ★ 투표형일 때만 "투표 개설 시점"을 보여준다 (지정형은 투표가 없어서)
   const isVoteMode = topicMode === "투표형";
 
   const toggleGen = (g: string) => {
@@ -94,11 +96,11 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
     );
   };
 
-  // 서버에 보내기 전에 꼭 필요한 칸을 검사한다 (문제가 있으면 안내 문구, 없으면 "")
   const validate = () => {
     if (title.trim() === "") return "활동명을 입력해 주세요.";
+
     const count = Number(memberCount);
-    // Number.isInteger: 소수가 아닌 정수인지
+
     if (
       !Number.isInteger(count) ||
       count < MIN_CAPACITY ||
@@ -106,40 +108,41 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
     ) {
       return `모집 인원은 ${MIN_CAPACITY}~${MAX_CAPACITY}명 사이 숫자로 입력해 주세요.`;
     }
+
     if (startDate === "") return "시작일을 선택해 주세요.";
     if (endDate === "") return "종료일을 선택해 주세요.";
-    // "2026-11-10" 모양은 글자 비교로도 날짜 순서가 맞다
     if (endDate < startDate) return "종료일은 시작일 이후여야 합니다.";
+
     return "";
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
     const message = validate();
+
     if (message) {
-      // 빈 칸이 있으면 창을 닫지 않고 안내만 보여준다
       setError(message);
       return;
     }
-    if (onCreateSuccess) {
-      onCreateSuccess({
-        title,
-        type,
-        generations,
-        departments,
-        memberCount,
-        startDate,
-        endDate,
-        repeatRule,
-        topicMode,
-        voteTime,
-        confirmMode,
-        discordEnabled,
-      });
-    }
+
+    onCreateSuccess?.({
+      title,
+      type,
+      generations,
+      departments,
+      memberCount,
+      startDate,
+      endDate,
+      repeatRule,
+      topicMode,
+      voteTime,
+      confirmMode,
+      discordEnabled,
+    });
+
     onClose();
   };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 font-pretendard select-none">
       <div className="relative w-full max-w-[620px] max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-7 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
@@ -150,6 +153,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
               스터디 · 면접 준비 · 포폴 피드백 같은 자체 활동을 만듭니다
             </p>
           </div>
+
           <button
             type="button"
             onClick={onClose}
@@ -165,6 +169,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
             <label className="block font-bold text-gray-700 mb-2">
               활동 유형
             </label>
+
             <div className="flex gap-2">
               {["스터디", "면접 준비", "포폴 피드백", "기타"].map((item) => (
                 <button
@@ -193,6 +198,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
           {/* 활동명 */}
           <div>
             <label className="block font-bold text-gray-700 mb-2">활동명</label>
+
             <input
               type="text"
               value={title}
@@ -209,6 +215,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
               <label className="block font-bold text-gray-700 mb-2">
                 대상 기수
               </label>
+
               <div className="flex flex-wrap gap-2">
                 {["9기", "10기", "전체"].map((g) => (
                   <button
@@ -231,6 +238,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
               <label className="block font-bold text-gray-700 mb-2">
                 대상 전공
               </label>
+
               <div className="flex flex-wrap gap-2">
                 {["Front-end", "Back-end", "DevOps", "Design"].map((d) => (
                   <button
@@ -250,13 +258,13 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
             </div>
           </div>
 
-          {/* 모집 인원 & 기간 설정 (시작일/종료일) */}
+          {/* 모집 인원 & 기간 설정 */}
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block font-bold text-gray-700 mb-2">
                 모집 인원
               </label>
-              {/* type="number": 숫자만 입력 가능 ("6명" 같은 글자가 안 들어가게) */}
+
               <input
                 type="number"
                 min={MIN_CAPACITY}
@@ -267,10 +275,12 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
                 className="w-full rounded-xl border border-gray-200 p-3 outline-none focus:border-black"
               />
             </div>
+
             <div>
               <label className="block font-bold text-gray-700 mb-2">
                 시작일
               </label>
+
               <input
                 type="date"
                 value={startDate}
@@ -278,11 +288,12 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
                 className="w-full rounded-xl border border-gray-200 p-2.5 outline-none focus:border-black font-medium bg-white"
               />
             </div>
+
             <div>
               <label className="block font-bold text-gray-700 mb-2">
                 종료일
               </label>
-              {/* min: 시작일보다 앞은 못 고르게 */}
+
               <input
                 type="date"
                 value={endDate}
@@ -298,6 +309,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
             <label className="block font-bold text-gray-700 mb-2">
               반복 규칙
             </label>
+
             <select
               value={repeatRule}
               onChange={(e) => setRepeatRule(e.target.value)}
@@ -316,6 +328,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
               alt=""
               className="h-4 w-4 shrink-0 mt-0.5 text-blue-600"
             />
+
             <div>
               <p className="font-bold">기본값이 자동으로 채워졌습니다</p>
               <p className="mt-0.5 text-[11px] opacity-80">
@@ -330,6 +343,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
             <label className="block font-bold text-gray-700 mb-2">
               주제 결정 방식
             </label>
+
             <div className="grid grid-cols-2 gap-3">
               <div
                 onClick={() => setTopicMode("투표형")}
@@ -341,14 +355,18 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
               >
                 <div className="flex items-center gap-2 font-bold text-gray-900">
                   <span
-                    className={`h-3.5 w-3.5 rounded-full border border-black flex items-center justify-center ${topicMode === "투표형" ? "bg-black" : "bg-white"}`}
+                    className={`h-3.5 w-3.5 rounded-full border border-black flex items-center justify-center ${
+                      topicMode === "투표형" ? "bg-black" : "bg-white"
+                    }`}
                   >
                     {topicMode === "투표형" && (
                       <span className="h-1.5 w-1.5 rounded-full bg-white" />
                     )}
                   </span>
+
                   <span>투표형</span>
                 </div>
+
                 <p className="mt-1.5 text-[11px] text-gray-500 leading-tight">
                   회차 N일 전 투표가 자동으로 열리고 최다 득표 주제가 확정됩니다
                 </p>
@@ -364,14 +382,18 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
               >
                 <div className="flex items-center gap-2 font-bold text-gray-900">
                   <span
-                    className={`h-3.5 w-3.5 rounded-full border border-black flex items-center justify-center ${topicMode === "지정형" ? "bg-black" : "bg-white"}`}
+                    className={`h-3.5 w-3.5 rounded-full border border-black flex items-center justify-center ${
+                      topicMode === "지정형" ? "bg-black" : "bg-white"
+                    }`}
                   >
                     {topicMode === "지정형" && (
                       <span className="h-1.5 w-1.5 rounded-full bg-white" />
                     )}
                   </span>
+
                   <span>지정형</span>
                 </div>
+
                 <p className="mt-1.5 text-[11px] text-gray-500 leading-tight">
                   회차 N일 전 스터디장에게 주제 입력 알림이 갑니다
                 </p>
@@ -388,6 +410,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
                 <label className="block font-bold text-gray-700 mb-2">
                   투표 개설 시점
                 </label>
+
                 <input
                   type="text"
                   value={voteTime}
@@ -401,6 +424,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
               <label className="block font-bold text-gray-700 mb-2">
                 참여 확정 방식
               </label>
+
               <div className="flex items-center gap-4 pt-2">
                 <label className="flex items-center gap-2 cursor-pointer font-bold text-gray-800">
                   <input
@@ -412,6 +436,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
                   />
                   <span>스터디장 승인</span>
                 </label>
+
                 <label className="flex items-center gap-2 cursor-pointer font-medium text-gray-500">
                   <input
                     type="radio"
@@ -427,24 +452,27 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
           </div>
 
           {/* 디스코드 알림 설정 */}
-          <label className="flex items-start gap-3 rounded-xl border border-gray-200 p-4 cursor-pointer">
+
+          {/* 디스코드 알림 설정 */}
+          <label className="flex items-center gap-3 rounded-xl border border-gray-200 p-4 cursor-pointer hover:bg-gray-50 transition">
             <input
               type="checkbox"
               checked={discordEnabled}
               onChange={(e) => setDiscordEnabled(e.target.checked)}
-              className="mt-0.5 h-4 w-4 accent-black"
+              className="h-4 w-4 accent-black"
             />
-            <span>
-              <span className="block font-bold text-gray-800">
+
+            <span className="flex flex-col gap-1">
+              <span className="font-bold text-gray-800">
                 디스코드로 모집 공지 전송
               </span>
-              <span className="mt-1 block text-[11px] leading-relaxed text-gray-500">
+
+              <span className="text-[11px] text-gray-500">
                 체크하면 활동 개설 시 디스코드에도 알림을 전송합니다.
               </span>
             </span>
           </label>
 
-          {/* 빈 칸 안내 (있을 때만) */}
           {error && (
             <p className="rounded-xl bg-red-50 px-4 py-3 font-semibold text-red-600">
               {error}
@@ -456,6 +484,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
             <span className="text-[11px] text-gray-400">
               개설하면 대상 기수·전공 팀원에게 모집 공지가 발송됩니다
             </span>
+
             <div className="flex gap-2">
               <button
                 type="button"
@@ -464,11 +493,12 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
               >
                 취소
               </button>
+
               <button
                 type="submit"
                 className="rounded-xl bg-black px-5 py-2.5 font-bold text-white hover:bg-gray-800 transition cursor-pointer"
               >
-                활동 개설
+                {"활동 개설"}
               </button>
             </div>
           </div>

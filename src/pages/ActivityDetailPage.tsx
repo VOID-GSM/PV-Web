@@ -1707,6 +1707,7 @@ export default function ActivityDetailPage() {
 
       <CreateNoticeModal
         isOpen={isNoticeModalOpen}
+        mode="activity"
         onClose={() => setIsNoticeModalOpen(false)}
         activityId={activityId}
         onSuccess={async () => {

@@ -8,6 +8,7 @@ export interface NoticeCreateRequest {
   activityId?: number;
   generationIds?: number[];
   majors?: string[];
+  discordEnabled?: boolean;
   title: string;
   content: string;
 }
