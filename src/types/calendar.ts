@@ -13,6 +13,10 @@ export interface CalendarEvent {
   description?: string;
   isMyEvent?: boolean;
   completed?: boolean;
+  // ★ 보드 마감일 때: 어느 보드의 마감인지 (보드 번호)
+  boardId?: number;
+  // ★ 보드 마감일 때: 담당자 회원 번호들 (assignees는 화면에 보여줄 이름)
+  assigneeIds?: number[];
 }
 
 export interface BoardFilter {
