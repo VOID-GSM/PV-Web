@@ -80,6 +80,9 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
 
   if (!isOpen) return null;
 
+  // ★ 투표형일 때만 "투표 개설 시점"을 보여준다 (지정형은 투표가 없어서)
+  const isVoteMode = topicMode === "투표형";
+
   const toggleGen = (g: string) => {
     setGenerations((prev) =>
       prev.includes(g) ? prev.filter((item) => item !== g) : [...prev, g],
@@ -398,19 +401,23 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
           </div>
 
           {/* 투표 개설 시점 & 참여 확정 방식 */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block font-bold text-gray-700 mb-2">
-                투표 개설 시점
-              </label>
+          {/* ★ 투표형이면 두 칸, 지정형이면 참여 확정 방식만 한 줄 전체 */}
+          <div className={isVoteMode ? "grid grid-cols-2 gap-4" : ""}>
+            {/* ★ 투표형일 때만 보인다 */}
+            {isVoteMode && (
+              <div>
+                <label className="block font-bold text-gray-700 mb-2">
+                  투표 개설 시점
+                </label>
 
-              <input
-                type="text"
-                value={voteTime}
-                onChange={(e) => setVoteTime(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 p-3 outline-none focus:border-black"
-              />
-            </div>
+                <input
+                  type="text"
+                  value={voteTime}
+                  onChange={(e) => setVoteTime(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 p-3 outline-none focus:border-black"
+                />
+              </div>
+            )}
 
             <div>
               <label className="block font-bold text-gray-700 mb-2">

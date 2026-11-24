@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, getErrorMessage } from "../apis/client";
-// ★ 토큰 저장은 키 이름을 직접 쓰지 않고 tokenStorage로
+// 토큰 저장은 키 이름을 직접 쓰지 않고 tokenStorage로
 import { tokenStorage } from "../apis/tokenStorage";
 
 // 재입장 응답 모양 (POST /auth/re-entry/{code})
@@ -14,16 +14,13 @@ interface ReEntryResponse {
   refreshToken: string;
 }
 
-// ★ 토큰 말고 같이 정리할 저장 이름 (친구 InvitePage와 같은 이름)
+// 토큰 말고 같이 정리할 저장 이름 (친구 InvitePage와 같은 이름)
 const MEMBER_ID_KEY = "pvweb:memberId";
 // 입장할 때 기기에 저장해 둔 프로필 (사이드바가 서버 정보 전에 잠깐 보여준다)
 const INVITE_PROFILE_KEY = "pvweb:invite-profile:v1";
 
-// 화면 상태: 처리 중 / 승인 대기 / 실패
-type ReEntryState =
-  | { kind: "loading" }
-  | { kind: "pending" }
-  | { kind: "error"; message: string };
+// ★ 화면 상태: 처리 중 / 실패 (승인 대기는 /pending 화면이 맡는다)
+type ReEntryState = { kind: "loading" } | { kind: "error"; message: string };
 
 export default function ReEntryPage() {
   // 주소의 :code 부분 (예: /re-entry/2d6252... → "2d6252...")
@@ -50,22 +47,17 @@ export default function ReEntryPage() {
         // encodeURIComponent: 코드에 특수문자가 있어도 주소가 깨지지 않게
         const { data } = await api.post<ReEntryResponse>(`/auth/re-entry/${encodeURIComponent(code)}`);
 
-        // ★ 성공했을 때만 이 기기의 계정 정보를 새 계정으로 덮어쓴다
+        // 성공했을 때만 이 기기의 계정 정보를 새 계정으로 덮어쓴다
         // (실패하면 지금 쓰던 계정은 그대로 남는다)
         tokenStorage.set(data.accessToken, data.refreshToken);
         localStorage.setItem(MEMBER_ID_KEY, String(data.memberId));
-        // ★ 예전 계정의 저장 프로필을 지운다 (사이드바에 다른 사람 이름이 보이지 않게)
+        // 예전 계정의 저장 프로필을 지운다 (사이드바에 다른 사람 이름이 보이지 않게)
         localStorage.removeItem(INVITE_PROFILE_KEY);
 
-        if (data.status === "PENDING") {
-          // 아직 부장 승인 전이면 안내만 보여준다 (await 뒤라 경고 없음)
-          setState({ kind: "pending" });
-          return;
-        }
-
+        // ★ 승인 대기면 /pending, 가입 완료면 /today
         // window.location.replace: 페이지를 새로 열어서, 새 토큰으로 모든 정보를 처음부터 불러오게 한다
         // (navigate로 이동하면 App이 들고 있던 예전 계정의 일정·할 일이 남을 수 있다)
-        window.location.replace("/today");
+        window.location.replace(data.status === "PENDING" ? "/pending" : "/today");
       } catch (error) {
         setState({ kind: "error", message: getErrorMessage(error) });
       }
@@ -83,13 +75,6 @@ export default function ReEntryPage() {
           <>
             <p className="mt-6 text-sm font-semibold text-gray-800">재입장하는 중입니다...</p>
             <p className="mt-1 text-xs text-gray-400">잠시만 기다려 주세요</p>
-          </>
-        )}
-
-        {state.kind === "pending" && (
-          <>
-            <p className="mt-6 text-sm font-semibold text-gray-800">부장 승인을 기다리고 있어요</p>
-            <p className="mt-1 text-xs text-gray-400">승인되면 다시 이 링크로 들어와 주세요</p>
           </>
         )}
 

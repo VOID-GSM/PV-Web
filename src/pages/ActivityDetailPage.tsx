@@ -37,6 +37,8 @@ import {
   formatActivitySchedule,
   formatTopicRule,
 } from "../utils/activitySchedule";
+// ★ 활동 목록이 바뀌었다는 신호 이름 (Header에서 활동을 만들면 이 신호가 온다)
+import { ACTIVITIES_CHANGED_EVENT } from "../utils/activityEvents";
 import { Header } from "../components/layout/Header";
 import ConfirmModal from "../components/common/ConfirmModal";
 import CreateNoticeModal from "../components/modals/CreateNoticeModal";
@@ -150,17 +152,35 @@ export default function ActivityDetailPage() {
   }, [toast]);
 
   // 활동 선택 칩에 쓸 전체 활동 목록
+  // ★ 처음 한 번 + Header에서 활동을 만들 때마다(신호) 다시 불러온다 (새로고침 없이 바로 보이게)
   useEffect(() => {
     let cancelled = false;
-    getActivities()
-      .then((list) => {
-        if (!cancelled) setAllActivities(list ?? []);
-      })
-      .catch((error: unknown) => console.error("활동 목록 조회 실패:", error));
+
+    const loadActivities = () => {
+      getActivities()
+        .then((list) => {
+          if (cancelled) return;
+          const items = list ?? [];
+          setAllActivities(items);
+          // ★ 활동이 하나도 없던 화면(/activity)에서 새 활동이 생기면 그 활동으로 이동
+          if (!id && items.length > 0) {
+            navigate(`/activity/${items[0].id}`, { replace: true });
+          }
+        })
+        .catch((error: unknown) =>
+          console.error("활동 목록 조회 실패:", error),
+        );
+    };
+
+    loadActivities();
+    // ★ 신호를 듣기 시작 (화면을 떠나면 아래 return에서 그만 듣는다)
+    window.addEventListener(ACTIVITIES_CHANGED_EVENT, loadActivities);
+
     return () => {
       cancelled = true;
+      window.removeEventListener(ACTIVITIES_CHANGED_EVENT, loadActivities);
     };
-  }, []);
+  }, [id, navigate]);
 
   const [absenceRequests, setAbsenceRequests] = useState<AbsenceRequest[]>([]);
 
