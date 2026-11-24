@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, getErrorMessage } from "../apis/client";
+// 토큰 저장은 키 이름을 직접 쓰지 않고 tokenStorage로
+import { tokenStorage } from "../apis/tokenStorage";
 
 // 재입장 응답 모양 (POST /auth/re-entry/{code})
 interface ReEntryResponse {
@@ -12,21 +14,23 @@ interface ReEntryResponse {
   refreshToken: string;
 }
 
-// 토큰 저장 이름 (tokenStorage.ts, 친구 api/client.ts와 같은 이름)
 
 
-// 화면 상태: 처리 중 / 승인 대기 / 실패
-type ReEntryState =
-  | { kind: "loading" }
-  | { kind: "pending" }
-  | { kind: "error"; message: string };
+
+const MEMBER_ID_KEY = "pvweb:memberId";
+// 입장할 때 기기에 저장해 둔 프로필 (사이드바가 서버 정보 전에 잠깐 보여준다)
+const INVITE_PROFILE_KEY = "pvweb:invite-profile:v1";
+
+
+// ★ 화면 상태: 처리 중 / 실패 (승인 대기는 /pending 화면이 맡는다)
+type ReEntryState = { kind: "loading" } | { kind: "error"; message: string };
 
 export default function ReEntryPage() {
   // 주소의 :code 부분 (예: /re-entry/2d6252... → "2d6252...")
   const { code } = useParams();
   const navigate = useNavigate();
 
-  // ★ 처음 상태: 코드가 없으면 바로 "실패", 있으면 "처리 중"
+  // 처음 상태: 코드가 없으면 바로 "실패", 있으면 "처리 중"
   // (useEffect 안에서 바로 setState하면 ESLint 경고가 나서, 처음부터 정해 둔다)
   const [state, setState] = useState<ReEntryState>(() =>
     code
@@ -34,11 +38,12 @@ export default function ReEntryPage() {
       : { kind: "error", message: "재입장 코드가 없습니다." },
   );
 
-  // 개발 모드에서 화면이 두 번 그려져도 요청은 한 번만 보내려고 기억해 둔다
+  // 개발 모드(StrictMode)에서 화면이 두 번 그려져도 요청은 한 번만 보내려고 기억해 둔다
+  // (코드가 한 번만 쓰이는 방식이면 두 번째 요청이 실패하기 때문)
   const requestedRef = useRef(false);
 
   useEffect(() => {
-    // ★ 코드가 없거나 이미 보냈으면 아무것도 안 한다
+    // 코드가 없거나 이미 보냈으면 아무것도 안 한다
     if (!code || requestedRef.current) return;
     requestedRef.current = true;
 
@@ -48,6 +53,7 @@ export default function ReEntryPage() {
         const { data } = await api.post<ReEntryResponse>(
           `/auth/re-entry/${encodeURIComponent(code)}`,
         );
+
 
         // 받은 토큰을 이 기기에 저장
         localStorage.setItem("pvweb:memberId", String(data.memberId));
@@ -59,8 +65,18 @@ export default function ReEntryPage() {
           return;
         }
 
+        // 성공했을 때만 이 기기의 계정 정보를 새 계정으로 덮어쓴다
+        // (실패하면 지금 쓰던 계정은 그대로 남는다)
+        tokenStorage.set(data.accessToken, data.refreshToken);
+        localStorage.setItem(MEMBER_ID_KEY, String(data.memberId));
+        // 예전 계정의 저장 프로필을 지운다 (사이드바에 다른 사람 이름이 보이지 않게)
+        localStorage.removeItem(INVITE_PROFILE_KEY);
+
+
+        // ★ 승인 대기면 /pending, 가입 완료면 /today
         // window.location.replace: 페이지를 새로 열어서, 새 토큰으로 모든 정보를 처음부터 불러오게 한다
-        window.location.replace("/today");
+        // (navigate로 이동하면 App이 들고 있던 예전 계정의 일정·할 일이 남을 수 있다)
+        window.location.replace(data.status === "PENDING" ? "/pending" : "/today");
       } catch (error) {
         setState({ kind: "error", message: getErrorMessage(error) });
       }
@@ -83,6 +99,7 @@ export default function ReEntryPage() {
           </>
         )}
 
+
         {state.kind === "pending" && (
           <>
             <p className="mt-6 text-sm font-semibold text-gray-800">
@@ -93,6 +110,7 @@ export default function ReEntryPage() {
             </p>
           </>
         )}
+
 
         {state.kind === "error" && (
           <>
