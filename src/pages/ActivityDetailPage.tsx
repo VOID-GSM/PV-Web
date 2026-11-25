@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   getActivities,
   getActivity,
@@ -97,6 +97,7 @@ const PAGE_SUBTITLE = "모든 보드의 마감·회의·활동을 한 화면에�
 export default function ActivityDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const activityId = Number(id);
 
   // 내 정보 (내 회원 번호와 부장 여부를 알기 위해 쓴다)
@@ -104,6 +105,11 @@ export default function ActivityDetailPage() {
   const me = profileQuery.data;
 
   const [activeTab, setActiveTab] = useState("회차");
+  useEffect(() => {
+    if (searchParams.get("tab") === "공지") {
+      setActiveTab("공지");
+    }
+  }, [searchParams]);
 
   // 서버에서 받은 활동 상세 (설정 창과 권한 판단에 쓴다)
   const [detail, setDetail] = useState<ActivityDetail | null>(null);
@@ -1613,8 +1619,7 @@ export default function ActivityDetailPage() {
             </div>
 
             {/* 참여 신청 대기: 승인 모집 활동에서만 부장과 스터디장에게 보인다 */}
-            {canManage &&
-              currentDetail?.summary.recruitMode === "APPROVAL" && (
+            {canManage && currentDetail?.summary.recruitMode === "APPROVAL" && (
               <div className="space-y-3 rounded-3xl border border-gray-100 bg-white p-5 text-xs shadow-xs">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold text-gray-900">
