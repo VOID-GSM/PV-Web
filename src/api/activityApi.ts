@@ -218,3 +218,14 @@ export interface Generation {
 export function getGenerations() {
   return apiRequest<Generation[]>("/generations");
 }
+// 회차 주제 직접 지정 (주제 지정형 활동)
+export function updateActivitySessionTopic(
+  activityId: number,
+  sessionId: number,
+  topic: string,
+) {
+  return apiRequest<void>(`/activities/${activityId}/sessions/${sessionId}`, {
+    method: "PATCH",
+    body: { topic },
+  });
+}
