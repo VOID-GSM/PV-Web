@@ -1,12 +1,13 @@
-// src/components/modals/ActivitySettingsModal.tsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { MAJOR_LABEL } from "../../apis/interviews";
 import type {
   ActivityDetail,
   ActivityStatus,
   ActivityUpdateRequest,
   Major,
+  Generation,
 } from "../../api/activityApi";
+import { getGenerations } from "../../api/activityApi";
 import {
   formatActivityPeriod,
   formatActivitySchedule,
@@ -21,13 +22,11 @@ interface ActivitySettingsModalProps {
   onDelete: () => void;
 }
 
-// 서버 규칙
 const MAX_NAME_LENGTH = 100;
 const MAX_DESCRIPTION_LENGTH = 2000;
 const MIN_CAPACITY = 1;
 const MAX_CAPACITY = 200;
 
-// 고를 수 있는 전공 (서버 값). Object.keys: 표의 이름표만 꺼낸다
 const MAJOR_KEYS = Object.keys(MAJOR_LABEL) as Major[];
 
 const STATUS_OPTIONS: { value: ActivityStatus; label: string }[] = [
@@ -47,43 +46,91 @@ export const ActivitySettingsModal: React.FC<ActivitySettingsModalProps> = ({
   const [description, setDescription] = useState("");
   const [capacity, setCapacity] = useState("");
   const [majors, setMajors] = useState<Major[]>([]);
+  const [generationIds, setGenerationIds] = useState<number[]>([]);
   const [status, setStatus] = useState<ActivityStatus>("RECRUITING");
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
-  // 창이 열릴 때 서버에 저장된 값으로 채운다 (렌더링 단계에서 열림 변화를 감지한다)
+  const [generations, setGenerations] = useState<Generation[]>([]);
+
+  // 기수 목록 조회
+  useEffect(() => {
+    let cancelled = false;
+
+    getGenerations()
+      .then((data) => {
+        if (!cancelled) {
+          setGenerations(data);
+        }
+      })
+      .catch((err: unknown) => {
+        console.error("기수 목록 조회 실패:", err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // 모달을 열거나 다른 활동을 선택하면 입력값 초기화
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
-  if (isOpen !== prevIsOpen) {
-    setPrevIsOpen(isOpen);
-    if (isOpen && activity) {
-      setName(activity.summary.name);
-      setDescription(activity.description ?? "");
-      setCapacity(String(activity.summary.capacity));
-      setMajors(activity.targetMajors ?? []);
-      setStatus(activity.summary.status);
-      setError("");
-      setIsSaving(false);
-    }
+  const [prevActivityId, setPrevActivityId] = useState<number | null>(
+    activity?.summary.id ?? null,
+  );
+
+  if (
+    isOpen &&
+    activity &&
+    (!prevIsOpen || prevActivityId !== activity.summary.id)
+  ) {
+    setPrevIsOpen(true);
+    setPrevActivityId(activity.summary.id);
+
+    setName(activity.summary.name);
+    setDescription(activity.description ?? "");
+    setCapacity(String(activity.summary.capacity));
+    setMajors(activity.targetMajors ?? []);
+    setGenerationIds(
+      activity.targetGenerations?.map((generation) => generation.id) ?? [],
+    );
+    setStatus(activity.summary.status);
+    setError("");
+    setIsSaving(false);
+  }
+
+  if (!isOpen && prevIsOpen) {
+    setPrevIsOpen(false);
   }
 
   if (!isOpen || !activity) return null;
 
   const toggleMajor = (major: Major) => {
     setMajors((prev) =>
-      prev.includes(major) ? prev.filter((m) => m !== major) : [...prev, major],
+      prev.includes(major)
+        ? prev.filter((item) => item !== major)
+        : [...prev, major],
     );
   };
 
-  // 서버 규칙에 맞는지 검사한다 (문제가 있으면 안내 문구, 없으면 "")
+  const toggleGeneration = (id: number) => {
+    setGenerationIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  };
+
   const validate = () => {
-    if (name.trim() === "") return "활동 이름을 입력해 주세요.";
+    if (!name.trim()) return "활동 이름을 입력해 주세요.";
+
     if (name.trim().length > MAX_NAME_LENGTH) {
       return `활동 이름은 ${MAX_NAME_LENGTH}자까지 입력할 수 있습니다.`;
     }
+
     if (description.trim().length > MAX_DESCRIPTION_LENGTH) {
       return `활동 설명은 ${MAX_DESCRIPTION_LENGTH}자까지 입력할 수 있습니다.`;
     }
+
     const count = Number(capacity);
+
     if (
       !Number.isInteger(count) ||
       count < MIN_CAPACITY ||
@@ -91,30 +138,42 @@ export const ActivitySettingsModal: React.FC<ActivitySettingsModalProps> = ({
     ) {
       return `모집 인원은 ${MIN_CAPACITY}~${MAX_CAPACITY}명 사이 숫자로 입력해 주세요.`;
     }
+
     return "";
   };
 
-  // 서버에 있는 값과 달라진 항목만 모은다 (PATCH = 일부만 고치기)
   const buildChanges = (): ActivityUpdateRequest => {
     const changes: ActivityUpdateRequest = {};
 
     if (name.trim() !== activity.summary.name) {
       changes.name = name.trim();
     }
+
     if (description.trim() !== (activity.description ?? "").trim()) {
       changes.description = description.trim();
     }
+
     if (Number(capacity) !== activity.summary.capacity) {
       changes.capacity = Number(capacity);
     }
 
-    // 전공은 순서가 달라도 같은 걸로 본다
     const originalMajors = activity.targetMajors ?? [];
+
     if (
       majors.length !== originalMajors.length ||
-      majors.some((m) => !originalMajors.includes(m))
+      majors.some((major) => !originalMajors.includes(major))
     ) {
       changes.targetMajors = majors;
+    }
+
+    const originalGenerationIds =
+      activity.targetGenerations?.map((generation) => generation.id) ?? [];
+
+    if (
+      generationIds.length !== originalGenerationIds.length ||
+      generationIds.some((id) => !originalGenerationIds.includes(id))
+    ) {
+      changes.targetGenerationIds = generationIds;
     }
 
     if (status !== activity.summary.status) {
@@ -128,13 +187,14 @@ export const ActivitySettingsModal: React.FC<ActivitySettingsModalProps> = ({
     e.preventDefault();
 
     const message = validate();
+
     if (message) {
       setError(message);
       return;
     }
 
     const changes = buildChanges();
-    // 바뀐 게 없으면 서버에 보내지 않고 닫는다
+
     if (Object.keys(changes).length === 0) {
       onClose();
       return;
@@ -142,15 +202,27 @@ export const ActivitySettingsModal: React.FC<ActivitySettingsModalProps> = ({
 
     setError("");
     setIsSaving(true);
-    const ok = await onSave(changes);
-    setIsSaving(false);
 
-    if (ok) onClose();
+    try {
+      const ok = await onSave(changes);
+
+      if (ok) {
+        onClose();
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "활동 설정을 저장하지 못했습니다.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const generationText =
     activity.targetGenerations && activity.targetGenerations.length > 0
-      ? activity.targetGenerations.map((g) => `${g.number}기`).join(", ")
+      ? activity.targetGenerations
+          .map((generation) => `${generation.number}기`)
+          .join(", ")
       : "제한 없음";
 
   return (
@@ -161,6 +233,7 @@ export const ActivitySettingsModal: React.FC<ActivitySettingsModalProps> = ({
             <h2 className="text-lg font-bold text-gray-900">활동 설정</h2>
             <p className="mt-1 text-xs text-gray-400">바꾼 항목만 저장됩니다</p>
           </div>
+
           <button
             type="button"
             onClick={onClose}
@@ -171,7 +244,6 @@ export const ActivitySettingsModal: React.FC<ActivitySettingsModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5 pt-4 text-xs">
-          {/* 활동 이름 */}
           <div>
             <label className="mb-1 block font-bold text-gray-700">
               활동 이름
@@ -186,7 +258,6 @@ export const ActivitySettingsModal: React.FC<ActivitySettingsModalProps> = ({
             />
           </div>
 
-          {/* 활동 설명 */}
           <div>
             <div className="mb-1 flex items-center justify-between">
               <label className="font-bold text-gray-700">활동 설명</label>
@@ -204,7 +275,6 @@ export const ActivitySettingsModal: React.FC<ActivitySettingsModalProps> = ({
             />
           </div>
 
-          {/* 모집 인원 + 상태 */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="mb-1 block font-bold text-gray-700">
@@ -244,7 +314,6 @@ export const ActivitySettingsModal: React.FC<ActivitySettingsModalProps> = ({
             </div>
           </div>
 
-          {/* 대상 전공 */}
           <div>
             <div className="mb-1 flex items-center justify-between">
               <label className="font-bold text-gray-700">대상 전공</label>
@@ -252,6 +321,7 @@ export const ActivitySettingsModal: React.FC<ActivitySettingsModalProps> = ({
                 선택하지 않으면 전공 제한이 없어요
               </span>
             </div>
+
             <div className="flex flex-wrap gap-2">
               {MAJOR_KEYS.map((major) => (
                 <button
@@ -270,7 +340,44 @@ export const ActivitySettingsModal: React.FC<ActivitySettingsModalProps> = ({
             </div>
           </div>
 
-          {/* 개설 후에는 바꿀 수 없는 항목 (보여주기만 한다) */}
+          <div>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="font-bold text-gray-700">대상 기수</label>
+              <span className="text-[10px] text-gray-400">
+                선택하지 않으면 전체 기수
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {generations.map((generation) => (
+                <button
+                  key={generation.id}
+                  type="button"
+                  onClick={() => toggleGeneration(generation.id)}
+                  className={`cursor-pointer rounded-full border px-3.5 py-1.5 font-semibold transition ${
+                    generationIds.includes(generation.id)
+                      ? "border-black bg-white font-bold text-black ring-1 ring-black"
+                      : "border-gray-200 text-gray-500 hover:bg-gray-50"
+                  }`}
+                >
+                  {generation.number}기
+                </button>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => setGenerationIds([])}
+                className={`cursor-pointer rounded-full border px-3.5 py-1.5 font-semibold transition ${
+                  generationIds.length === 0
+                    ? "border-black bg-white font-bold text-black ring-1 ring-black"
+                    : "border-gray-200 text-gray-500 hover:bg-gray-50"
+                }`}
+              >
+                전체
+              </button>
+            </div>
+          </div>
+
           <div className="rounded-2xl bg-gray-50 p-4">
             <p className="font-bold text-gray-700">개설 후 바꿀 수 없는 항목</p>
             <dl className="mt-3 space-y-2 text-gray-600">
@@ -291,7 +398,7 @@ export const ActivitySettingsModal: React.FC<ActivitySettingsModalProps> = ({
                 <dd className="font-medium">{formatTopicRule(activity)}</dd>
               </div>
               <div className="flex gap-3">
-                <dt className="w-20 shrink-0 text-gray-400">대상 기수</dt>
+                <dt className="w-20 shrink-0 text-gray-400">기존 대상 기수</dt>
                 <dd className="font-medium">{generationText}</dd>
               </div>
             </dl>

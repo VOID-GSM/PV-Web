@@ -210,3 +210,11 @@ export function rejectActivityApplication(
     { method: "POST" },
   );
 }
+export interface Generation {
+  id: number;
+  number: number;
+}
+
+export function getGenerations() {
+  return apiRequest<Generation[]>("/generations");
+}
