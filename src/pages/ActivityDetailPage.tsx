@@ -31,7 +31,12 @@ import {
 } from "../api/attendanceApi";
 import { createComment } from "../api/commentApi";
 import { createPost, getPost, getPosts } from "../api/postApi";
-import { getNotice, getNotices, type NoticeItem } from "../api/noticeApi";
+import {
+  getNotice,
+  getNotices,
+  updateNotice,
+  type NoticeItem,
+} from "../api/noticeApi";
 import { useMyProfile } from "../hooks/useMembers";
 import {
   formatActivityPeriod,
@@ -197,6 +202,12 @@ export default function ActivityDetailPage() {
   >({});
   const [isLoadingNotices, setIsLoadingNotices] = useState(true);
   const [noticeError, setNoticeError] = useState("");
+  const [editingNotice, setEditingNotice] = useState<ActivityNotice | null>(
+    null,
+  );
+  const [editNoticeTitle, setEditNoticeTitle] = useState("");
+  const [editNoticeContent, setEditNoticeContent] = useState("");
+  const [isUpdatingNotice, setIsUpdatingNotice] = useState(false);
 
   const [isNoticeModalOpen, setIsNoticeModalOpen] = useState(false);
   const [isAbsenceModalOpen, setIsAbsenceModalOpen] = useState(false);
@@ -418,6 +429,12 @@ export default function ActivityDetailPage() {
 
   // 활동 설정 저장 (바뀐 항목만 넘어온다)
   const handleSaveSettings = async (changes: ActivityUpdateRequest) => {
+    if (!canManage) {
+      showToast("활동 설정을 변경할 권한이 없습니다.");
+      return false;
+    }
+
+    // 기존 저장 로직 유지
     try {
       await updateActivity(activityId, changes);
       await refreshActivityInfo();
@@ -549,6 +566,81 @@ export default function ActivityDetailPage() {
     setExpandedNoticeId(notice.id);
     if (!notice.content?.trim()) {
       void loadNoticeDetail(notice.id);
+    }
+  };
+
+  // 공지 작성자 본인만 수정할 수 있다. 편집을 열 때 상세 내용을 다시 조회한다.
+  const handleOpenNoticeEditor = async (notice: ActivityNotice) => {
+    if (notice.authorId !== myId) {
+      showToast("공지 작성자만 수정할 수 있습니다.");
+      return;
+    }
+
+    try {
+      const latestNotice = await getNotice(notice.id);
+      if (latestNotice.authorId !== myId) {
+        showToast("공지 작성자만 수정할 수 있습니다.");
+        return;
+      }
+
+      setEditingNotice({ ...notice, ...latestNotice });
+      setEditNoticeTitle(latestNotice.title ?? notice.title);
+      setEditNoticeContent(latestNotice.content ?? notice.content ?? "");
+    } catch (error) {
+      console.error("공지 수정 내용 조회 실패:", error);
+      showToast(
+        error instanceof Error
+          ? error.message
+          : "공지 내용을 불러오지 못했습니다.",
+      );
+    }
+  };
+
+  const handleUpdateNotice = async () => {
+    if (!editingNotice || isUpdatingNotice) return;
+
+    if (editingNotice.authorId !== myId) {
+      showToast("공지 작성자만 수정할 수 있습니다.");
+      setEditingNotice(null);
+      return;
+    }
+
+    const title = editNoticeTitle.trim();
+    const content = editNoticeContent.trim();
+
+    if (!title || !content) {
+      showToast("공지 제목과 내용을 모두 입력해 주세요.");
+      return;
+    }
+
+    try {
+      setIsUpdatingNotice(true);
+      const updatedNotice = await updateNotice(editingNotice.id, {
+        title,
+        content,
+      });
+
+      setNotices((previous) =>
+        previous.map((notice) =>
+          notice.id === editingNotice.id
+            ? { ...notice, ...updatedNotice, title, content }
+            : notice,
+        ),
+      );
+      setNoticeDetailErrors((previous) => {
+        const next = { ...previous };
+        delete next[editingNotice.id];
+        return next;
+      });
+      setEditingNotice(null);
+      showToast("공지를 수정했습니다.", "success");
+    } catch (error) {
+      console.error("공지 수정 실패:", error);
+      showToast(
+        error instanceof Error ? error.message : "공지를 수정하지 못했습니다.",
+      );
+    } finally {
+      setIsUpdatingNotice(false);
     }
   };
 
@@ -1392,13 +1484,26 @@ export default function ActivityDetailPage() {
                                   {notice.authorName ||
                                     `회원 ${notice.authorId}`}
                                 </span>
-                                <span>
-                                  {notice.createdAt
-                                    ? new Date(
-                                        notice.createdAt,
-                                      ).toLocaleDateString("ko-KR")
-                                    : ""}
-                                </span>
+                                <div className="flex items-center gap-3">
+                                  <span>
+                                    {notice.createdAt
+                                      ? new Date(
+                                          notice.createdAt,
+                                        ).toLocaleDateString("ko-KR")
+                                      : ""}
+                                  </span>
+                                  {notice.authorId === myId && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        void handleOpenNoticeEditor(notice)
+                                      }
+                                      className="cursor-pointer font-bold text-gray-700 underline underline-offset-2 hover:text-black"
+                                    >
+                                      수정
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           )}
@@ -1743,6 +1848,88 @@ export default function ActivityDetailPage() {
           setIsNoticeModalOpen(false);
         }}
       />
+
+      {editingNotice && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-notice-title"
+            className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-xl"
+          >
+            <div className="mb-5 flex items-center justify-between">
+              <h2
+                id="edit-notice-title"
+                className="text-lg font-bold text-gray-900"
+              >
+                공지 수정
+              </h2>
+              <button
+                type="button"
+                onClick={() => setEditingNotice(null)}
+                disabled={isUpdatingNotice}
+                className="cursor-pointer text-2xl leading-none text-gray-400 hover:text-gray-700 disabled:opacity-40"
+                aria-label="공지 수정 닫기"
+              >
+                ×
+              </button>
+            </div>
+
+            <label
+              className="mb-2 block text-xs font-bold text-gray-700"
+              htmlFor="edit-notice-title-input"
+            >
+              제목
+            </label>
+            <input
+              id="edit-notice-title-input"
+              value={editNoticeTitle}
+              onChange={(event) => setEditNoticeTitle(event.target.value)}
+              maxLength={100}
+              placeholder="공지 제목을 입력해 주세요."
+              className="mb-4 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-gray-500"
+            />
+
+            <label
+              className="mb-2 block text-xs font-bold text-gray-700"
+              htmlFor="edit-notice-content-input"
+            >
+              내용
+            </label>
+            <textarea
+              id="edit-notice-content-input"
+              value={editNoticeContent}
+              onChange={(event) => setEditNoticeContent(event.target.value)}
+              rows={10}
+              placeholder="공지 내용을 입력해 주세요."
+              className="w-full resize-y rounded-xl border border-gray-200 px-4 py-3 text-sm leading-relaxed outline-none focus:border-gray-500"
+            />
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditingNotice(null)}
+                disabled={isUpdatingNotice}
+                className="cursor-pointer rounded-xl border border-gray-200 px-4 py-2.5 text-xs font-bold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleUpdateNotice()}
+                disabled={
+                  isUpdatingNotice ||
+                  !editNoticeTitle.trim() ||
+                  !editNoticeContent.trim()
+                }
+                className="cursor-pointer rounded-xl bg-black px-5 py-2.5 text-xs font-bold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {isUpdatingNotice ? "저장 중..." : "수정 저장"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <AbsenceRequestModal
         isOpen={isAbsenceModalOpen}

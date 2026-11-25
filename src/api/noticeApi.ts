@@ -45,3 +45,14 @@ export function createNotice(body: NoticeCreateRequest) {
     body,
   });
 }
+export interface NoticeUpdateRequest {
+  title: string;
+  content: string;
+}
+
+export function updateNotice(noticeId: number, body: NoticeUpdateRequest) {
+  return apiRequest<NoticeItem>(`/notices/${noticeId}`, {
+    method: "PATCH",
+    body,
+  });
+}
