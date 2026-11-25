@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { getHomeTodos, type HomeTodoItem } from "./api/homeApi";
+import { getActivityMembers } from "./api/activityApi";
 import { MainPage } from "./pages/MainPage";
 import CalendarPage from "./pages/CalendarPage";
 import ActivityDetailPage from "./pages/ActivityDetailPage";
@@ -73,49 +74,92 @@ function AppContent() {
 
   const loadMonth = useCallback((base: Date) => {
     const monthKey = `${base.getFullYear()}-${base.getMonth()}`;
+
     if (loadedMonthsRef.current.has(monthKey)) return;
     loadedMonthsRef.current.add(monthKey);
 
-    // 그 달 1일의 7일 전 ~ 그 달 말일의 7일 뒤
     const fromDate = new Date(base.getFullYear(), base.getMonth(), -6);
+
     const toDate = new Date(base.getFullYear(), base.getMonth() + 1, 7);
 
     getCalendarEvents(formatDate(fromDate), formatDate(toDate))
-      .then((data) => {
-        const loadedEvents: CalendarEvent[] = data.map((event) => ({
-          id: String(event.id),
-          title: event.title,
-          type:
-            event.type === "DEADLINE"
-              ? "마감"
-              : event.type === "MEETING"
-                ? "회의"
-                : event.type === "ACTIVITY"
-                  ? "활동"
-                  : "개인 일정",
-          board: "",
-          date: event.startsAt.slice(0, 10),
-          endDate: event.endsAt.slice(0, 10),
-          time: event.allDay ? undefined : event.startsAt.slice(11, 16),
-          description: event.memo ?? "",
-          // 서버에 저장된 완료 여부 (새로고침해도 체크가 유지된다)
-          completed: event.completed ?? false,
-          // ☆ 보드 마감이면 보드 번호와 담당자 번호들
-          boardId: event.boardId,
-          assigneeIds: event.assigneeIds ?? [],
-          isMyEvent: true,
-        }));
+      .then(async (data) => {
+        const activityIds = Array.from(
+          new Set(
+            data
+              .filter(
+                (event) =>
+                  event.type === "ACTIVITY" &&
+                  typeof event.activityId === "number",
+              )
+              .map((event) => event.activityId as number),
+          ),
+        );
 
-        // 같은 id는 새 값으로 덮어쓰고, 새 일정은 추가한다.
-        // (달을 옮겨도 먼저 불러온 달의 일정이 사라지지 않는다)
+        const leaderNames = new Map<number, string>();
+
+        await Promise.all(
+          activityIds.map(async (activityId) => {
+            try {
+              const members = await getActivityMembers(activityId);
+
+              const leader = members.find(
+                (member) =>
+                  member.role === "LEADER" || member.roleLabel === "스터디장",
+              );
+
+              if (leader?.name) {
+                leaderNames.set(activityId, leader.name);
+              }
+            } catch (error) {
+              console.error(`활동 ${activityId}의 스터디장 조회 실패:`, error);
+            }
+          }),
+        );
+
+        const loadedEvents: CalendarEvent[] = data.map((event) => {
+          const isActivity = event.type === "ACTIVITY";
+
+          const leaderName =
+            typeof event.activityId === "number"
+              ? leaderNames.get(event.activityId)
+              : undefined;
+
+          return {
+            id: String(event.id),
+            title: event.title,
+            type:
+              event.type === "DEADLINE"
+                ? "마감"
+                : event.type === "MEETING"
+                  ? "회의"
+                  : isActivity
+                    ? "활동"
+                    : "개인 일정",
+            board: isActivity ? "지정된 보드 없음" : "",
+            date: event.startsAt.slice(0, 10),
+            endDate: event.endsAt.slice(0, 10),
+            time: event.allDay ? undefined : event.startsAt.slice(11, 16),
+            description: event.memo ?? "",
+            completed: event.completed ?? false,
+            boardId: event.boardId,
+            assigneeIds: event.assigneeIds ?? [],
+            assignees: isActivity ? [leaderName || "스터디장"] : [],
+            isMyEvent: true,
+          };
+        });
+
         setEvents((prev) => {
           const merged = new Map(prev.map((item) => [item.id, item]));
-          loadedEvents.forEach((item) => merged.set(item.id, item));
+
+          loadedEvents.forEach((item) => {
+            merged.set(item.id, item);
+          });
+
           return Array.from(merged.values());
         });
       })
       .catch((error: unknown) => {
-        // 실패하면 다음에 다시 시도할 수 있게 표시를 지운다
         loadedMonthsRef.current.delete(monthKey);
         console.error("캘린더 API 조회 실패:", error);
       });
@@ -126,7 +170,9 @@ function AppContent() {
     (dateStr: string) => {
       // "2026-11-30" → 그 날짜 정오 (시간대 때문에 날짜가 밀리지 않게)
       const base = new Date(`${dateStr}T12:00:00`);
-      loadedMonthsRef.current.delete(`${base.getFullYear()}-${base.getMonth()}`);
+      loadedMonthsRef.current.delete(
+        `${base.getFullYear()}-${base.getMonth()}`,
+      );
       loadMonth(base);
     },
     [loadMonth],
