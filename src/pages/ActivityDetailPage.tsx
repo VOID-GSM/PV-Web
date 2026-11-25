@@ -10,6 +10,7 @@ import {
   proposeTopicCandidate,
   voteTopicCandidate,
   cancelTopicVote,
+  updateActivitySessionTopic,
   getActivityApplications,
   applyToActivity,
   cancelActivityApplication,
@@ -252,6 +253,11 @@ export default function ActivityDetailPage() {
     (member) => member.memberId === myId,
   )?.role;
   const canManage = isSystemLeader || myActivityRole === "LEADER";
+  // 주제 지정형인지 확인
+  const isAssignedTopicMode = currentDetail?.topicMode === "ASSIGNED";
+
+  // 주제 지정은 부장이 아닌, 해당 활동의 스터디장만 가능
+  const canSetAssignedTopic = myActivityRole === "LEADER";
   // 이 활동에 참여 중인지 (서버가 알려주는 값을 우선한다)
   const isMember =
     currentDetail?.summary.isMember ??
@@ -814,7 +820,7 @@ export default function ActivityDetailPage() {
             })),
         );
 
-        if (apiSessions[0]) {
+        if (apiSessions[0] && nextDetail.topicMode !== "ASSIGNED") {
           try {
             await refreshTopicCandidates(currentActivityId, apiSessions[0].id);
           } catch (error) {
@@ -851,11 +857,23 @@ export default function ActivityDetailPage() {
 
   const handleProposeTopic = () => {
     if (!id || !sessions[0]) {
-      showToast("주제를 제안할 회차가 없습니다.");
+      showToast("주제를 지정할 회차가 없습니다.");
       return;
     }
 
-    setTopicTitle("");
+    // 지정형 주제는 해당 활동의 스터디장만 입력 가능
+    if (isAssignedTopicMode && !canSetAssignedTopic) {
+      showToast("주제 지정은 스터디장만 할 수 있습니다.");
+      return;
+    }
+
+    // 지정형은 기존 주제가 있으면 불러와 수정할 수 있게 한다.
+    const currentTopic = sessions[0].title;
+
+    setTopicTitle(
+      isAssignedTopicMode && currentTopic !== "주제 미정" ? currentTopic : "",
+    );
+
     setIsTopicModalOpen(true);
   };
 
@@ -863,13 +881,22 @@ export default function ActivityDetailPage() {
     const title = topicTitle.trim();
 
     if (!title) {
-      showToast("제안할 주제를 입력해 주세요.");
+      showToast(
+        isAssignedTopicMode
+          ? "지정할 주제를 입력해 주세요."
+          : "제안할 주제를 입력해 주세요.",
+      );
       return;
     }
 
     if (!sessions[0]) {
-      showToast("주제를 제안할 회차가 없습니다.");
+      showToast("주제를 지정할 회차가 없습니다.");
       setIsTopicModalOpen(false);
+      return;
+    }
+
+    if (isAssignedTopicMode && !canSetAssignedTopic) {
+      showToast("주제 지정은 스터디장만 할 수 있습니다.");
       return;
     }
 
@@ -878,7 +905,26 @@ export default function ActivityDetailPage() {
     try {
       setIsSubmittingTopic(true);
 
+      // 지정형: 투표 후보 등록 없이 회차 주제를 직접 저장한다.
+      if (isAssignedTopicMode) {
+        await updateActivitySessionTopic(activityId, sessionId, title);
+
+        setSessions((previous) =>
+          previous.map((session, index) =>
+            index === 0 ? { ...session, title } : session,
+          ),
+        );
+
+        setIsTopicModalOpen(false);
+        setTopicTitle("");
+
+        showToast("회차 주제가 지정되었습니다.", "success");
+        return;
+      }
+
+      // 투표형: 기존 동작을 그대로 유지한다.
       await proposeTopicCandidate(activityId, sessionId, title);
+
       await refreshTopicCandidates(activityId, sessionId);
 
       setIsTopicModalOpen(false);
@@ -886,10 +932,17 @@ export default function ActivityDetailPage() {
 
       showToast("주제가 제안되었습니다.", "success");
     } catch (error) {
-      console.error("주제 제안 실패:", error);
+      console.error(
+        isAssignedTopicMode ? "회차 주제 지정 실패:" : "주제 제안 실패:",
+        error,
+      );
 
       showToast(
-        error instanceof Error ? error.message : "주제를 제안하지 못했습니다.",
+        error instanceof Error
+          ? error.message
+          : isAssignedTopicMode
+            ? "주제를 지정하지 못했습니다."
+            : "주제를 제안하지 못했습니다.",
       );
     } finally {
       setIsSubmittingTopic(false);
@@ -1526,95 +1579,149 @@ export default function ActivityDetailPage() {
           </div>
 
           <div className="col-span-4 space-y-4">
-            <div className="space-y-4 rounded-3xl border border-gray-100 bg-white p-5 text-xs shadow-xs">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-bold text-gray-900">주제 투표</h3>
-                  <p className="mt-1 text-[11px] text-gray-400">
-                    함께 진행할 활동 주제를 정해 보세요.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleProposeTopic}
-                  disabled={isSubmittingTopic || sessions.length === 0}
-                  className="rounded-xl bg-black px-3 py-2 text-[11px] font-bold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {isSubmittingTopic ? "등록 중..." : "+ 주제 제안"}
-                </button>
-              </div>
-
-              {sessions.length === 0 ? (
-                <div className="py-8 text-center text-gray-400">
-                  회차가 등록되면 주제를 제안할 수 있습니다.
-                </div>
-              ) : votes.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-gray-200 py-8 text-center">
-                  <p className="font-semibold text-gray-600">
-                    아직 등록된 주제가 없습니다.
-                  </p>
-                  <p className="mt-1 text-[11px] text-gray-400">
-                    첫 번째 주제를 제안해 보세요.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <div className="space-y-2 pt-1">
-                    {votes.map((item, index) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        disabled={isVoting}
-                        onClick={() => setSelectedVoteOption(index)}
-                        className={`flex w-full items-center justify-between rounded-xl border p-3 text-left transition disabled:opacity-60 ${
-                          selectedVoteOption === index
-                            ? "border-black bg-gray-50 ring-1 ring-black"
-                            : "border-gray-200 hover:bg-gray-50"
-                        }`}
-                      >
-                        <span className="flex min-w-0 items-center gap-2">
-                          <span
-                            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
-                              selectedVoteOption === index
-                                ? "border-black bg-black"
-                                : "border-gray-300 bg-white"
-                            }`}
-                          >
-                            {selectedVoteOption === index && (
-                              <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                            )}
-                          </span>
-                          <span className="truncate font-medium text-gray-800">
-                            {item.text}
-                          </span>
-                        </span>
-                        <span className="ml-2 shrink-0 text-[11px] font-bold text-gray-400">
-                          {item.votes}표
-                        </span>
-                      </button>
-                    ))}
+            {isAssignedTopicMode ? (
+              <div className="space-y-4 rounded-3xl border border-gray-100 bg-white p-5 text-xs shadow-xs">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900">
+                      주제 지정
+                    </h3>
+                    <p className="mt-1 text-[11px] text-gray-400">
+                      스터디장이 회차 주제를 직접 지정합니다.
+                    </p>
                   </div>
 
+                  {canSetAssignedTopic && (
+                    <button
+                      type="button"
+                      onClick={handleProposeTopic}
+                      disabled={isSubmittingTopic || sessions.length === 0}
+                      className="rounded-xl bg-black px-3 py-2 text-[11px] font-bold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {isSubmittingTopic
+                        ? "저장 중..."
+                        : sessions[0]?.title &&
+                            sessions[0].title !== "주제 미정"
+                          ? "주제 변경"
+                          : "주제 입력"}
+                    </button>
+                  )}
+                </div>
+
+                {sessions.length === 0 ? (
+                  <div className="py-8 text-center text-gray-400">
+                    회차가 등록되면 주제를 지정할 수 있습니다.
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                    <p className="text-[11px] font-semibold text-gray-400">
+                      {sessions[0].sessionNum} 주제
+                    </p>
+
+                    <p className="mt-2 break-words text-sm font-bold text-gray-900">
+                      {sessions[0].title}
+                    </p>
+                  </div>
+                )}
+
+                {!canSetAssignedTopic && (
+                  <p className="text-[11px] text-gray-400">
+                    주제 입력 및 변경은 해당 활동의 스터디장만 할 수 있습니다.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4 rounded-3xl border border-gray-100 bg-white p-5 text-xs shadow-xs">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900">
+                      주제 투표
+                    </h3>
+                    <p className="mt-1 text-[11px] text-gray-400">
+                      함께 진행할 활동 주제를 정해 보세요.
+                    </p>
+                  </div>
                   <button
                     type="button"
-                    onClick={handleVoteCandidate}
-                    disabled={isVoting || selectedVoteOption === null}
-                    className="w-full rounded-xl bg-black py-3 font-bold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+                    onClick={handleProposeTopic}
+                    disabled={isSubmittingTopic || sessions.length === 0}
+                    className="rounded-xl bg-black px-3 py-2 text-[11px] font-bold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    {isVoting
-                      ? "처리 중..."
-                      : selectedVoteOption !== null &&
-                          votes[selectedVoteOption]?.voted
-                        ? "선택한 투표 취소하기"
-                        : "선택한 주제에 투표하기"}
+                    {isSubmittingTopic ? "등록 중..." : "+ 주제 제안"}
                   </button>
-                </>
-              )}
-            </div>
+                </div>
+
+                {sessions.length === 0 ? (
+                  <div className="py-8 text-center text-gray-400">
+                    회차가 등록되면 주제를 제안할 수 있습니다.
+                  </div>
+                ) : votes.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-gray-200 py-8 text-center">
+                    <p className="font-semibold text-gray-600">
+                      아직 등록된 주제가 없습니다.
+                    </p>
+                    <p className="mt-1 text-[11px] text-gray-400">
+                      첫 번째 주제를 제안해 보세요.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-2 pt-1">
+                      {votes.map((item, index) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          disabled={isVoting}
+                          onClick={() => setSelectedVoteOption(index)}
+                          className={`flex w-full items-center justify-between rounded-xl border p-3 text-left transition disabled:opacity-60 ${
+                            selectedVoteOption === index
+                              ? "border-black bg-gray-50 ring-1 ring-black"
+                              : "border-gray-200 hover:bg-gray-50"
+                          }`}
+                        >
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span
+                              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+                                selectedVoteOption === index
+                                  ? "border-black bg-black"
+                                  : "border-gray-300 bg-white"
+                              }`}
+                            >
+                              {selectedVoteOption === index && (
+                                <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                              )}
+                            </span>
+                            <span className="truncate font-medium text-gray-800">
+                              {item.text}
+                            </span>
+                          </span>
+                          <span className="ml-2 shrink-0 text-[11px] font-bold text-gray-400">
+                            {item.votes}표
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleVoteCandidate}
+                      disabled={isVoting || selectedVoteOption === null}
+                      className="w-full rounded-xl bg-black py-3 font-bold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+                    >
+                      {isVoting
+                        ? "처리 중..."
+                        : selectedVoteOption !== null &&
+                            votes[selectedVoteOption]?.voted
+                          ? "선택한 투표 취소하기"
+                          : "선택한 주제에 투표하기"}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* 참여 신청 대기: 승인 모집 활동에서만 부장과 스터디장에게 보인다 */}
-            {canManage &&
-              currentDetail?.summary.recruitMode === "APPROVAL" && (
+            {canManage && currentDetail?.summary.recruitMode === "APPROVAL" && (
               <div className="space-y-3 rounded-3xl border border-gray-100 bg-white p-5 text-xs shadow-xs">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold text-gray-900">
@@ -1751,11 +1858,13 @@ export default function ActivityDetailPage() {
             onClick={(event) => event.stopPropagation()}
           >
             <h2 className="text-lg font-bold text-gray-900">
-              새로운 주제 제안
+              {isAssignedTopicMode ? "회차 주제 지정" : "새로운 주제 제안"}
             </h2>
 
             <p className="mt-2 text-sm text-gray-500">
-              함께 진행하고 싶은 활동 주제를 입력해 주세요.
+              {isAssignedTopicMode
+                ? "이 회차에서 진행할 주제를 입력해 주세요."
+                : "함께 진행하고 싶은 활동 주제를 입력해 주세요."}
             </p>
 
             <form
@@ -1768,7 +1877,11 @@ export default function ActivityDetailPage() {
                 type="text"
                 value={topicTitle}
                 onChange={(event) => setTopicTitle(event.target.value)}
-                placeholder="주제 이름을 입력해 주세요."
+                placeholder={
+                  isAssignedTopicMode
+                    ? "지정할 회차 주제를 입력해 주세요."
+                    : "주제 이름을 입력해 주세요."
+                }
                 maxLength={100}
                 autoFocus
                 disabled={isSubmittingTopic}
@@ -1790,7 +1903,11 @@ export default function ActivityDetailPage() {
                   disabled={isSubmittingTopic || !topicTitle.trim()}
                   className="rounded-xl bg-black px-5 py-2.5 text-sm font-bold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  {isSubmittingTopic ? "등록 중..." : "주제 제안"}
+                  {isSubmittingTopic
+                    ? "저장 중..."
+                    : isAssignedTopicMode
+                      ? "주제 저장"
+                      : "주제 제안"}
                 </button>
               </div>
             </form>
