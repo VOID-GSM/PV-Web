@@ -33,6 +33,16 @@ export interface MySkills {
   skills: MySkillItem[];
 }
 
+// ★ 역량 항목 수정할 때 보낼 것 (바꿀 것만 넣는다)
+export interface SkillUpdateRequest {
+  // 이름 (최대 50자)
+  name?: string;
+  description?: string;
+  sortOrder?: number;
+  // false면 숨기기 (삭제 API가 없어서 이걸 "삭제"로 쓴다. 점수·과제 기록은 그대로 남는다)
+  active?: boolean;
+}
+
 // 역량 항목 목록 — GET /skills?major=
 export const getSkills = async (major?: Major) => {
   const { data } = await api.get<Skill[]>("/skills", { params: { major } });
@@ -42,6 +52,12 @@ export const getSkills = async (major?: Major) => {
 // 역량 항목 추가 — POST /skills (부장만, 같은 전공+이름이면 409)
 export const createSkill = async (body: { major: Major; name: string; description?: string }) => {
   const { data } = await api.post<Skill>("/skills", body);
+  return data;
+};
+
+// ★ 역량 항목 수정·숨기기 — PATCH /skills/{skillId} (부장만)
+export const updateSkill = async (skillId: number, body: SkillUpdateRequest) => {
+  const { data } = await api.patch<Skill>(`/skills/${skillId}`, body);
   return data;
 };
 
