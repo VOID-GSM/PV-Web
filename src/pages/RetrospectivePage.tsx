@@ -70,6 +70,8 @@ function toPageRetro(r: ServerRetrospective, boardName: string): Retrospective |
     id: r.retrospectiveId,
     boardName,
     author: r.memberName,
+    // ☆ 작성자 회원 번호 (프로필 사진용)
+    authorId: r.memberId,
     // 서버가 작성 날짜를 주지 않아서 비워둔다
     date: "",
     ...toKpt(r.content),

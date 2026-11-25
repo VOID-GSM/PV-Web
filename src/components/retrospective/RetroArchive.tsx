@@ -1,4 +1,6 @@
 import { KPT_FIELDS, type Retrospective } from "../../constants/retrospective";
+// ☆ 프로필 사진 (없으면 이름 첫 글자)
+import Avatar from "../common/Avatar";
 
 type RetroArchiveProps = {
   // 선택한 보드에 작성된 회고들
@@ -21,9 +23,8 @@ export default function RetroArchive({ retros }: RetroArchiveProps) {
             <li key={retro.id} className="rounded-lg border border-neutral-100 p-4">
               {/* 작성자 · 날짜 */}
               <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-black text-xs text-white">
-                  {retro.author.charAt(0)}
-                </div>
+                {/* ☆ 작성자 프로필 사진 */}
+                <Avatar memberId={retro.authorId} name={retro.author} className="h-7 w-7 text-xs" />
                 <p className="text-sm font-semibold">{retro.author}</p>
                 <p className="text-xs text-neutral-400">{retro.date}</p>
               </div>
