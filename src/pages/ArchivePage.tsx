@@ -1,7 +1,8 @@
 // src/pages/ArchivePage.tsx
 // ★ useCallback: 토스트 닫기 함수를 한 번만 만들어 두려고
 import { useCallback, useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+// ☆ useSearchParams: 주소의 ?activityId=3 을 읽는다 (활동 화면에서 바로 열 수 있게)
+import { useNavigate, useSearchParams } from "react-router-dom";
 // ★ 다른 화면과 같은 공통 헤더 (진짜 알림 · 새로 만들기 메뉴)
 import { Header } from "../components/layout/Header";
 import Dropdown from "../components/common/Dropdown";
@@ -17,8 +18,12 @@ import {
   comparePosts,
   type ApiPost,
   type ApiPostSummary,
+  // ☆ 서버에 보낼 검색 조건 모양
+  type PostSearchCondition,
 } from "../api/postApi";
 import { createComment, getComments } from "../api/commentApi";
+// ☆ 진짜 활동 목록
+import { getActivities, type ActivitySummary } from "../api/activityApi";
 
 interface Comment {
   id: number;
@@ -33,22 +38,42 @@ type ArchiveTab = "all" | "my" | "compare" | "feedback";
 // ★ 토스트 하나의 모양 (id가 바뀌면 같은 문구여도 새로 뜬다)
 type ToastState = { id: number; message: string; type: "success" | "info" };
 
-const activityFilterOptions = ["활동 선택", "등록된 활동 없음"];
+// ☆ 활동 드롭다운 맨 위 "전체" 항목
+const ALL_ACTIVITIES = "전체 활동";
 const periodFilterOptions = ["기간 선택", "전체"];
 
 // ★ 에러를 토스트 문구로 바꾸기 (Error면 그 메시지, 아니면 기본 문구)
 const toErrorMessage = (error: unknown, fallback: string) =>
   error instanceof Error ? error.message : fallback;
 
+// ☆ 서버가 활동 목록을 배열로 주든 { content: [...] }로 주든 배열로 꺼낸다
+const toActivityList = (data: unknown): ActivitySummary[] => {
+  if (Array.isArray(data)) return data as ActivitySummary[];
+  const content = (data as { content?: ActivitySummary[] } | null)?.content;
+  return Array.isArray(content) ? content : [];
+};
+
+// ☆ 주소의 ?activityId=3 → 3 (없거나 숫자가 아니면 null)
+const toActivityId = (value: string | null) => {
+  const id = Number(value);
+  return value && Number.isInteger(id) && id > 0 ? id : null;
+};
+
 export default function ArchivePage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   // ★ 가짜 알림 창·새로 만들기 메뉴 상태는 지웠다 (공통 Header가 대신한다)
 
   const [selectedTab, setSelectedTab] = useState<ArchiveTab>("all");
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedActivity, setSelectedActivity] = useState("활동 선택");
+  // ☆ 고른 활동 번호 (null이면 전체). 주소에 ?activityId가 있으면 그 활동으로 시작
+  const [selectedActivityId, setSelectedActivityId] = useState<number | null>(
+    () => toActivityId(searchParams.get("activityId")),
+  );
+  // ☆ 서버의 진짜 활동 목록 (드롭다운·활동 이름 표시용)
+  const [activities, setActivities] = useState<ActivitySummary[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState("기간 선택");
 
   const [articles, setArticles] = useState<Article[]>(() => getArticles());
@@ -56,11 +81,26 @@ export default function ArchivePage() {
     null,
   );
 
+  // ☆ 활동 번호 → 이름 표
+  const activityNameById = new Map(activities.map((a) => [a.id, a.name]));
+  // ☆ 정리글의 활동 칸 글자: 숫자(활동 번호)면 진짜 이름으로, 아니면 그대로 ("활동 미지정" 등)
+  const activityLabel = (value: string) =>
+    /^\d+$/.test(value)
+      ? (activityNameById.get(Number(value)) ?? `활동 ${value}`)
+      : value;
+
+  // ☆ 드롭다운에 보일 글자들 / 지금 고른 글자
+  const activityOptions = [ALL_ACTIVITIES, ...activities.map((a) => a.name)];
+  const selectedActivityName =
+    selectedActivityId === null
+      ? ALL_ACTIVITIES
+      : (activityNameById.get(selectedActivityId) ?? ALL_ACTIVITIES);
+
   const selectedArticle =
     articles.find((article) => article.id === selectedArticleId) ?? null;
 
   const filteredArticles = articles.filter((article) =>
-    `${article.title} ${article.content} ${article.activity} ${(article.tags ?? []).join(" ")}`
+    `${article.title} ${article.content} ${activityLabel(article.activity)} ${(article.tags ?? []).join(" ")}`
       .toLowerCase()
       .includes(searchTerm.toLowerCase().trim()),
   );
@@ -75,8 +115,29 @@ export default function ArchivePage() {
   };
   const closeToast = useCallback(() => setToast(null), []);
 
+  // ☆ 활동 목록은 처음에 한 번만 불러온다 (못 불러와도 "전체 활동"만 보이고 화면은 그대로)
   useEffect(() => {
     let cancelled = false;
+
+    getActivities()
+      .then((data: unknown) => {
+        if (!cancelled) setActivities(toActivityList(data));
+      })
+      .catch((error: unknown) => {
+        console.error("활동 목록 조회 실패:", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    // ☆ 활동을 골랐으면 서버에 activityId를 같이 보낸다 (없으면 조건 없이 전체)
+    const activityCondition: PostSearchCondition =
+      selectedActivityId !== null ? { activityId: selectedActivityId } : {};
 
     const loadArticles = async () => {
       try {
@@ -100,8 +161,8 @@ export default function ArchivePage() {
 
         if (selectedTab === "compare") {
           // 비교할 회차 ID는 현재 화면의 articles 상태가 아니라 서버 목록에서 가져온다.
-          // 따라서 useEffect 의존성에 articles를 추가할 필요가 없다.
-          const response = await getPosts({}, 0, 50);
+          // ☆ 활동을 골랐으면 그 활동의 정리글에서 회차를 찾는다
+          const response = await getPosts(activityCondition, 0, 50);
           const summaries: ApiPostSummary[] = response.content ?? [];
 
           const sessionId = summaries.find(
@@ -116,8 +177,9 @@ export default function ArchivePage() {
             loaded = posts.map((post: ApiPost) => ({
               id: String(post.id),
               title: post.title,
+              // ☆ 활동 번호를 글자로 저장해 두고, 보여줄 때 진짜 이름으로 바꾼다
               activity: post.activityId
-                ? `활동 ${post.activityId}`
+                ? String(post.activityId)
                 : "활동 미지정",
               round: post.sessionId ? `${post.sessionId}회차` : "회차 미지정",
               tags: [],
@@ -129,8 +191,11 @@ export default function ArchivePage() {
             }));
           }
         } else {
-          const condition =
-            selectedTab === "my" ? { author: "me" as const } : {};
+          // ☆ 탭 조건(내가 쓴 글) + 활동 조건을 합친다
+          const condition: PostSearchCondition = {
+            ...activityCondition,
+            ...(selectedTab === "my" ? { author: "me" as const } : {}),
+          };
 
           const response = await getPosts(condition, 0, 50);
           const summaries: ApiPostSummary[] = response.content ?? [];
@@ -150,8 +215,9 @@ export default function ArchivePage() {
                 return {
                   id: String(post.id),
                   title: post.title,
+                  // ☆ 활동 번호를 글자로 (보여줄 때 이름으로 바꾼다)
                   activity: post.activityId
-                    ? `활동 ${post.activityId}`
+                    ? String(post.activityId)
                     : "활동 미지정",
                   round: post.sessionId
                     ? `${post.sessionId}회차`
@@ -172,7 +238,7 @@ export default function ArchivePage() {
                   id: String(summary.id),
                   title: summary.title,
                   activity: summary.activityId
-                    ? `활동 ${summary.activityId}`
+                    ? String(summary.activityId)
                     : "활동 미지정",
                   round: summary.sessionId
                     ? `${summary.sessionId}회차`
@@ -214,7 +280,8 @@ export default function ArchivePage() {
     return () => {
       cancelled = true;
     };
-  }, [selectedTab]);
+    // ☆ 탭이나 고른 활동이 바뀌면 다시 불러온다
+  }, [selectedTab, selectedActivityId]);
 
   useEffect(() => {
     if (!selectedArticleId || !/^\d+$/.test(selectedArticleId)) {
@@ -247,6 +314,16 @@ export default function ArchivePage() {
   }, [selectedArticleId]);
 
   // ★ 가짜 메뉴 바깥 클릭 감지 코드는 지웠다 (공통 Header가 직접 처리한다)
+
+  // ☆ 활동 드롭다운에서 고르면 그 활동 번호로 바꾼다 ("전체 활동"이면 null)
+  const handleActivityChange = (name: string) => {
+    if (name === ALL_ACTIVITIES) {
+      setSelectedActivityId(null);
+      return;
+    }
+    const found = activities.find((a) => a.name === name);
+    setSelectedActivityId(found ? found.id : null);
+  };
 
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -321,6 +398,10 @@ export default function ArchivePage() {
 
   const getEmptyMessage = () => {
     if (searchTerm) return "검색 결과가 없습니다.";
+    // ☆ 활동을 골랐는데 없으면 그 안내
+    if (selectedActivityId !== null && selectedTab !== "feedback") {
+      return "이 활동의 정리글이 없습니다.";
+    }
 
     switch (selectedTab) {
       case "all":
@@ -415,10 +496,11 @@ export default function ArchivePage() {
             </svg>
           </div>
 
+          {/* ☆ 진짜 활동 목록 드롭다운 */}
           <Dropdown
-            options={activityFilterOptions}
-            value={selectedActivity}
-            onChange={setSelectedActivity}
+            options={activityOptions}
+            value={selectedActivityName}
+            onChange={handleActivityChange}
           />
 
           <Dropdown
@@ -532,7 +614,8 @@ export default function ArchivePage() {
                     </span>
 
                     <span className="mt-1 block text-[10px] text-gray-400">
-                      {article.activity} · {article.round}
+                      {/* ☆ 활동 진짜 이름 */}
+                      {activityLabel(article.activity)} · {article.round}
                     </span>
 
                     <span className="mt-2 block text-[10px] text-gray-400">
@@ -580,7 +663,9 @@ export default function ArchivePage() {
 
                   <p className="mt-2 text-[11px] text-gray-400">
                     {selectedArticle.author} · {selectedArticle.date} ·{" "}
-                    {selectedArticle.activity} · {selectedArticle.round}
+                    {/* ☆ 활동 진짜 이름 */}
+                    {activityLabel(selectedArticle.activity)} ·{" "}
+                    {selectedArticle.round}
                   </p>
                 </div>
 
