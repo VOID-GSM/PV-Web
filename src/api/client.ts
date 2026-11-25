@@ -1,4 +1,5 @@
-import { goToPendingPage, refreshSession } from "./session";
+// ★ goToInvitePage: 입장 화면이 아닐 때만 /invite로 보낸다
+import { goToInvitePage, goToPendingPage, refreshSession } from "./session";
 
 export const API_BASE_URL = "/api";
 
@@ -61,8 +62,11 @@ export async function apiRequest<T>(
       goToPendingPage();
       return new Promise<T>(() => {});
     } else if (result === "invalid") {
-      window.location.replace("/invite");
-      return new Promise<T>(() => {});
+      // ★ 입장 화면이 아니면 /invite로 보내고 기다린다
+      // 입장·재입장 화면이면 보내지 않고(초대 코드 유지) 아래에서 그냥 에러로 끝낸다
+      if (goToInvitePage()) {
+        return new Promise<T>(() => {});
+      }
     }
   }
 
@@ -76,8 +80,10 @@ export async function apiRequest<T>(
     }
 
     if (result === "invalid") {
-      window.location.replace("/invite");
-      return new Promise<T>(() => {});
+      // ★ 위와 같은 이유로 입장 화면에서는 보내지 않는다
+      if (goToInvitePage()) {
+        return new Promise<T>(() => {});
+      }
     }
   }
 
