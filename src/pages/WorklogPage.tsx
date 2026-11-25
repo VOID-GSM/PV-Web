@@ -59,6 +59,8 @@ function toPageWorklog(w: ServerWorklog, boards: ServerBoard[]): Worklog {
   return {
     id: w.id,
     author: w.authorName,
+    // ☆ 작성자 번호 (프로필 사진용)
+    authorId: w.authorId,
     date: formatDate(created),
     time: created.toTimeString().slice(0, 5),
     boards: boardName ? [boardName] : [],
@@ -90,6 +92,8 @@ function WorklogCardWithComments({ worklog, isMine, names, onError }: WorklogCar
     id: c.id,
     // 이름표에서 찾고, 그래도 못 찾으면 "팀원"
     author: names.get(c.authorId) ?? "팀원",
+    // ☆ 댓글 작성자 번호 (프로필 사진용)
+    authorId: c.authorId,
     content: c.content,
   }));
 
@@ -182,7 +186,7 @@ export default function WorklogPage() {
   const boards = boardsQuery.data ?? [];
   const worklogs = serverWorklogs.map((w) => toPageWorklog(w, boards));
 
-  // 내가 쓴 일지 번호들 ("내 일지" 탭, 검은 동그라미에 사용)
+  // 내가 쓴 일지 번호들 ("내 일지" 탭, 검은 테두리에 사용)
   const myWorklogIds = new Set(serverWorklogs.filter((w) => w.authorId === myId).map((w) => w.id));
 
   // ★ 회원 번호 → 이름 표 (뒤에 넣은 것이 앞의 것을 덮어쓴다)
