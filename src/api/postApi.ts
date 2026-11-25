@@ -3,6 +3,7 @@ import { apiRequest, queryString } from "./client";
 export interface ApiPostSummary {
   id: number;
   authorId: number;
+  authorName: string | null;
   activityId?: number;
   sessionId?: number;
   questionId?: number;
