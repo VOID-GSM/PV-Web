@@ -38,6 +38,8 @@ import {
   useSkills,
   useSubmissionStatus,
   useSubmitAssignment,
+  // ☆ 역량 수정·숨기기
+  useUpdateSkill,
 } from "../hooks/useAssignments";
 // 진짜 내 이름·기수·전공·번호
 import { useMyName } from "../hooks/useMyName";
@@ -53,6 +55,9 @@ import { getErrorMessage } from "../apis/client";
 // ★ 파일 업로드
 import { uploadFile } from "../apis/files";
 import { tokenStorage } from "../apis/tokenStorage";
+
+// ☆ 부장만 볼 수 있는 탭 (과제를 내고 관리하는 화면)
+const LEADER_ONLY_TABS = ["과제 목록", "제출 현황"];
 
 // ─────────────────────────────────────────────
 // 서버 모양 → 화면 모양 번역 함수들 (컴포넌트 바깥)
@@ -159,10 +164,13 @@ export default function AssignmentPage() {
   const passSubmission = usePassSubmission();
   const requestResubmission = useRequestResubmission();
   const createSkill = useCreateSkill();
+  // ☆ 역량 수정·숨기기
+  const updateSkill = useUpdateSkill();
   const saveScores = useSaveMyScores();
 
   // 진짜 내 정보 (★ 회원 번호는 파일 업로드에 필요. 못 불러왔으면 토큰에서)
-  const { myName, myGeneration, myMajors, myId: profileId } = useMyName();
+  // ☆ isLeader: 부장인지 (과제 관리 화면을 보여줄지 정한다)
+  const { myName, myGeneration, myMajors, myId: profileId, isLeader } = useMyName();
   const myId = profileId ?? tokenStorage.getMemberId();
 
   // 화면 상태
@@ -183,6 +191,11 @@ export default function AssignmentPage() {
   };
   const closeToast = useCallback(() => setToast(null), []);
 
+  // ☆ 보여줄 탭: 부장이 아니면 과제 목록·제출 현황을 뺀다
+  const visibleTabs = isLeader ? ASSIGNMENT_TABS : ASSIGNMENT_TABS.filter((tab) => !LEADER_ONLY_TABS.includes(tab));
+  // ☆ 지금 탭이 숨겨진 탭이면(부장이 아님) 첫 탭으로
+  const currentTab = visibleTabs.includes(activeTab) ? activeTab : visibleTabs[0];
+
   // ===== 과제 =====
   const received = receivedQuery.data?.content ?? [];
   const created = createdQuery.data?.content ?? [];
@@ -195,13 +208,18 @@ export default function AssignmentPage() {
     created.map((a) => [a.id, a.submissionCount ?? 0])
   );
 
-  const ongoingAssignments = assignments.filter((a) => getDaysLeft(a.deadline) >= 0);
+  // ☆ 진행 중 과제: 부장은 전체, 아니면 내가 받은 과제만
+  const ongoingAssignments = (isLeader ? assignments : myAssignments).filter((a) => getDaysLeft(a.deadline) >= 0);
   const summaryAssignment =
     assignments.find((a) => a.id === selectedAssignmentId) ?? ongoingAssignments[0] ?? null;
 
   // 제출 현황: 제출 현황 탭에서 고른 과제 / 역량맵 탭 오른쪽 요약 과제
-  const statusQuery = useSubmissionStatus(selectedAssignmentId, activeTab === "제출 현황");
-  const summaryStatusQuery = useSubmissionStatus(summaryAssignment?.id ?? null, activeTab === "역량 맵");
+  // ☆ 부장일 때만 요청한다 (부장이 아니면 서버가 거절해서)
+  const statusQuery = useSubmissionStatus(selectedAssignmentId, isLeader && currentTab === "제출 현황");
+  const summaryStatusQuery = useSubmissionStatus(
+    summaryAssignment?.id ?? null,
+    isLeader && currentTab === "역량 맵"
+  );
 
   // ===== 역량 =====
   const pageSkills: Skill[] = (skillsQuery.data ?? [])
@@ -214,7 +232,7 @@ export default function AssignmentPage() {
   );
 
   // 역량맵 팀원 목록: 지금은 내 점수만 있어서 진짜 나 한 줄
-  // ☆ memberId: 내 회원 번호 (프로필 사진용)
+  // memberId: 내 회원 번호 (프로필 사진용)
   const myMembers: Member[] = myName
     ? [{ name: myName, generation: myGeneration, majors: myMajors, memberId: myId }]
     : [];
@@ -235,6 +253,8 @@ export default function AssignmentPage() {
   // ===== 이벤트 처리 =====
 
   const openCreate = (skillId: number | null = null) => {
+    // ☆ 부장이 아니면 열지 않는다 (버튼도 숨기지만 한 번 더 막는다)
+    if (!isLeader) return;
     setInitialSkillId(skillId);
     setIsCreateOpen(true);
   };
@@ -247,6 +267,29 @@ export default function AssignmentPage() {
       { major: skillMajor, name },
       {
         onSuccess: () => showToast(`역량 항목 '${name}'을(를) 추가했습니다`, "success"),
+        onError: (error) => showToast(getErrorMessage(error)),
+      }
+    );
+  };
+
+  // ☆ 역량 항목 이름 수정 (부장만)
+  const handleUpdateSkill = (skillId: number, name: string) => {
+    updateSkill.mutate(
+      { skillId, body: { name } },
+      {
+        onSuccess: () => showToast(`역량 항목 이름을 '${name}'(으)로 바꿨습니다`, "success"),
+        // 같은 전공에 같은 이름이 있으면 서버가 거절한다
+        onError: (error) => showToast(getErrorMessage(error)),
+      }
+    );
+  };
+
+  // ☆ 역량 항목 삭제 (부장만) — 서버에 삭제 API가 없어서 숨기기(active: false)로 처리한다
+  const handleDeleteSkill = (skillId: number) => {
+    updateSkill.mutate(
+      { skillId, body: { active: false } },
+      {
+        onSuccess: () => showToast("역량 항목을 삭제했습니다", "success"),
         onError: (error) => showToast(getErrorMessage(error)),
       }
     );
@@ -366,9 +409,10 @@ export default function AssignmentPage() {
     showToast("미제출자 알림은 서버 연결을 준비 중입니다");
   };
 
+  // ☆ 진행 중 과제를 눌렀을 때: 부장은 제출 현황, 아니면 내 제출물로
   const goToStatus = (assignmentId: number) => {
     setSelectedAssignmentId(assignmentId);
-    setActiveTab("제출 현황");
+    setActiveTab(isLeader ? "제출 현황" : "내 제출물");
   };
 
   // 제출 현황 불러오는 중 / 실패 문구
@@ -380,10 +424,10 @@ export default function AssignmentPage() {
 
   // ===== 탭별 본문 =====
   const renderTab = () => {
-    if (activeTab === "과제 목록") {
+    if (currentTab === "과제 목록") {
       return <AssignmentList assignments={assignments} submittedCounts={submittedCounts} onOpenStatus={goToStatus} />;
     }
-    if (activeTab === "제출 현황") {
+    if (currentTab === "제출 현황") {
       return (
         <SubmissionReview
           assignments={assignments}
@@ -399,7 +443,7 @@ export default function AssignmentPage() {
         />
       );
     }
-    if (activeTab === "내 제출물") {
+    if (currentTab === "내 제출물") {
       return (
         <MySubmissions
           assignments={myAssignments}
@@ -419,8 +463,12 @@ export default function AssignmentPage() {
             members={visibleMembers}
             myName={myName}
             myScores={myScores}
+            // ☆ 부장만 역량 항목 관리·출제
+            canManage={isLeader}
             onScoreChange={handleScoreChange}
             onAddSkill={handleAddSkill}
+            onUpdateSkill={handleUpdateSkill}
+            onDeleteSkill={handleDeleteSkill}
             onCreateFromSkill={(skillId) => openCreate(skillId)}
           />
         </div>
@@ -430,20 +478,23 @@ export default function AssignmentPage() {
             submittedCounts={submittedCounts}
             onSelect={goToStatus}
           />
-          <section className="rounded-lg bg-white p-5">
-            <h2 className="font-bold">제출 현황{summaryAssignment ? ` · ${summaryAssignment.title}` : ""}</h2>
-            <div className="mt-3">
-              {!summaryAssignment ? (
-                <p className="rounded border border-dashed py-8 text-center text-xs text-neutral-400">
-                  진행 중인 과제가 없습니다
-                </p>
-              ) : summaryStatusQuery.isError ? (
-                <p className="py-6 text-center text-xs text-neutral-400">제출 현황은 출제자·부장만 볼 수 있습니다</p>
-              ) : (
-                <RecipientStatusList rows={toRows(summaryStatusQuery.data)} />
-              )}
-            </div>
-          </section>
+          {/* ☆ 제출 현황 요약은 부장만 */}
+          {isLeader && (
+            <section className="rounded-lg bg-white p-5">
+              <h2 className="font-bold">제출 현황{summaryAssignment ? ` · ${summaryAssignment.title}` : ""}</h2>
+              <div className="mt-3">
+                {!summaryAssignment ? (
+                  <p className="rounded border border-dashed py-8 text-center text-xs text-neutral-400">
+                    진행 중인 과제가 없습니다
+                  </p>
+                ) : summaryStatusQuery.isError ? (
+                  <p className="py-6 text-center text-xs text-neutral-400">제출 현황은 출제자·부장만 볼 수 있습니다</p>
+                ) : (
+                  <RecipientStatusList rows={toRows(summaryStatusQuery.data)} />
+                )}
+              </div>
+            </section>
+          )}
         </aside>
       </div>
     );
@@ -459,12 +510,13 @@ export default function AssignmentPage() {
       <div className="flex flex-col gap-4 p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex gap-5">
-            {ASSIGNMENT_TABS.map((tab) => (
+            {/* ☆ 보여줄 탭만 */}
+            {visibleTabs.map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={`border-b-2 pb-1 text-sm ${
-                  activeTab === tab ? "border-black font-semibold" : "border-transparent text-neutral-400"
+                  currentTab === tab ? "border-black font-semibold" : "border-transparent text-neutral-400"
                 }`}
               >
                 {tab}
@@ -483,17 +535,21 @@ export default function AssignmentPage() {
             <div className="w-40">
               <Dropdown options={["전체", ...MAJORS]} value={major} onChange={setMajor} placeholder="전공: 전체" />
             </div>
-            <button
-              onClick={() => openCreate()}
-              disabled={createAssignment.isPending}
-              className="rounded bg-black px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
-            >
-              {createAssignment.isPending ? "출제 중..." : "+ 과제 출제"}
-            </button>
+            {/* ☆ 과제 출제 버튼은 부장만 (누르기 전에 막는다) */}
+            {isLeader && (
+              <button
+                onClick={() => openCreate()}
+                disabled={createAssignment.isPending}
+                className="rounded bg-black px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+              >
+                {createAssignment.isPending ? "출제 중..." : "+ 과제 출제"}
+              </button>
+            )}
           </div>
         </div>
 
-        <ReminderBanner majors={remindedMajors} onCreate={() => openCreate()} />
+        {/* ☆ 출제 리마인더 배너도 부장만 */}
+        {isLeader && <ReminderBanner majors={remindedMajors} onCreate={() => openCreate()} />}
 
         {isLoading ? (
           <p className="rounded-lg bg-white py-16 text-center text-sm text-neutral-400">과제를 불러오는 중...</p>
