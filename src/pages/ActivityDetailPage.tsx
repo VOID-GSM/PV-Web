@@ -71,6 +71,7 @@ interface SessionItem {
   title: string;
   description: string;
   status: "진행 예정" | "완료" | "휴강";
+  votingOpen?: boolean;
 }
 
 interface VoteItem {
@@ -127,6 +128,7 @@ export default function ActivityDetailPage() {
   const [allActivities, setAllActivities] = useState<ActivitySummary[]>([]);
 
   const [sessions, setSessions] = useState<SessionItem[]>([]);
+  const [topicSessionId, setTopicSessionId] = useState<number | null>(null);
   const [votes, setVotes] = useState<VoteItem[]>([]);
   const [selectedVoteOption, setSelectedVoteOption] = useState<number | null>(
     null,
@@ -760,6 +762,7 @@ export default function ActivityDetailPage() {
               : session.status === "CANCELLED"
                 ? "휴강"
                 : "진행 예정",
+          votingOpen: session.votingOpen === true,
         }));
         setSessions(mappedSessions);
 
@@ -826,17 +829,28 @@ export default function ActivityDetailPage() {
             })),
         );
 
-        if (apiSessions[0] && nextDetail.topicMode !== "ASSIGNED") {
+        const openVotingSession = apiSessions.find(
+          (session) => session.votingOpen === true,
+        );
+
+        if (nextDetail.topicMode !== "ASSIGNED" && openVotingSession) {
+          setTopicSessionId(openVotingSession.id);
+
           try {
-            await refreshTopicCandidates(currentActivityId, apiSessions[0].id);
+            await refreshTopicCandidates(
+              currentActivityId,
+              openVotingSession.id,
+            );
           } catch (error) {
             console.error("주제 후보 조회 실패:", error);
+
             if (!cancelled) {
               setVotes([]);
               setSelectedVoteOption(null);
             }
           }
         } else {
+          setTopicSessionId(null);
           setVotes([]);
           setSelectedVoteOption(null);
         }
@@ -862,22 +876,30 @@ export default function ActivityDetailPage() {
   }, [id, navigate, refreshTopicCandidates, applyDetail]);
 
   const handleProposeTopic = () => {
-    if (!id || !sessions[0]) {
-      showToast("주제를 지정할 회차가 없습니다.");
+    const hasTargetSession = isAssignedTopicMode
+      ? sessions.length > 0
+      : topicSessionId !== null;
+
+    if (!id || !hasTargetSession) {
+      showToast(
+        isAssignedTopicMode
+          ? "주제를 지정할 회차가 없습니다."
+          : "현재 주제 제안 기간이 열린 회차가 없습니다.",
+      );
       return;
     }
 
-    // 지정형 주제는 해당 활동의 스터디장만 입력 가능
     if (isAssignedTopicMode && !canSetAssignedTopic) {
       showToast("주제 지정은 스터디장만 할 수 있습니다.");
       return;
     }
 
-    // 지정형은 기존 주제가 있으면 불러와 수정할 수 있게 한다.
-    const currentTopic = sessions[0].title;
+    const currentTopic = sessions[0]?.title;
 
     setTopicTitle(
-      isAssignedTopicMode && currentTopic !== "주제 미정" ? currentTopic : "",
+      isAssignedTopicMode && currentTopic && currentTopic !== "주제 미정"
+        ? currentTopic
+        : "",
     );
 
     setIsTopicModalOpen(true);
@@ -895,19 +917,22 @@ export default function ActivityDetailPage() {
       return;
     }
 
-    if (!sessions[0]) {
-      showToast("주제를 지정할 회차가 없습니다.");
+    const sessionId = isAssignedTopicMode
+      ? sessions[0]
+        ? Number(sessions[0].id)
+        : null
+      : topicSessionId;
+
+    if (sessionId === null) {
+      showToast(
+        isAssignedTopicMode
+          ? "주제를 지정할 회차가 없습니다."
+          : "현재 주제 제안 기간이 열린 회차가 없습니다.",
+      );
+
       setIsTopicModalOpen(false);
       return;
     }
-
-    if (isAssignedTopicMode && !canSetAssignedTopic) {
-      showToast("주제 지정은 스터디장만 할 수 있습니다.");
-      return;
-    }
-
-    const sessionId = Number(sessions[0].id);
-
     try {
       setIsSubmittingTopic(true);
 
@@ -956,8 +981,8 @@ export default function ActivityDetailPage() {
   };
 
   const handleVoteCandidate = async () => {
-    if (!id || !sessions[0]) {
-      showToast("투표할 회차가 없습니다.");
+    if (!id || topicSessionId === null) {
+      showToast("현재 투표 기간이 열린 회차가 없습니다.");
       return;
     }
     if (selectedVoteOption === null) {
@@ -968,7 +993,7 @@ export default function ActivityDetailPage() {
     const selectedCandidate = votes[selectedVoteOption];
     if (!selectedCandidate) return;
 
-    const sessionId = Number(sessions[0].id);
+    const sessionId = topicSessionId;
     const candidateId = Number(selectedCandidate.id);
 
     try {
@@ -1650,16 +1675,16 @@ export default function ActivityDetailPage() {
                   <button
                     type="button"
                     onClick={handleProposeTopic}
-                    disabled={isSubmittingTopic || sessions.length === 0}
+                    disabled={isSubmittingTopic || topicSessionId === null}
                     className="rounded-xl bg-black px-3 py-2 text-[11px] font-bold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {isSubmittingTopic ? "등록 중..." : "+ 주제 제안"}
                   </button>
                 </div>
 
-                {sessions.length === 0 ? (
+                {topicSessionId === null ? (
                   <div className="py-8 text-center text-gray-400">
-                    회차가 등록되면 주제를 제안할 수 있습니다.
+                    현재 주제 제안 및 투표가 가능한 회차가 없습니다.
                   </div>
                 ) : votes.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-gray-200 py-8 text-center">
