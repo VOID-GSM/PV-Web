@@ -77,8 +77,6 @@ export const Header: React.FC<HeaderProps> = ({
 
   // 아래에는 기존 코드를 그대로 유지해 줘.
 
-
-
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
   const [isNoticeModalOpen, setIsNoticeModalOpen] = useState(false);
   const [isArticleModalOpen, setIsArticleModalOpen] = useState(false);
@@ -167,18 +165,21 @@ export const Header: React.FC<HeaderProps> = ({
     // 공지 알림
     if (notificationType.includes("NOTICE")) {
       // 공지 ID가 있으면 실제 공지 상세 조회
-      if (notification.noticeId) {
+      const noticeId = Number(notification.targetId);
+
+      if (Number.isInteger(noticeId) && noticeId > 0) {
         setSelectedNotice(null);
         setNoticePreview(null);
         setSelectedNoticeError("");
         setIsLoadingSelectedNotice(true);
+        setIsNoticeOpen(false);
 
-        void getNotice(notification.noticeId)
+        void getNotice(noticeId)
           .then((notice) => {
             setSelectedNotice(notice);
           })
           .catch((error: unknown) => {
-            console.error("알림에서 공지 상세 조회 실패:", error);
+            console.error("공지 상세 조회 실패:", error);
 
             setSelectedNoticeError(
               error instanceof Error
