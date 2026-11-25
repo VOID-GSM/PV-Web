@@ -214,7 +214,10 @@ export default function AssignmentPage() {
   );
 
   // 역량맵 팀원 목록: 지금은 내 점수만 있어서 진짜 나 한 줄
-  const myMembers: Member[] = myName ? [{ name: myName, generation: myGeneration, majors: myMajors }] : [];
+  // ☆ memberId: 내 회원 번호 (프로필 사진용)
+  const myMembers: Member[] = myName
+    ? [{ name: myName, generation: myGeneration, majors: myMajors, memberId: myId }]
+    : [];
 
   const majorFilter = major === "" || major === "전체" ? "" : major;
   const generationFilter = generation === "" || generation === "전체" ? "" : generation;

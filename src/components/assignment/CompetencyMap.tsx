@@ -1,5 +1,7 @@
 import { useState } from "react";
 import Dropdown from "../common/Dropdown";
+// ☆ 프로필 사진 (없으면 이름 첫 글자)
+import Avatar from "../common/Avatar";
 import { MAJORS, averageColor, scoreColor, type Member, type Skill } from "../../constants/assignment";
 import targetIcon from "../../assets/icons/target.svg";
 import arrowRightIcon from "../../assets/icons/arrow-right.svg";
@@ -98,12 +100,16 @@ export default function CompetencyMap({
                 return (
                   <tr key={member.name} className="border-t">
                     <td className="py-2">
-                      <span className="flex items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black text-[10px] text-white">
-                          {member.name.charAt(0)}
-                        </span>
+                      {/* ☆ span → div (Avatar가 div라서 그 바깥도 div로) */}
+                      <div className="flex items-center gap-2">
+                        {/* ☆ 프로필 사진 */}
+                        <Avatar
+                          memberId={member.memberId}
+                          name={member.name}
+                          className="h-6 w-6 text-[10px]"
+                        />
                         {member.name}
-                      </span>
+                      </div>
                     </td>
                     {skills.map((skill) => {
                       const score = getScore(member.name, skill.id);
@@ -190,4 +196,4 @@ export default function CompetencyMap({
       </div>
     </section>
   );
-}
+} 
