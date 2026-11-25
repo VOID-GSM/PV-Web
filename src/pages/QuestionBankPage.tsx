@@ -77,6 +77,8 @@ function toPageAnswer(a: ServerAnswer, questionId: number, generation: string): 
     id: a.id,
     questionId,
     author: a.memberName,
+    // ☆ 작성자 회원 번호 (프로필 사진용)
+    authorId: a.memberId,
     generation,
     date: formatDate(new Date(a.createdAt)),
     content: a.content,
