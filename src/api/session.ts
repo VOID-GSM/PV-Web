@@ -5,7 +5,19 @@ const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? "/api";
 const MEMBER_ID_KEY = "pvweb:memberId";
 const INVITE_PROFILE_KEY = "pvweb:invite-profile:v1";
 
+// ★ 로그인 없이 들어오는 화면 (초대 링크로 가입 / 재입장 링크)
+// 이 화면에서는 로그인이 필요한 API를 부르지 않고, 401이 나도 다른 주소로 보내지 않는다 (초대 코드가 사라지지 않게)
+const PUBLIC_PATH_PREFIXES = ["/invite", "/re-entry"];
+
 export type RefreshResult = "ok" | "pending" | "invalid" | "failed";
+
+// ★ 지금(또는 넘겨받은) 주소가 로그인 없이 쓰는 화면인지
+// "/invite", "/invite/abc", "/re-entry/abc" → true / "/invitex" 같은 다른 주소 → false
+export function isPublicPath(pathname: string = window.location.pathname) {
+  return PUBLIC_PATH_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+}
 
 export function clearSession() {
   tokenStorage.clear();
@@ -22,6 +34,15 @@ export function goToPendingPage() {
   if (!window.location.pathname.startsWith("/pending")) {
     window.location.replace("/pending");
   }
+}
+
+// ★ 로그인이 풀렸을 때 입장 화면으로 보낸다
+// 이미 입장·재입장 화면이면 보내지 않는다 (보내면 주소의 초대 코드가 사라진다)
+// 보냈으면 true, 안 보냈으면 false
+export function goToInvitePage() {
+  if (isPublicPath()) return false;
+  window.location.replace("/invite");
+  return true;
 }
 
 async function requestRefresh(): Promise<RefreshResult> {

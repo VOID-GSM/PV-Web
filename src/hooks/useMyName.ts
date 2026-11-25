@@ -18,5 +18,7 @@ export function useMyName() {
     myMajors: me ? me.majors.map((m) => MAJOR_LABEL[m]) : [],
     // 내 회원 번호 (못 불러왔으면 null)
     myId: me?.memberId ?? null,
+    // ★ 부장인지 (역할에 LEADER가 있으면). 아직 못 불러왔으면 false → 부장 전용 버튼이 잠깐 숨겨진다
+    isLeader: me?.roles?.includes("LEADER") ?? false,
   };
 }

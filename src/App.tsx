@@ -1,6 +1,7 @@
 // useCallback: 함수를 한 번만 만들어 두고 재사용하게 해주는 기능 (토스트 닫기에 사용)
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+// ★ useLocation: 지금 주소를 알려준다 (입장 화면인지 확인용)
+import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { getHomeTodos, type HomeTodoItem } from "./api/homeApi";
 import { getActivityMembers } from "./api/activityApi";
 import { MainPage } from "./pages/MainPage";
@@ -11,7 +12,7 @@ import ArticleEditorPage from "./pages/ArticleEditorPage";
 import WeeklyReportPage from "./pages/WeeklyReportPage";
 import InvitePage from "./pages/InvitePage";
 import PendingPage from "./pages/PendingPage";
-// ★ 재입장 링크로 들어왔을 때 보여줄 화면
+// 재입장 링크로 들어왔을 때 보여줄 화면
 import ReEntryPage from "./pages/ReEntryPage";
 import SettingsPage from "./pages/SettingsPage";
 import WorklogPage from "./pages/WorklogPage";
@@ -20,7 +21,8 @@ import QuestionBankPage from "./pages/QuestionBankPage";
 import AssignmentPage from "./pages/AssignmentPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import { apiRequest } from "./api/client";
-import { refreshSession } from "./api/session";
+// ★ isPublicPath: 로그인 없이 쓰는 화면(입장·재입장)인지
+import { isPublicPath, refreshSession } from "./api/session";
 import SidebarLayout from "./components/layout/SidebarLayout";
 import { AddEventModal } from "./components/calendar/AddEventModal";
 // 브라우저 alert 대신 쓸 토스트
@@ -28,7 +30,7 @@ import Toast from "./components/common/Toast";
 import type { CalendarEvent } from "./types/calendar";
 import {
   createCalendarEvent,
-  // ☆ 보드 마감 만들기
+  // 보드 마감 만들기
   createDeadline,
   deleteCalendarEvent,
   getBoards,
@@ -50,6 +52,10 @@ const formatDate = (date: Date) => {
 
 function AppContent() {
   const navigate = useNavigate();
+  // ★ 지금 주소가 입장·재입장 화면이면 로그인이 필요한 데이터를 불러오지 않는다
+  // (토큰이 없어서 401 → /invite로 튕기며 초대 코드가 사라지던 문제)
+  const location = useLocation();
+  const isPublicPage = isPublicPath(location.pathname);
 
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [boards, setBoards] = useState<ApiBoard[]>([]);
@@ -83,6 +89,7 @@ function AppContent() {
     const toDate = new Date(base.getFullYear(), base.getMonth() + 1, 7);
 
     getCalendarEvents(formatDate(fromDate), formatDate(toDate))
+
       .then(async (data) => {
         const activityIds = Array.from(
           new Set(
@@ -149,6 +156,35 @@ function AppContent() {
           };
         });
 
+
+      .then((data) => {
+        const loadedEvents: CalendarEvent[] = data.map((event) => ({
+          id: String(event.id),
+          title: event.title,
+          type:
+            event.type === "DEADLINE"
+              ? "마감"
+              : event.type === "MEETING"
+                ? "회의"
+                : event.type === "ACTIVITY"
+                  ? "활동"
+                  : "개인 일정",
+          board: "",
+          date: event.startsAt.slice(0, 10),
+          endDate: event.endsAt.slice(0, 10),
+          time: event.allDay ? undefined : event.startsAt.slice(11, 16),
+          description: event.memo ?? "",
+          // 서버에 저장된 완료 여부 (새로고침해도 체크가 유지된다)
+          completed: event.completed ?? false,
+          // 보드 마감이면 보드 번호와 담당자 번호들
+          boardId: event.boardId,
+          assigneeIds: event.assigneeIds ?? [],
+          isMyEvent: true,
+        }));
+
+        // 같은 id는 새 값으로 덮어쓰고, 새 일정은 추가한다.
+        // (달을 옮겨도 먼저 불러온 달의 일정이 사라지지 않는다)
+
         setEvents((prev) => {
           const merged = new Map(prev.map((item) => [item.id, item]));
 
@@ -165,7 +201,7 @@ function AppContent() {
       });
   }, []);
 
-  // ☆ 어떤 날짜가 속한 달을 서버에서 다시 불러온다 (마감을 만든 뒤 캘린더에 바로 보이게)
+  // 어떤 날짜가 속한 달을 서버에서 다시 불러온다 (마감을 만든 뒤 캘린더에 바로 보이게)
   const reloadMonthOf = useCallback(
     (dateStr: string) => {
       // "2026-11-30" → 그 날짜 정오 (시간대 때문에 날짜가 밀리지 않게)
@@ -180,10 +216,15 @@ function AppContent() {
 
   // 처음에는 이번 달만 불러온다
   useEffect(() => {
+    // ★ 입장·재입장 화면에서는 부르지 않는다
+    if (isPublicPage) return;
     loadMonth(new Date());
-  }, [loadMonth]);
+  }, [loadMonth, isPublicPage]);
 
   useEffect(() => {
+    // ★ 입장·재입장 화면에서는 부르지 않는다
+    if (isPublicPage) return;
+
     let cancelled = false;
 
     // 오늘 할 일 조회
@@ -221,10 +262,11 @@ function AppContent() {
     return () => {
       cancelled = true;
     };
-  }, []);
+    // ★ 입장 화면 → 일반 화면으로 바뀌면 그때 불러온다
+  }, [isPublicPage]);
 
   const handleAddEvent = async (newEvent: CalendarEvent) => {
-    // ☆ 보드 마감 (부장이 마감 + 보드를 고른 경우): 보드 마감 API로 저장
+    // 보드 마감 (부장이 마감 + 보드를 고른 경우): 보드 마감 API로 저장
     if (newEvent.type === "마감" && newEvent.boardId) {
       try {
         await createDeadline(newEvent.boardId, {
@@ -487,7 +529,7 @@ function AppContent() {
 
         <Route path="/invite" element={<InvitePage />} />
         <Route path="/invite/:code" element={<InvitePage />} />
-        {/* ★ 재입장 링크 (사이드바 밖: 아직 토큰이 없는 사람이 들어오는 주소라서) */}
+        {/* 재입장 링크 (사이드바 밖: 아직 토큰이 없는 사람이 들어오는 주소라서) */}
         <Route path="/re-entry/:code" element={<ReEntryPage />} />
       </Routes>
 
@@ -495,7 +537,7 @@ function AppContent() {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onAddEvent={handleAddEvent}
-        // ☆ 부장이면 마감을 보드에 등록할 수 있게 (끝난 보드는 빼고)
+        // 부장이면 마감을 보드에 등록할 수 있게 (끝난 보드는 빼고)
         boards={boards.filter((board) => board.status !== "CLOSED")}
       />
 

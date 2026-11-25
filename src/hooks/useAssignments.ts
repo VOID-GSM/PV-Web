@@ -10,7 +10,15 @@ import {
   type AssignmentListType,
   type SubmissionRequest,
 } from "../apis/assignments";
-import { createSkill, getMySkills, getSkills, saveMyScores } from "../apis/skills";
+// ★ updateSkill, SkillUpdateRequest 추가
+import {
+  createSkill,
+  getMySkills,
+  getSkills,
+  saveMyScores,
+  updateSkill,
+  type SkillUpdateRequest,
+} from "../apis/skills";
 
 // 창고 이름표
 export const assignmentKeys = {
@@ -123,6 +131,16 @@ export function useCreateSkill() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: createSkill,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: skillKeys.all }),
+  });
+}
+
+// ★ 역량 항목 수정·숨기기 (부장만) → 역량 목록·내 점수를 다시 불러온다
+export function useUpdateSkill() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ skillId, body }: { skillId: number; body: SkillUpdateRequest }) =>
+      updateSkill(skillId, body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: skillKeys.all }),
   });
 }
