@@ -1,12 +1,12 @@
-import React, { useState } from "react";
-
+import React, { useEffect, useState } from "react";
 import alertIcon from "../../assets/icons/alert.svg";
 import checkCircleIcon from "../../assets/icons/check-circle.svg";
+import { getGenerations, type Generation } from "../../api/activityApi";
 
 export interface ActivityFormData {
   title: string;
   type: string;
-  generations: string[];
+  generationIds: number[];
   departments: string[];
   memberCount: string;
   startDate: string;
@@ -27,6 +27,8 @@ interface CreateActivityModalProps {
 const MIN_CAPACITY = 1;
 const MAX_CAPACITY = 200;
 
+const DEPARTMENTS = ["Front-end", "Back-end", "DevOps", "Design"];
+
 export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
   isOpen,
   onClose,
@@ -34,13 +36,11 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
 }) => {
   const [type, setType] = useState("스터디");
   const [title, setTitle] = useState("");
-  const [generations, setGenerations] = useState<string[]>([]);
+  const [generationIds, setGenerationIds] = useState<number[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
   const [memberCount, setMemberCount] = useState("");
-
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-
   const [repeatRule, setRepeatRule] = useState(
     "매주 수요일 16:00 · 전공동아리 시간",
   );
@@ -49,11 +49,38 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
   const [confirmMode, setConfirmMode] = useState<"스터디장 승인" | "선착순">(
     "스터디장 승인",
   );
-
   const [discordEnabled, setDiscordEnabled] = useState(false);
-  // ★ 저장을 눌렀을 때 빈 칸이 있으면 보여줄 안내 (없으면 "")
-
   const [error, setError] = useState("");
+
+  const [generations, setGenerations] = useState<Generation[]>([]);
+  const [isLoadingGenerations, setIsLoadingGenerations] = useState(false);
+
+  // 기수 목록 조회
+  useEffect(() => {
+    let cancelled = false;
+
+    getGenerations()
+      .then((data) => {
+        if (!cancelled) {
+          setGenerations(data);
+        }
+      })
+      .catch((err: unknown) => {
+        console.error("기수 목록 조회 실패:", err);
+        if (!cancelled) {
+          setError("기수 목록을 불러오지 못했습니다.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingGenerations(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // 모달을 새로 열 때 폼 초기화
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
@@ -64,7 +91,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
     if (isOpen) {
       setType("스터디");
       setTitle("");
-      setGenerations([]);
+      setGenerationIds([]);
       setDepartments([]);
       setMemberCount("");
       setDiscordEnabled(false);
@@ -80,23 +107,24 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
 
   if (!isOpen) return null;
 
-  // ★ 투표형일 때만 "투표 개설 시점"을 보여준다 (지정형은 투표가 없어서)
   const isVoteMode = topicMode === "투표형";
 
-  const toggleGen = (g: string) => {
-    setGenerations((prev) =>
-      prev.includes(g) ? prev.filter((item) => item !== g) : [...prev, g],
+  const toggleGeneration = (id: number) => {
+    setGenerationIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     );
   };
 
-  const toggleDept = (d: string) => {
+  const toggleDept = (department: string) => {
     setDepartments((prev) =>
-      prev.includes(d) ? prev.filter((item) => item !== d) : [...prev, d],
+      prev.includes(department)
+        ? prev.filter((item) => item !== department)
+        : [...prev, department],
     );
   };
 
   const validate = () => {
-    if (title.trim() === "") return "활동명을 입력해 주세요.";
+    if (!title.trim()) return "활동명을 입력해 주세요.";
 
     const count = Number(memberCount);
 
@@ -108,43 +136,44 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
       return `모집 인원은 ${MIN_CAPACITY}~${MAX_CAPACITY}명 사이 숫자로 입력해 주세요.`;
     }
 
-    if (startDate === "") return "시작일을 선택해 주세요.";
-    if (endDate === "") return "종료일을 선택해 주세요.";
+    if (!startDate) return "시작일을 선택해 주세요.";
+    if (!endDate) return "종료일을 선택해 주세요.";
     if (endDate < startDate) return "종료일은 시작일 이후여야 합니다.";
 
     return "";
   };
 
   const handleSubmit = (e: React.FormEvent) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  const message = validate();
+    const message = validate();
 
-  if (message) {
-    setError(message);
-    return;
-  }
+    if (message) {
+      setError(message);
+      return;
+    }
 
-  onCreateSuccess?.({
-    title,
-    type,
-    generations,
-    departments,
-    memberCount,
-    startDate,
-    endDate,
-    repeatRule,
-    topicMode,
-    voteTime,
-    confirmMode,
-    discordEnabled,
-  });
+    onCreateSuccess?.({
+      title: title.trim(),
+      type,
+      generationIds,
+      departments,
+      memberCount,
+      startDate,
+      endDate,
+      repeatRule,
+      topicMode,
+      voteTime,
+      confirmMode,
+      discordEnabled,
+    });
 
-  onClose();
-};
+    onClose();
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 font-pretendard select-none">
-      <div className="relative w-full max-w-[620px] max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-7 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+      <div className="relative max-h-[90vh] w-full max-w-[620px] overflow-y-auto rounded-3xl bg-white p-7 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
         <div className="flex items-start justify-between pb-4">
           <div>
             <h2 className="text-xl font-bold text-gray-900">활동 개설</h2>
@@ -156,26 +185,25 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition cursor-pointer"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
           >
             ✕
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6 text-xs">
-          {/* 활동 유형 */}
           <div>
-            <label className="block font-bold text-gray-700 mb-2">
+            <label className="mb-2 block font-bold text-gray-700">
               활동 유형
             </label>
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {["스터디", "면접 준비", "포폴 피드백", "기타"].map((item) => (
                 <button
                   key={item}
                   type="button"
                   onClick={() => setType(item)}
-                  className={`px-4 py-2 rounded-full font-semibold border flex items-center gap-1.5 transition cursor-pointer ${
+                  className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-4 py-2 font-semibold transition ${
                     type === item
                       ? "border-black bg-black text-white"
                       : "border-gray-200 text-gray-600 hover:bg-gray-50"
@@ -185,85 +213,97 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
                     <img
                       src={checkCircleIcon}
                       alt=""
-                      className="h-3.5 w-3.5 filter invert"
+                      className="h-3.5 w-3.5 invert"
                     />
                   )}
-                  <span>{item}</span>
+                  {item}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* 활동명 */}
           <div>
-            <label className="block font-bold text-gray-700 mb-2">활동명</label>
-
+            <label className="mb-2 block font-bold text-gray-700">활동명</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               maxLength={100}
-              className="w-full rounded-xl border border-gray-300 p-3 text-sm font-semibold outline-none focus:border-black"
               placeholder="예: React 심화 스터디"
+              className="w-full rounded-xl border border-gray-300 p-3 text-sm font-semibold outline-none focus:border-black"
             />
           </div>
 
-          {/* 대상 기수 & 대상 전공 */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block font-bold text-gray-700 mb-2">
+              <label className="mb-2 block font-bold text-gray-700">
                 대상 기수
               </label>
 
               <div className="flex flex-wrap gap-2">
-                {["9기", "10기", "전체"].map((g) => (
+                {generations.map((generation) => (
                   <button
-                    key={g}
+                    key={generation.id}
                     type="button"
-                    onClick={() => toggleGen(g)}
-                    className={`px-3.5 py-1.5 rounded-full font-semibold border cursor-pointer ${
-                      generations.includes(g)
-                        ? "border-black bg-white text-black font-bold ring-1 ring-black"
+                    onClick={() => toggleGeneration(generation.id)}
+                    className={`cursor-pointer rounded-full border px-3.5 py-1.5 font-semibold ${
+                      generationIds.includes(generation.id)
+                        ? "border-black bg-white text-black ring-1 ring-black"
                         : "border-gray-200 text-gray-500"
                     }`}
                   >
-                    {g}
+                    {generation.number}기
                   </button>
                 ))}
+
+                <button
+                  type="button"
+                  onClick={() => setGenerationIds([])}
+                  className={`cursor-pointer rounded-full border px-3.5 py-1.5 font-semibold ${
+                    generationIds.length === 0
+                      ? "border-black bg-white text-black ring-1 ring-black"
+                      : "border-gray-200 text-gray-500"
+                  }`}
+                >
+                  전체
+                </button>
               </div>
+
+              {isLoadingGenerations && (
+                <p className="mt-2 text-[10px] text-gray-400">
+                  기수 목록을 불러오는 중...
+                </p>
+              )}
             </div>
 
             <div>
-              <label className="block font-bold text-gray-700 mb-2">
+              <label className="mb-2 block font-bold text-gray-700">
                 대상 전공
               </label>
-
               <div className="flex flex-wrap gap-2">
-                {["Front-end", "Back-end", "DevOps", "Design"].map((d) => (
+                {DEPARTMENTS.map((department) => (
                   <button
-                    key={d}
+                    key={department}
                     type="button"
-                    onClick={() => toggleDept(d)}
-                    className={`px-3.5 py-1.5 rounded-full font-semibold border cursor-pointer ${
-                      departments.includes(d)
-                        ? "border-black bg-white text-black font-bold ring-1 ring-black"
+                    onClick={() => toggleDept(department)}
+                    className={`cursor-pointer rounded-full border px-3.5 py-1.5 font-semibold ${
+                      departments.includes(department)
+                        ? "border-black bg-white text-black ring-1 ring-black"
                         : "border-gray-200 text-gray-500"
                     }`}
                   >
-                    {d}
+                    {department}
                   </button>
                 ))}
               </div>
             </div>
           </div>
 
-          {/* 모집 인원 & 기간 설정 */}
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block font-bold text-gray-700 mb-2">
+              <label className="mb-2 block font-bold text-gray-700">
                 모집 인원
               </label>
-
               <input
                 type="number"
                 min={MIN_CAPACITY}
@@ -276,43 +316,39 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
             </div>
 
             <div>
-              <label className="block font-bold text-gray-700 mb-2">
+              <label className="mb-2 block font-bold text-gray-700">
                 시작일
               </label>
-
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 p-2.5 outline-none focus:border-black font-medium bg-white"
+                className="w-full rounded-xl border border-gray-200 bg-white p-2.5 font-medium outline-none focus:border-black"
               />
             </div>
 
             <div>
-              <label className="block font-bold text-gray-700 mb-2">
+              <label className="mb-2 block font-bold text-gray-700">
                 종료일
               </label>
-
               <input
                 type="date"
                 value={endDate}
                 min={startDate || undefined}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 p-2.5 outline-none focus:border-black font-medium bg-white"
+                className="w-full rounded-xl border border-gray-200 bg-white p-2.5 font-medium outline-none focus:border-black"
               />
             </div>
           </div>
 
-          {/* 반복 규칙 */}
           <div>
-            <label className="block font-bold text-gray-700 mb-2">
+            <label className="mb-2 block font-bold text-gray-700">
               반복 규칙
             </label>
-
             <select
               value={repeatRule}
               onChange={(e) => setRepeatRule(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 p-3 outline-none focus:border-black bg-white"
+              className="w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:border-black"
             >
               <option>매주 수요일 16:00 · 전공동아리 시간</option>
               <option>매주 목요일 18:00</option>
@@ -320,14 +356,8 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
             </select>
           </div>
 
-          {/* 기본값 안내 박스 */}
-          <div className="flex gap-2.5 rounded-2xl bg-blue-50 p-4 text-blue-700 leading-relaxed border border-blue-100">
-            <img
-              src={alertIcon}
-              alt=""
-              className="h-4 w-4 shrink-0 mt-0.5 text-blue-600"
-            />
-
+          <div className="flex gap-2.5 rounded-2xl border border-blue-100 bg-blue-50 p-4 leading-relaxed text-blue-700">
+            <img src={alertIcon} alt="" className="mt-0.5 h-4 w-4 shrink-0" />
             <div>
               <p className="font-bold">기본값이 자동으로 채워졌습니다</p>
               <p className="mt-0.5 text-[11px] opacity-80">
@@ -337,79 +367,40 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
             </div>
           </div>
 
-          {/* 주제 결정 방식 */}
           <div>
-            <label className="block font-bold text-gray-700 mb-2">
+            <label className="mb-2 block font-bold text-gray-700">
               주제 결정 방식
             </label>
 
             <div className="grid grid-cols-2 gap-3">
-              <div
-                onClick={() => setTopicMode("투표형")}
-                className={`cursor-pointer rounded-2xl border p-4 transition ${
-                  topicMode === "투표형"
-                    ? "border-black bg-white ring-2 ring-black"
-                    : "border-gray-200 bg-gray-50 text-gray-500"
-                }`}
-              >
-                <div className="flex items-center gap-2 font-bold text-gray-900">
-                  <span
-                    className={`h-3.5 w-3.5 rounded-full border border-black flex items-center justify-center ${
-                      topicMode === "투표형" ? "bg-black" : "bg-white"
-                    }`}
-                  >
-                    {topicMode === "투표형" && (
-                      <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                    )}
-                  </span>
-
-                  <span>투표형</span>
-                </div>
-
-                <p className="mt-1.5 text-[11px] text-gray-500 leading-tight">
-                  회차 N일 전 투표가 자동으로 열리고 최다 득표 주제가 확정됩니다
-                </p>
-              </div>
-
-              <div
-                onClick={() => setTopicMode("지정형")}
-                className={`cursor-pointer rounded-2xl border p-4 transition ${
-                  topicMode === "지정형"
-                    ? "border-black bg-white ring-2 ring-black"
-                    : "border-gray-200 bg-gray-50 text-gray-500"
-                }`}
-              >
-                <div className="flex items-center gap-2 font-bold text-gray-900">
-                  <span
-                    className={`h-3.5 w-3.5 rounded-full border border-black flex items-center justify-center ${
-                      topicMode === "지정형" ? "bg-black" : "bg-white"
-                    }`}
-                  >
-                    {topicMode === "지정형" && (
-                      <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                    )}
-                  </span>
-
-                  <span>지정형</span>
-                </div>
-
-                <p className="mt-1.5 text-[11px] text-gray-500 leading-tight">
-                  회차 N일 전 스터디장에게 주제 입력 알림이 갑니다
-                </p>
-              </div>
+              {(["투표형", "지정형"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setTopicMode(mode)}
+                  className={`rounded-2xl border p-4 text-left transition ${
+                    topicMode === mode
+                      ? "border-black bg-white ring-2 ring-black"
+                      : "border-gray-200 bg-gray-50"
+                  }`}
+                >
+                  <span className="font-bold text-gray-900">{mode}</span>
+                  <p className="mt-1.5 text-[11px] leading-tight text-gray-500">
+                    {mode === "투표형"
+                      ? "회차 N일 전 투표가 자동으로 열리고 최다 득표 주제가 확정됩니다"
+                      : "회차 N일 전 스터디장에게 주제 입력 알림이 갑니다"}
+                  </p>
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* 투표 개설 시점 & 참여 확정 방식 */}
-          {/* ★ 투표형이면 두 칸, 지정형이면 참여 확정 방식만 한 줄 전체 */}
           <div className={isVoteMode ? "grid grid-cols-2 gap-4" : ""}>
-            {/* ★ 투표형일 때만 보인다 */}
             {isVoteMode && (
               <div>
-                <label className="block font-bold text-gray-700 mb-2">
+                <label className="mb-2 block font-bold text-gray-700">
                   투표 개설 시점
                 </label>
-
                 <input
                   type="text"
                   value={voteTime}
@@ -420,12 +411,11 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
             )}
 
             <div>
-              <label className="block font-bold text-gray-700 mb-2">
+              <label className="mb-2 block font-bold text-gray-700">
                 참여 확정 방식
               </label>
-
               <div className="flex items-center gap-4 pt-2">
-                <label className="flex items-center gap-2 cursor-pointer font-bold text-gray-800">
+                <label className="flex cursor-pointer items-center gap-2 font-bold text-gray-800">
                   <input
                     type="radio"
                     name="confirm"
@@ -433,10 +423,10 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
                     onChange={() => setConfirmMode("스터디장 승인")}
                     className="accent-black"
                   />
-                  <span>스터디장 승인</span>
+                  스터디장 승인
                 </label>
 
-                <label className="flex items-center gap-2 cursor-pointer font-medium text-gray-500">
+                <label className="flex cursor-pointer items-center gap-2 font-medium text-gray-500">
                   <input
                     type="radio"
                     name="confirm"
@@ -444,32 +434,28 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
                     onChange={() => setConfirmMode("선착순")}
                     className="accent-black"
                   />
-                  <span>선착순</span>
+                  선착순
                 </label>
               </div>
             </div>
           </div>
 
-       {/* 디스코드 알림 설정 */}
-<label className="flex items-center gap-3 rounded-xl border border-gray-200 p-4 cursor-pointer hover:bg-gray-50 transition">
-  <input
-    type="checkbox"
-    checked={discordEnabled}
-    onChange={(e) => setDiscordEnabled(e.target.checked)}
-    className="h-4 w-4 accent-black"
-  />
-
-  <span className="flex flex-col gap-1">
-    <span className="font-bold text-gray-800">
-      디스코드로 모집 공지 전송
-    </span>
-
-    <span className="text-[11px] text-gray-500">
-      체크하면 활동 개설 시 디스코드에도 알림을 전송합니다.
-    </span>
-  </span>
-</label>
-
+          <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 p-4 transition hover:bg-gray-50">
+            <input
+              type="checkbox"
+              checked={discordEnabled}
+              onChange={(e) => setDiscordEnabled(e.target.checked)}
+              className="h-4 w-4 accent-black"
+            />
+            <span className="flex flex-col gap-1">
+              <span className="font-bold text-gray-800">
+                디스코드로 모집 공지 전송
+              </span>
+              <span className="text-[11px] text-gray-500">
+                체크하면 활동 개설 시 디스코드에도 알림을 전송합니다.
+              </span>
+            </span>
+          </label>
 
           {error && (
             <p className="rounded-xl bg-red-50 px-4 py-3 font-semibold text-red-600">
@@ -477,26 +463,23 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
             </p>
           )}
 
-          {/* Footer */}
-          <div className="border-t border-gray-100 pt-5 flex items-center justify-between">
+          <div className="flex items-center justify-between border-t border-gray-100 pt-5">
             <span className="text-[11px] text-gray-400">
               개설하면 대상 기수·전공 팀원에게 모집 공지가 발송됩니다
             </span>
-
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-xl border border-gray-200 px-5 py-2.5 font-bold text-gray-600 hover:bg-gray-50 transition cursor-pointer"
+                className="cursor-pointer rounded-xl border border-gray-200 px-5 py-2.5 font-bold text-gray-600 transition hover:bg-gray-50"
               >
                 취소
               </button>
-
               <button
                 type="submit"
-                className="rounded-xl bg-black px-5 py-2.5 font-bold text-white hover:bg-gray-800 transition cursor-pointer"
+                className="cursor-pointer rounded-xl bg-black px-5 py-2.5 font-bold text-white transition hover:bg-gray-800"
               >
-                {"활동 개설"}
+                활동 개설
               </button>
             </div>
           </div>

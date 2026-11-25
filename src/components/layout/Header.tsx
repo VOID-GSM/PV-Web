@@ -1,4 +1,3 @@
-// src/components/layout/Header.tsx
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 
@@ -18,7 +17,6 @@ import { createPost } from "../../api/postApi";
 import CreateNoticeModal from "../modals/CreateNoticeModal";
 import CreateArticleModal from "../modals/CreateArticleModal";
 import Toast from "../common/Toast";
-// ★ 활동 목록이 바뀌었다고 알리는 신호
 import { notifyActivitiesChanged } from "../../utils/activityEvents";
 
 import {
@@ -64,7 +62,6 @@ export const Header: React.FC<HeaderProps> = ({
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isNoticeOpen, setIsNoticeOpen] = useState(false);
-
   const [activeNoticeTab, setActiveNoticeTab] = useState<NoticeTab>("전체");
 
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
@@ -113,13 +110,11 @@ export const Header: React.FC<HeaderProps> = ({
   const handleMarkAllRead = async () => {
     try {
       await markAllNotificationsRead();
-
       setNotifications((items) =>
         items.map((item) => ({ ...item, read: true })),
       );
     } catch (error) {
       console.error("알림 전체 읽음 처리 실패:", error);
-
       showToast(
         error instanceof Error
           ? error.message
@@ -133,7 +128,6 @@ export const Header: React.FC<HeaderProps> = ({
 
     try {
       await markNotificationRead(notification.id);
-
       setNotifications((items) =>
         items.map((item) =>
           item.id === notification.id ? { ...item, read: true } : item,
@@ -141,7 +135,6 @@ export const Header: React.FC<HeaderProps> = ({
       );
     } catch (error) {
       console.error("알림 읽음 처리 실패:", error);
-
       showToast(
         error instanceof Error
           ? error.message
@@ -194,7 +187,6 @@ export const Header: React.FC<HeaderProps> = ({
     );
 
     const repeatTime = form.repeatRule.match(/\d{1,2}:\d{2}/)?.[0];
-
     const topicOpenDaysBefore = Number(form.voteTime.match(/\d+/)?.[0] ?? 3);
 
     try {
@@ -204,12 +196,18 @@ export const Header: React.FC<HeaderProps> = ({
         capacity: Number(form.memberCount),
         startDate: form.startDate,
         endDate: form.endDate,
+
         targetMajors: form.departments
           .map((major) => majorMap[major])
           .filter(
             (major): major is "FRONTEND" | "BACKEND" | "DEVOPS" | "DESIGN" =>
               Boolean(major),
           ),
+
+        // 기수 번호가 아닌 기수 ID 전달
+        targetGenerationIds:
+          form.generationIds.length > 0 ? form.generationIds : undefined,
+
         recruitMode:
           form.confirmMode === "스터디장 승인" ? "APPROVAL" : "FIRST_COME",
         topicMode: form.topicMode === "투표형" ? "VOTE" : "ASSIGNED",
@@ -221,14 +219,10 @@ export const Header: React.FC<HeaderProps> = ({
         discordEnabled: form.discordEnabled,
       });
 
-      // ★ 활동 화면에 "목록 다시 불러와!" 신호 보내기 (새로고침 안 해도 바로 보인다)
       notifyActivitiesChanged();
-
-      // ★ "새로고침해 주세요" 문구 삭제
       showToast("활동을 만들었습니다.", "success");
     } catch (error) {
       console.error("활동 생성 실패:", error);
-
       showToast(
         error instanceof Error ? error.message : "활동을 생성하지 못했습니다.",
       );
@@ -252,21 +246,18 @@ export const Header: React.FC<HeaderProps> = ({
     };
 
     document.addEventListener("mousedown", handleClickOutside);
-
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   return (
     <>
-      <header className="flex h-16 w-full items-center justify-between border-b border-gray-100 bg-white px-8 select-none shrink-0 relative font-pretendard">
+      <header className="relative flex h-16 w-full shrink-0 items-center justify-between border-b border-gray-100 bg-white px-8 font-pretendard select-none">
         <div>
           <h1 className="text-base font-bold text-gray-900">{title}</h1>
-
           {subtitle && <p className="text-xs text-gray-400">{subtitle}</p>}
         </div>
 
         <div className="flex items-center gap-3">
-          {/* 알림 버튼 및 드롭다운 */}
           <div className="relative" ref={noticeRef}>
             <button
               type="button"
@@ -274,21 +265,19 @@ export const Header: React.FC<HeaderProps> = ({
                 setIsNoticeOpen(!isNoticeOpen);
                 setIsCreateOpen(false);
               }}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-100 text-gray-500 hover:bg-gray-50 transition cursor-pointer relative"
+              className="relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-gray-100 text-gray-500 transition hover:bg-gray-50"
             >
               <img src={bellIcon} alt="알림" className="h-4 w-4 opacity-60" />
-
               {unreadCount > 0 && (
                 <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500" />
               )}
             </button>
 
             {isNoticeOpen && (
-              <div className="absolute right-0 mt-3 w-96 rounded-3xl border border-gray-100 bg-white p-5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
+              <div className="absolute right-0 z-50 mt-3 w-96 animate-in fade-in zoom-in-95 rounded-3xl border border-gray-100 bg-white p-5 shadow-2xl duration-150">
                 <div className="flex items-center justify-between pb-3">
                   <div className="flex items-center gap-2">
                     <h3 className="text-base font-bold text-gray-900">알림</h3>
-
                     <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">
                       안 읽음 {unreadCount}
                     </span>
@@ -297,22 +286,21 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     type="button"
                     onClick={handleMarkAllRead}
-                    className="text-xs font-medium text-gray-400 hover:text-gray-600 cursor-pointer"
+                    className="cursor-pointer text-xs font-medium text-gray-400 hover:text-gray-600"
                   >
                     모두 읽음
                   </button>
                 </div>
 
-                {/* 탭: 전체 / 안 읽음 */}
-                <div className="flex border-b border-gray-100 pb-1 pt-2 gap-4 text-xs font-semibold text-gray-400">
+                <div className="flex gap-4 border-b border-gray-100 pt-2 pb-1 text-xs font-semibold text-gray-400">
                   {NOTICE_TABS.map((tab) => (
                     <button
                       key={tab}
                       type="button"
                       onClick={() => setActiveNoticeTab(tab)}
-                      className={`pb-2 relative cursor-pointer ${
+                      className={`relative cursor-pointer pb-2 ${
                         activeNoticeTab === tab
-                          ? "text-gray-900 font-bold border-b-2 border-black"
+                          ? "border-b-2 border-black font-bold text-gray-900"
                           : "hover:text-gray-600"
                       }`}
                     >
@@ -321,10 +309,9 @@ export const Header: React.FC<HeaderProps> = ({
                   ))}
                 </div>
 
-                {/* 알림 목록 */}
                 {filteredNotifications.length === 0 ? (
                   <div className="py-8 text-center text-xs text-gray-400">
-                    <p>새로운 알림이 없습니다.</p>
+                    새로운 알림이 없습니다.
                   </div>
                 ) : (
                   <div className="max-h-72 overflow-y-auto py-2">
@@ -336,7 +323,7 @@ export const Header: React.FC<HeaderProps> = ({
                           key={item.id}
                           type="button"
                           onClick={() => handleClickNotification(item)}
-                          className={`block w-full rounded-xl px-3 py-3 text-left hover:bg-gray-50 ${
+                          className={`block w-full cursor-pointer rounded-xl px-3 py-3 text-left hover:bg-gray-50 ${
                             item.read ? "opacity-60" : "bg-blue-50/50"
                           }`}
                         >
@@ -345,11 +332,9 @@ export const Header: React.FC<HeaderProps> = ({
                               {comment.label}
                             </span>
                           )}
-
                           <span className="block text-xs font-semibold text-gray-800">
                             {item.title || "새 알림"}
                           </span>
-
                           <span className="mt-1 block text-[10px] text-gray-400">
                             {item.createdAt
                               ? new Date(item.createdAt).toLocaleString("ko-KR")
@@ -364,7 +349,6 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
 
-          {/* 새로 만들기 버튼 및 드롭다운 */}
           <div className="relative" ref={createRef}>
             <button
               type="button"
@@ -372,32 +356,27 @@ export const Header: React.FC<HeaderProps> = ({
                 setIsCreateOpen(!isCreateOpen);
                 setIsNoticeOpen(false);
               }}
-              className="flex h-9 items-center gap-1.5 rounded-xl bg-black px-4 text-xs font-bold text-white hover:bg-gray-800 transition cursor-pointer shadow-xs"
+              className="flex h-9 cursor-pointer items-center gap-1.5 rounded-xl bg-black px-4 text-xs font-bold text-white shadow-xs transition hover:bg-gray-800"
             >
-              <img
-                src={plusIcon}
-                alt=""
-                className="h-3.5 w-3.5 filter invert"
-              />
+              <img src={plusIcon} alt="" className="h-3.5 w-3.5 invert" />
               <span>새로 만들기</span>
             </button>
 
             {isCreateOpen && (
-              <div className="absolute right-0 mt-3 w-64 rounded-3xl border border-gray-100 bg-white p-3 shadow-2xl z-50 space-y-3 animate-in fade-in zoom-in-95 duration-150 text-xs">
+              <div className="absolute right-0 z-50 mt-3 w-64 animate-in fade-in zoom-in-95 space-y-3 rounded-3xl border border-gray-100 bg-white p-3 text-xs shadow-2xl duration-150">
                 <div>
                   <p className="px-3 py-1 text-[10px] font-semibold text-gray-400">
                     새로 만들기
                   </p>
 
-                  <div className="space-y-0.5 mt-1">
-                    {/* 일정 추가 */}
+                  <div className="mt-1 space-y-0.5">
                     <button
                       type="button"
                       onClick={() => {
                         setIsCreateOpen(false);
-                        if (handleAddModal) handleAddModal();
+                        handleAddModal?.();
                       }}
-                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 font-semibold text-gray-800 hover:bg-gray-100 transition cursor-pointer"
+                      className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 font-semibold text-gray-800 transition hover:bg-gray-100"
                     >
                       <img
                         src={calendarIcon}
@@ -407,14 +386,13 @@ export const Header: React.FC<HeaderProps> = ({
                       <span>일정 추가</span>
                     </button>
 
-                    {/* 활동 개설 */}
                     <button
                       type="button"
                       onClick={() => {
                         setIsCreateOpen(false);
                         setIsActivityModalOpen(true);
                       }}
-                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 font-semibold text-gray-800 hover:bg-gray-100 transition cursor-pointer"
+                      className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 font-semibold text-gray-800 transition hover:bg-gray-100"
                     >
                       <img
                         src={bookIcon}
@@ -424,14 +402,13 @@ export const Header: React.FC<HeaderProps> = ({
                       <span>활동 개설</span>
                     </button>
 
-                    {/* 공지 보내기 */}
                     <button
                       type="button"
                       onClick={() => {
                         setIsCreateOpen(false);
                         setIsNoticeModalOpen(true);
                       }}
-                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 font-semibold text-gray-800 hover:bg-gray-100 transition cursor-pointer"
+                      className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 font-semibold text-gray-800 transition hover:bg-gray-100"
                     >
                       <img
                         src={bellIcon}
@@ -441,7 +418,6 @@ export const Header: React.FC<HeaderProps> = ({
                       <span>공지 보내기</span>
                     </button>
 
-                    {/* 과제 출제 */}
                     <button
                       type="button"
                       onClick={() => {
@@ -449,7 +425,7 @@ export const Header: React.FC<HeaderProps> = ({
                         setArticleModalMode("assignment");
                         setIsArticleModalOpen(true);
                       }}
-                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 font-semibold text-gray-800 hover:bg-gray-100 transition cursor-pointer"
+                      className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 font-semibold text-gray-800 transition hover:bg-gray-100"
                     >
                       <img
                         src={fileTextIcon}
@@ -468,8 +444,7 @@ export const Header: React.FC<HeaderProps> = ({
                     내 기록
                   </p>
 
-                  <div className="space-y-0.5 mt-1">
-                    {/* 정리글 작성 */}
+                  <div className="mt-1 space-y-0.5">
                     <button
                       type="button"
                       onClick={() => {
@@ -477,7 +452,7 @@ export const Header: React.FC<HeaderProps> = ({
                         setArticleModalMode("article");
                         setIsArticleModalOpen(true);
                       }}
-                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 font-semibold text-gray-800 hover:bg-gray-100 transition cursor-pointer"
+                      className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 font-semibold text-gray-800 transition hover:bg-gray-100"
                     >
                       <img
                         src={fileTextIcon}
@@ -487,7 +462,6 @@ export const Header: React.FC<HeaderProps> = ({
                       <span>정리글 작성</span>
                     </button>
 
-                    {/* 업무일지 쓰기 */}
                     <button
                       type="button"
                       onClick={() => {
@@ -495,7 +469,7 @@ export const Header: React.FC<HeaderProps> = ({
                         setArticleModalMode("journal");
                         setIsArticleModalOpen(true);
                       }}
-                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 font-semibold text-gray-800 hover:bg-gray-100 transition cursor-pointer"
+                      className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 font-semibold text-gray-800 transition hover:bg-gray-100"
                     >
                       <img
                         src={clipboardIcon}
@@ -505,7 +479,6 @@ export const Header: React.FC<HeaderProps> = ({
                       <span>업무일지 쓰기</span>
                     </button>
 
-                    {/* 면접 답변 남기기 */}
                     <button
                       type="button"
                       onClick={() => {
@@ -513,7 +486,7 @@ export const Header: React.FC<HeaderProps> = ({
                         setArticleModalMode("interview");
                         setIsArticleModalOpen(true);
                       }}
-                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 font-semibold text-gray-800 hover:bg-gray-100 transition cursor-pointer"
+                      className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 font-semibold text-gray-800 transition hover:bg-gray-100"
                     >
                       <img
                         src={micIcon}
@@ -530,7 +503,6 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </header>
 
-      {/* 연동된 모달 */}
       <CreateActivityModal
         isOpen={isActivityModalOpen}
         onClose={() => setIsActivityModalOpen(false)}
@@ -565,11 +537,9 @@ export const Header: React.FC<HeaderProps> = ({
               title: data.title.trim(),
               content: data.content,
             });
-
             showToast("정리글을 저장했습니다.", "success");
           } catch (error) {
             console.error("정리글 생성 실패:", error);
-
             showToast(
               error instanceof Error
                 ? error.message
@@ -579,7 +549,6 @@ export const Header: React.FC<HeaderProps> = ({
         }}
       />
 
-      {/* 새로 만들기·알림 결과 토스트 */}
       {toast && (
         <Toast
           key={toast.id}
