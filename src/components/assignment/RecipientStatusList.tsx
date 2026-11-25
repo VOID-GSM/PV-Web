@@ -1,4 +1,6 @@
 import { STATUS_BADGE, type SubmissionStatus } from "../../constants/assignment";
+// ☆ 프로필 사진 (없으면 이름 첫 글자)
+import Avatar from "../common/Avatar";
 
 // ★ 받는 사람 한 줄 (페이지가 서버 제출 현황을 이 모양으로 바꿔서 넘겨준다)
 export type RecipientRow = {
@@ -36,9 +38,8 @@ export default function RecipientStatusList({ rows, selectedMemberId, onSelect }
             }`}
           >
             <span className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black text-[10px] text-white">
-                {row.name.charAt(0)}
-              </span>
+              {/* ☆ 프로필 사진 (줄마다 서버가 준 회원 번호가 있다) */}
+              <Avatar memberId={row.memberId} name={row.name} className="h-7 w-7 text-[10px]" />
               <span>
                 <span className="block text-sm">{row.name}</span>
                 <span className="block text-[11px] text-neutral-400">

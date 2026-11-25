@@ -1,5 +1,7 @@
 import { useState } from "react";
 import Dropdown from "../common/Dropdown";
+// ☆ 프로필 사진 (없으면 이름 첫 글자)
+import Avatar from "../common/Avatar";
 import {
   MAJORS,
   MAX_DESCRIPTION,
@@ -218,9 +220,8 @@ export default function AssignmentCreateModal({
               받는 사람 {recipients.length}명
               {recipients.map((m) => (
                 <span key={m.name} className="flex items-center gap-1 rounded-full bg-neutral-100 px-2 py-0.5">
-                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-black text-[9px] text-white">
-                    {m.name.charAt(0)}
-                  </span>
+                  {/* ☆ 프로필 사진 (회원 번호가 있으면 사진, 없으면 첫 글자) */}
+                  <Avatar memberId={m.memberId} name={m.name} className="h-4 w-4 text-[9px]" />
                   {m.name}
                 </span>
               ))}
