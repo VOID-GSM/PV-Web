@@ -299,9 +299,18 @@ export default function ActivityDetailPage() {
     }
   }, [activityId, applyDetail]);
 
-  // 스터디장·부장일 때만 참여 신청 목록을 불러온다 (다른 사람은 서버가 403을 준다)
+  // 참여 신청 승인 모드에서만 스터디장·부장이 신청 대기 목록을 조회한다.
+  // 선착순(FIRST_COME) 활동에서는 신청 대기 목록을 조회하지 않는다.
   useEffect(() => {
-    if (!canManage || !id || !Number.isFinite(activityId)) return;
+    if (
+      !canManage ||
+      currentDetail?.summary.recruitMode !== "APPROVAL" ||
+      !id ||
+      !Number.isFinite(activityId)
+    ) {
+      setApplicationsState(null);
+      return;
+    }
 
     let cancelled = false;
 
@@ -318,7 +327,7 @@ export default function ActivityDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [canManage, id, activityId]);
+  }, [canManage, id, activityId, currentDetail?.summary.recruitMode]);
 
   const handleApply = async () => {
     if (!Number.isFinite(activityId)) return;
@@ -1603,8 +1612,9 @@ export default function ActivityDetailPage() {
               )}
             </div>
 
-            {/* 참여 신청 대기: 부장과 이 활동의 스터디장에게만 보인다 */}
-            {canManage && (
+            {/* 참여 신청 대기: 승인 모집 활동에서만 부장과 스터디장에게 보인다 */}
+            {canManage &&
+              currentDetail?.summary.recruitMode === "APPROVAL" && (
               <div className="space-y-3 rounded-3xl border border-gray-100 bg-white p-5 text-xs shadow-xs">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold text-gray-900">
