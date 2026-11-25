@@ -1,7 +1,13 @@
 // useCallback: 함수를 한 번만 만들어 두고 재사용하게 해주는 기능 (토스트 닫기에 사용)
 import { useCallback, useEffect, useRef, useState } from "react";
 // ★ useLocation: 지금 주소를 알려준다 (입장 화면인지 확인용)
-import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
+import {
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import { getHomeTodos, type HomeTodoItem } from "./api/homeApi";
 import { getActivityMembers } from "./api/activityApi";
 import { MainPage } from "./pages/MainPage";
@@ -89,7 +95,6 @@ function AppContent() {
     const toDate = new Date(base.getFullYear(), base.getMonth() + 1, 7);
 
     getCalendarEvents(formatDate(fromDate), formatDate(toDate))
-
       .then(async (data) => {
         const activityIds = Array.from(
           new Set(
@@ -155,35 +160,6 @@ function AppContent() {
             isMyEvent: true,
           };
         });
-
-
-      .then((data) => {
-        const loadedEvents: CalendarEvent[] = data.map((event) => ({
-          id: String(event.id),
-          title: event.title,
-          type:
-            event.type === "DEADLINE"
-              ? "마감"
-              : event.type === "MEETING"
-                ? "회의"
-                : event.type === "ACTIVITY"
-                  ? "활동"
-                  : "개인 일정",
-          board: "",
-          date: event.startsAt.slice(0, 10),
-          endDate: event.endsAt.slice(0, 10),
-          time: event.allDay ? undefined : event.startsAt.slice(11, 16),
-          description: event.memo ?? "",
-          // 서버에 저장된 완료 여부 (새로고침해도 체크가 유지된다)
-          completed: event.completed ?? false,
-          // 보드 마감이면 보드 번호와 담당자 번호들
-          boardId: event.boardId,
-          assigneeIds: event.assigneeIds ?? [],
-          isMyEvent: true,
-        }));
-
-        // 같은 id는 새 값으로 덮어쓰고, 새 일정은 추가한다.
-        // (달을 옮겨도 먼저 불러온 달의 일정이 사라지지 않는다)
 
         setEvents((prev) => {
           const merged = new Map(prev.map((item) => [item.id, item]));
