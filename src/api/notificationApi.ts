@@ -6,6 +6,7 @@ export interface ApiNotification {
   content?: string;
   read?: boolean;
   createdAt?: string;
+  targetId?: number | string;
 
   // 알림 클릭 시 이동할 내부 경로
   targetUrl?: string;
