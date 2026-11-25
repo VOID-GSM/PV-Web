@@ -26,6 +26,8 @@ export const PERIOD_OPTIONS = ["이번 주", "이번 달", "전체"];
 export type WorklogComment = {
   id: number;
   author: string;
+  // ★ 댓글 작성자 회원 번호 (프로필 사진을 찾을 때 쓴다. 모르면 null)
+  authorId?: number | null;
   content: string;
 };
 
@@ -33,6 +35,8 @@ export type WorklogComment = {
 export type Worklog = {
   id: number;
   author: string;
+  // ★ 일지 작성자 회원 번호 (프로필 사진을 찾을 때 쓴다. 모르면 null)
+  authorId?: number | null;
   // "2026-10-26" 모양
   date: string;
   // "22:10" 모양

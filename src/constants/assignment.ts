@@ -5,7 +5,13 @@ export const ME = "동키";
 export const MY_GENERATION = "10기";
 
 // 팀원 하나의 모양
-export type Member = { name: string; generation: string; majors: string[] };
+// ★ memberId: 회원 번호 (프로필 사진을 찾을 때 쓴다. 모르면 없어도 된다)
+export type Member = {
+  name: string;
+  generation: string;
+  majors: string[];
+  memberId?: number | null;
+};
 
 // 팀원 목록. 서버 연결 전이라 나만 있다
 export const MEMBERS: Member[] = [{ name: ME, generation: MY_GENERATION, majors: ["Front-end"] }];

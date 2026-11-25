@@ -43,6 +43,8 @@ export type Answer = {
   id: number;
   questionId: number;
   author: string;
+  // ★ 답변 작성자 회원 번호 (프로필 사진을 찾을 때 쓴다. 모르면 null)
+  authorId?: number | null;
   generation: string;
   // "2026-10-26" 모양
   date: string;

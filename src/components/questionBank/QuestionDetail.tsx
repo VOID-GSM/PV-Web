@@ -1,4 +1,6 @@
 import { getCategoryBadge, type Answer, type Question } from "../../constants/questionBank";
+// ☆ 프로필 사진 (없으면 이름 첫 글자)
+import Avatar from "../common/Avatar";
 import editIcon from "../../assets/icons/edit.svg";
 import starIcon from "../../assets/icons/star.svg";
 
@@ -74,9 +76,12 @@ export default function QuestionDetail({
                   className={`rounded-lg p-4 ${isMine ? "border-2 border-black" : "bg-neutral-50"}`}
                 >
                   <div className="flex items-center gap-2">
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-black text-[10px] text-white">
-                      {answer.author.charAt(0)}
-                    </div>
+                    {/* ☆ 답변 작성자 프로필 사진 */}
+                    <Avatar
+                      memberId={answer.authorId}
+                      name={answer.author}
+                      className="h-6 w-6 text-[10px]"
+                    />
                     <p className="text-sm font-semibold">{answer.author}</p>
                     <p className="text-xs text-neutral-400">
                       {answer.generation} · {answer.date}

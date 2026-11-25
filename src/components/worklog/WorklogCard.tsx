@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { BOARDS, type Worklog } from "../../constants/worklog";
+// ☆ 프로필 사진 (없으면 이름 첫 글자)
+import Avatar from "../common/Avatar";
 
 // 항목마다 아이콘·글자색·배경색 (막힌 점만 노란 배경)
 const SECTION_STYLES: Record<string, { icon: string; color: string; bg: string }> = {
@@ -41,14 +43,12 @@ export default function WorklogCard({ worklog, isMine, onAddComment }: WorklogCa
       {/* ===== 머리: 작성자 · 날짜 · 보드 태그 · 공개 여부 ===== */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          {/* ★ 아바타: 이름 첫 글자. 내 글은 검은 원 */}
-          <div
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm ${
-              isMine ? "bg-black text-white" : "bg-neutral-200"
-            }`}
-          >
-            {worklog.author.charAt(0)}
-          </div>
+          {/* ☆ 작성자 프로필 사진. 내 글은 바깥에 검은 테두리로 구분 */}
+          <Avatar
+            memberId={worklog.authorId}
+            name={worklog.author}
+            className={`h-9 w-9 text-sm ${isMine ? "ring-2 ring-black ring-offset-2" : ""}`}
+          />
           <div>
             <p className="text-sm">
               <span className="font-semibold">{worklog.author}</span>
@@ -110,9 +110,12 @@ export default function WorklogCard({ worklog, isMine, onAddComment }: WorklogCa
             <ul className="mb-3 flex flex-col gap-2">
               {worklog.comments.map((comment) => (
                 <li key={comment.id} className="flex items-start gap-2">
-                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-[10px]">
-                    {comment.author.charAt(0)}
-                  </div>
+                  {/* ☆ 댓글 작성자 프로필 사진 */}
+                  <Avatar
+                    memberId={comment.authorId}
+                    name={comment.author}
+                    className="h-6 w-6 text-[10px]"
+                  />
                   <div>
                     <p className="text-[11px] text-neutral-400">{comment.author} · 댓글</p>
                     <p className="text-sm">{comment.content}</p>

@@ -5,6 +5,8 @@ import {
   submissionColor,
   type Member,
 } from "../../constants/admin";
+// ☆ 프로필 사진 (없으면 이름 첫 글자)
+import Avatar from "../common/Avatar";
 import alertIcon from "../../assets/icons/alert.svg";
 import moreIcon from "../../assets/icons/more.svg";
 
@@ -95,18 +97,18 @@ export default function MemberTable({
                 return (
                   <tr key={m.id} className={`border-t ${m.isActive ? "" : "text-neutral-400"}`}>
                     <td className="px-5 py-3">
-                      <span className="flex items-center gap-2">
-                        <span
-                          className={`flex h-7 w-7 items-center justify-center rounded-full text-[11px] ${
-                            m.isActive ? "bg-black text-white" : "bg-neutral-200"
-                          }`}
-                        >
-                          {m.name.charAt(0)}
-                        </span>
+                      {/* ☆ span → div (Avatar가 div라서 그 바깥도 div로) */}
+                      <div className="flex items-center gap-2">
+                        {/* ☆ 프로필 사진 (m.id가 회원 번호). 비활성화된 팀원은 흐리게 */}
+                        <Avatar
+                          memberId={m.id}
+                          name={m.name}
+                          className={`h-7 w-7 text-[11px] ${m.isActive ? "" : "opacity-40"}`}
+                        />
                         {m.name}
                         {/* ★ 내 회원 번호와 같은 줄에만 (나) */}
                         {myId !== null && m.id === myId && <span className="text-[10px] text-neutral-400">(나)</span>}
-                      </span>
+                      </div>
                     </td>
                     <td className="py-3 text-xs">
                       {m.generation} · {m.majors.join(", ")}

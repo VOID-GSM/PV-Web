@@ -1,4 +1,6 @@
 import { type JoinRequest } from "../../constants/admin";
+// ☆ 프로필 사진 부품 (모양을 다른 화면과 맞추려고)
+import Avatar from "../common/Avatar";
 
 type JoinRequestCardProps = {
   requests: JoinRequest[];
@@ -26,9 +28,8 @@ export default function JoinRequestCard({ requests, approvalMode, onApprove, onR
           {requests.map((r) => (
             <li key={r.id} className="flex items-center justify-between gap-2 rounded bg-neutral-50 px-3 py-2.5">
               <div className="flex min-w-0 items-center gap-2">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black text-[11px] text-white">
-                  {r.name.charAt(0)}
-                </span>
+                {/* ☆ 아직 가입 전이라 사진이 없어서 이름 첫 글자만 (r.id는 회원 번호가 아니라 요청 번호라 넘기지 않는다) */}
+                <Avatar name={r.name} className="h-7 w-7 text-[11px]" />
                 <div className="min-w-0">
                   <p className="text-sm font-medium">{r.name}</p>
                   <p className="truncate text-[11px] text-neutral-400">
