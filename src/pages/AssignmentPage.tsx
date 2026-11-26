@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-// ◇ 헤더에서 보낸 쪽지(state)를 읽고, 다 쓰면 지우려고
+// 헤더에서 보낸 쪽지(state)를 읽고, 다 쓰면 지우려고
 import { useLocation, useNavigate } from "react-router-dom";
 import { Header } from "../components/layout/Header";
 import Dropdown from "../components/common/Dropdown";
@@ -34,6 +34,8 @@ import {
   useCreateSkill,
   useMySkills,
   usePassSubmission,
+  // ★ 미제출자 알림
+  useRemindAssignment,
   useRequestResubmission,
   useResubmitAssignment,
   useSaveMyScores,
@@ -61,7 +63,7 @@ import { tokenStorage } from "../apis/tokenStorage";
 // 부장만 볼 수 있는 탭 (과제 목록은 모두 볼 수 있고, 제출 현황은 부장만)
 const LEADER_ONLY_TABS = ["제출 현황"];
 
-// ◇ 헤더 "새로 만들기 → 과제 출제"가 보낸 쪽지인지
+// 헤더 "새로 만들기 → 과제 출제"가 보낸 쪽지인지
 const wantsCreate = (state: unknown) =>
   typeof state === "object" && state !== null && "openCreate" in state && state.openCreate === true;
 
@@ -157,7 +159,7 @@ function uniqueById(list: AssignmentSummary[]): AssignmentSummary[] {
 type ToastState = { id: number; message: string; type: "success" | "info" };
 
 export default function AssignmentPage() {
-  // ◇ 지금 주소 정보(쪽지 포함)와 이동 도구
+  // 지금 주소 정보(쪽지 포함)와 이동 도구
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -177,6 +179,8 @@ export default function AssignmentPage() {
   // 역량 수정·숨기기
   const updateSkill = useUpdateSkill();
   const saveScores = useSaveMyScores();
+  // ★ 미제출자 알림
+  const remindAssignment = useRemindAssignment();
 
   // 진짜 내 정보 (회원 번호는 파일 업로드에 필요. 못 불러왔으면 토큰에서)
   // isLeader: 부장인지 (과제 관리 화면을 보여줄지 정한다)
@@ -188,9 +192,9 @@ export default function AssignmentPage() {
   const [generation, setGeneration] = useState("");
   const [major, setMajor] = useState("");
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<number | null>(null);
-  // ◇ 헤더에서 "과제 출제"로 들어왔으면 출제 창이 열린 채로 시작
+  // 헤더에서 "과제 출제"로 들어왔으면 출제 창이 열린 채로 시작
   const [isCreateOpen, setIsCreateOpen] = useState(() => wantsCreate(location.state));
-  // ◇ 마지막으로 확인한 이동 번호 (이미 과제 화면에 있을 때 헤더에서 또 누른 경우를 알아채려고)
+  // 마지막으로 확인한 이동 번호 (이미 과제 화면에 있을 때 헤더에서 또 누른 경우를 알아채려고)
   const [seenLocationKey, setSeenLocationKey] = useState(location.key);
   const [initialSkillId, setInitialSkillId] = useState<number | null>(null);
   // 이번에 화면에서 제출한 제출물 번호 (재제출할 때 필요. 과제 번호 → 제출물 번호)
@@ -199,7 +203,7 @@ export default function AssignmentPage() {
   const [submittingId, setSubmittingId] = useState<number | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
 
-  // ◇ 과제 화면에 있는데 헤더에서 또 "과제 출제"를 누르면(새 이동) 출제 창을 연다
+  // 과제 화면에 있는데 헤더에서 또 "과제 출제"를 누르면(새 이동) 출제 창을 연다
   // (useEffect 대신 그리는 중에 확인: 이 프로젝트 ESLint 규칙에 맞추려고)
   if (location.key !== seenLocationKey) {
     setSeenLocationKey(location.key);
@@ -282,7 +286,7 @@ export default function AssignmentPage() {
     setIsCreateOpen(true);
   };
 
-  // ◇ 출제 창 닫기: 헤더 쪽지가 남아 있으면 지운다 (새로고침했을 때 또 열리지 않게)
+  // 출제 창 닫기: 헤더 쪽지가 남아 있으면 지운다 (새로고침했을 때 또 열리지 않게)
   const closeCreate = () => {
     setIsCreateOpen(false);
     if (wantsCreate(location.state)) {
@@ -435,9 +439,27 @@ export default function AssignmentPage() {
     else requestResubmission.mutate(variables, options);
   };
 
-  // 미제출자 알림 (서버 API가 없다)
+  // ★ 미제출자 알림 → 서버 (POST /assignments/{id}/remind)
   const handleRemind = () => {
-    showToast("미제출자 알림은 서버 연결을 준비 중입니다");
+    if (selectedAssignmentId === null) {
+      showToast("알림을 보낼 과제를 먼저 골라 주세요");
+      return;
+    }
+    // 이미 보내는 중이면 또 보내지 않는다 (연타 방지)
+    if (remindAssignment.isPending) return;
+
+    remindAssignment.mutate(
+      // 디스코드 웹훅 준비 전이라 앱 알림만 보낸다
+      { assignmentId: selectedAssignmentId, discordEnabled: false },
+      {
+        onSuccess: ({ reminded }) =>
+          showToast(
+            reminded > 0 ? `미제출자 ${reminded}명에게 알림을 보냈습니다` : "알림을 보낼 미제출자가 없습니다",
+            reminded > 0 ? "success" : "info"
+          ),
+        onError: (error) => showToast(getErrorMessage(error)),
+      }
+    );
   };
 
   // 과제를 눌렀을 때: 부장은 제출 현황, 아니면 내 제출물로
@@ -591,7 +613,7 @@ export default function AssignmentPage() {
         )}
       </div>
 
-      {/* ◇ 부장일 때만 출제 창 (내 정보를 불러오기 전엔 잠깐 기다렸다가 열린다) */}
+      {/* 부장일 때만 출제 창 (내 정보를 불러오기 전엔 잠깐 기다렸다가 열린다) */}
       {isCreateOpen && isLeader && (
         <AssignmentCreateModal
           skills={pageSkills}
@@ -606,4 +628,4 @@ export default function AssignmentPage() {
       {toast && <Toast key={toast.id} message={toast.message} type={toast.type} onClose={closeToast} />}
     </div>
   );
-} 
+}
