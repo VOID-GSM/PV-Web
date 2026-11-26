@@ -17,6 +17,8 @@ import type {
 
 interface CalendarPageProps {
   events?: CalendarEvent[];
+  myEvents?: CalendarEvent[];
+  canManageMeetings?: boolean;
   boards?: { id: number; name: string; color: string; status?: string }[];
   activeMenu?: string;
   onNavigate?: (menu: string) => void;
@@ -24,11 +26,13 @@ interface CalendarPageProps {
   onAddEvent?: (newEvent: CalendarEvent) => void;
   onDeleteEvent?: (eventId: string) => void;
   onUpdateEvent?: (event: CalendarEvent) => void;
-  onMonthChange?: (date: Date) => void;
+  onMonthChange?: (date: Date, mine?: boolean) => void;
 }
 
 export default function CalendarPage({
   events = [],
+  myEvents = [],
+  canManageMeetings = false,
   boards = [],
   onOpenAddModal = () => {},
   onAddEvent = () => {},
@@ -42,8 +46,8 @@ export default function CalendarPage({
 
   // 보는 달이 바뀌면 그 달의 일정을 불러온다 (이미 불러온 달은 App에서 건너뜀)
   useEffect(() => {
-    onMonthChange?.(currentDate);
-  }, [currentDate, onMonthChange]);
+    onMonthChange?.(currentDate, onlyMyEvents);
+  }, [currentDate, onlyMyEvents, onMonthChange]);
 
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
     null,
@@ -68,7 +72,7 @@ export default function CalendarPage({
     "#ec4899",
     "#f59e0b",
   ];
-  const eventBoardNames = events
+  const eventBoardNames = [...events, ...myEvents]
     .map((event) => event.board?.trim())
     .filter(
       (name): name is string => Boolean(name) && name !== "지정된 보드 없음",
@@ -145,13 +149,14 @@ export default function CalendarPage({
   const activeFilters = boardFilters
     .filter((filter) => filter.checked)
     .map((filter) => filter.name);
-  const filteredEvents = events.filter(
+  const eventsToDisplay = onlyMyEvents ? myEvents : events;
+  const filteredEvents = eventsToDisplay.filter(
     (event) =>
-      (!onlyMyEvents || event.isMyEvent) &&
-      (!event.board ||
-        event.board === "지정된 보드 없음" ||
-        activeFilters.includes(event.board)),
+      !event.board ||
+      event.board === "지정된 보드 없음" ||
+      activeFilters.includes(event.board),
   );
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden h-full">
       <Header
@@ -200,6 +205,7 @@ export default function CalendarPage({
       {selectedEvent && !isEditModalOpen && (
         <EventDetailModal
           event={selectedEvent}
+          canManageMeetings={canManageMeetings}
           onClose={() => setSelectedEvent(null)}
           onDelete={handleDeleteEvent}
           onEdit={() => setIsEditModalOpen(true)}
@@ -210,6 +216,7 @@ export default function CalendarPage({
         <AddEventModal
           isOpen={isEditModalOpen}
           initialEvent={selectedEvent}
+          canManageMeetings={canManageMeetings}
           onUpdateEvent={onUpdateEvent}
           // ☆ 수정 창에도 보드 목록 (마감 화면을 똑같이 보여주려고)
           boards={deadlineBoards}
@@ -223,6 +230,7 @@ export default function CalendarPage({
       {/* 날짜 칸을 눌러서 여는 일정 추가 창 (그 날짜가 미리 채워진다) */}
       <AddEventModal
         isOpen={addDate !== null}
+        canManageMeetings={canManageMeetings}
         initialDate={addDate ?? undefined}
         onAddEvent={onAddEvent}
         // ☆ 부장이면 마감을 보드에 등록할 수 있게 보드 목록 넘기기

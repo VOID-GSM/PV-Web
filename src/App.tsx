@@ -1,5 +1,6 @@
 // useCallback: 함수를 한 번만 만들어 두고 재사용하게 해주는 기능 (토스트 닫기에 사용)
 import { useCallback, useEffect, useRef, useState } from "react";
+import { getMembers } from "./apis/members";
 // ★ useLocation: 지금 주소를 알려준다 (입장 화면인지 확인용)
 import {
   Routes,
@@ -65,6 +66,12 @@ function AppContent() {
 
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [boards, setBoards] = useState<ApiBoard[]>([]);
+  const [canManageMeetings, setCanManageMeetings] = useState(false);
+
+  const [myEvents, setMyEvents] = useState<CalendarEvent[]>([]);
+
+  const memberNamesRef = useRef<Map<number, string>>(new Map());
+  const boardNamesRef = useRef<Map<number, string>>(new Map());
   const [homeTodos, setHomeTodos] = useState<HomeTodoItem[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   // 지금 떠 있는 토스트 (null이면 안 보임)
@@ -84,8 +91,8 @@ function AppContent() {
   // 완료 체크를 서버에 저장하는 중인 일정 id (같은 일정을 연타해도 한 번만 처리)
   const pendingToggleRef = useRef<Set<string>>(new Set());
 
-  const loadMonth = useCallback((base: Date) => {
-    const monthKey = `${base.getFullYear()}-${base.getMonth()}`;
+  const loadMonth = useCallback((base: Date, mine = false) => {
+    const monthKey = `${base.getFullYear()}-${base.getMonth()}-${mine ? "mine" : "all"}`;
 
     if (loadedMonthsRef.current.has(monthKey)) return;
     loadedMonthsRef.current.add(monthKey);
@@ -94,7 +101,7 @@ function AppContent() {
 
     const toDate = new Date(base.getFullYear(), base.getMonth() + 1, 7);
 
-    getCalendarEvents(formatDate(fromDate), formatDate(toDate))
+    getCalendarEvents(formatDate(fromDate), formatDate(toDate), undefined, mine)
       .then(async (data) => {
         const activityIds = Array.from(
           new Set(
@@ -148,28 +155,61 @@ function AppContent() {
                   : isActivity
                     ? "활동"
                     : "개인 일정",
-            board: isActivity ? "지정된 보드 없음" : "",
+
+            board: isActivity
+              ? "지정된 보드 없음"
+              : event.boardId != null
+                ? (boardNamesRef.current.get(event.boardId) ??
+                  `보드 #${event.boardId}`)
+                : "",
+
             date: event.startsAt.slice(0, 10),
             endDate: event.endsAt.slice(0, 10),
             time: event.allDay ? undefined : event.startsAt.slice(11, 16),
             description: event.memo ?? "",
-            completed: event.completed ?? false,
+
+            completed:
+              event.type === "PERSONAL"
+                ? (event.completed ?? false)
+                : undefined,
+
             boardId: event.boardId,
             assigneeIds: event.assigneeIds ?? [],
-            assignees: isActivity ? [leaderName || "스터디장"] : [],
-            isMyEvent: true,
+
+            assignees: isActivity
+              ? [leaderName || "스터디장"]
+              : (event.assigneeIds ?? []).map(
+                  (memberId) =>
+                    memberNamesRef.current.get(memberId) ?? `회원 ${memberId}`,
+                ),
+
+            isMyEvent: mine || event.type === "PERSONAL",
           };
         });
 
-        setEvents((prev) => {
-          const merged = new Map(prev.map((item) => [item.id, item]));
+        const mergeEventsForRange = (prev: CalendarEvent[]) => {
+          const fromKey = formatDate(fromDate);
+          const toKey = formatDate(toDate);
 
-          loadedEvents.forEach((item) => {
-            merged.set(item.id, item);
-          });
+          // 현재 조회 범위의 서버 일정은 새 응답으로 교체하고,
+          // 화면에서만 만든 마일스톤은 유지한다.
+          const outsideRange = prev.filter(
+            (item) =>
+              item.date < fromKey ||
+              item.date > toKey ||
+              item.id.startsWith("ms-"),
+          );
+          const merged = new Map(outsideRange.map((item) => [item.id, item]));
 
+          loadedEvents.forEach((item) => merged.set(item.id, item));
           return Array.from(merged.values());
-        });
+        };
+
+        if (mine) {
+          setMyEvents(mergeEventsForRange);
+        } else {
+          setEvents(mergeEventsForRange);
+        }
       })
       .catch((error: unknown) => {
         loadedMonthsRef.current.delete(monthKey);
@@ -182,10 +222,11 @@ function AppContent() {
     (dateStr: string) => {
       // "2026-11-30" → 그 날짜 정오 (시간대 때문에 날짜가 밀리지 않게)
       const base = new Date(`${dateStr}T12:00:00`);
-      loadedMonthsRef.current.delete(
-        `${base.getFullYear()}-${base.getMonth()}`,
-      );
-      loadMonth(base);
+      const monthPrefix = `${base.getFullYear()}-${base.getMonth()}`;
+      loadedMonthsRef.current.delete(`${monthPrefix}-all`);
+      loadedMonthsRef.current.delete(`${monthPrefix}-mine`);
+      loadMonth(base, false);
+      loadMonth(base, true);
     },
     [loadMonth],
   );
@@ -215,15 +256,67 @@ function AppContent() {
           console.error("오늘 할 일 API 조회 실패:", error);
         }
       });
+    getMembers()
+      .then((members) => {
+        if (cancelled) return;
+
+        const names = new Map<number, string>();
+
+        members.forEach((member) => {
+          names.set(member.memberId, member.name);
+        });
+
+        memberNamesRef.current = names;
+
+        const applyMemberNames = (items: CalendarEvent[]) =>
+          items.map((event) => {
+            if (event.type === "활동" || !event.assigneeIds?.length) {
+              return event;
+            }
+
+            return {
+              ...event,
+              assignees: event.assigneeIds.map(
+                (memberId) => names.get(memberId) ?? `회원 ${memberId}`,
+              ),
+            };
+          });
+
+        setEvents(applyMemberNames);
+        setMyEvents(applyMemberNames);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          console.error("참석자 이름 조회 실패:", error);
+        }
+      });
 
     // 회원 정보 및 보드 조회
     apiRequest<{ roles: string[] }>("/members/me")
       .then((member) => {
         if (cancelled) return;
+        const isLeader = member.roles?.includes("LEADER") ?? false;
 
+        setCanManageMeetings(isLeader);
         if (member.roles?.includes("LEADER")) {
           return getBoards().then((data) => {
-            if (!cancelled) setBoards(data);
+            if (cancelled) return;
+
+            setBoards(data);
+            const names = new Map<number, string>(
+              data.map((board) => [board.id, board.name]),
+            );
+            boardNamesRef.current = names;
+
+            const applyBoardNames = (items: CalendarEvent[]) =>
+              items.map((event) =>
+                event.boardId != null && names.has(event.boardId)
+                  ? { ...event, board: names.get(event.boardId)! }
+                  : event,
+              );
+
+            setEvents(applyBoardNames);
+            setMyEvents(applyBoardNames);
           });
         }
 
@@ -269,7 +362,19 @@ function AppContent() {
       return;
     }
 
-    // 그 외(개인 일정 등): 기존처럼 내 일정으로 저장
+    // 보드 회의는 부장만 생성할 수 있다.
+    if (newEvent.type === "회의") {
+      if (!canManageMeetings) {
+        showToast("보드 회의 생성은 부장만 할 수 있습니다.");
+        return;
+      }
+      if (newEvent.boardId == null) {
+        showToast("회의를 등록할 보드를 선택해 주세요.");
+        return;
+      }
+    }
+
+    // 개인 일정은 type을 보내지 않아 기존 서버 동작을 유지한다.
     try {
       const startsAt = newEvent.time
         ? `${newEvent.date}T${newEvent.time}:00`
@@ -286,9 +391,21 @@ function AppContent() {
         startsAt,
         endsAt,
         allDay: !newEvent.time,
+
+        ...(newEvent.type === "회의"
+          ? {
+              type: "MEETING" as const,
+              boardId: newEvent.boardId as number,
+              assigneeIds: (newEvent.assigneeIds ?? []).slice(0, 20),
+            }
+          : {}),
       });
 
-      setEvents((prev) => [...prev, { ...newEvent, id: String(created.id) }]);
+      if (newEvent.type === "회의") {
+        reloadMonthOf(newEvent.date);
+      } else {
+        setEvents((prev) => [...prev, { ...newEvent, id: String(created.id) }]);
+      }
 
       setIsAddModalOpen(false);
       showToast("일정을 추가했습니다", "success");
@@ -301,6 +418,20 @@ function AppContent() {
   };
 
   const handleUpdateEvent = async (updatedEvent: CalendarEvent) => {
+    const previousEvent = [...events, ...myEvents].find(
+      (event) => event.id === updatedEvent.id,
+    );
+
+    if (updatedEvent.type === "회의" && !canManageMeetings) {
+      showToast("보드 회의 수정은 부장만 할 수 있습니다.");
+      return;
+    }
+
+    if (updatedEvent.type === "회의" && updatedEvent.boardId == null) {
+      showToast("회의를 등록할 보드를 선택해 주세요.");
+      return;
+    }
+
     try {
       const updated = await updateCalendarEvent(Number(updatedEvent.id), {
         title: updatedEvent.title,
@@ -310,26 +441,40 @@ function AppContent() {
           : `${updatedEvent.date}T00:00:00`,
         endsAt: `${updatedEvent.endDate || updatedEvent.date}T${updatedEvent.time || "23:59"}:00`,
         allDay: !updatedEvent.time,
+        ...(updatedEvent.type === "회의"
+          ? {
+              type: "MEETING" as const,
+              boardId: updatedEvent.boardId as number,
+              // []는 전체 참석자 해제, 값이 있으면 참석자 교체
+              assigneeIds: (updatedEvent.assigneeIds ?? []).slice(0, 20),
+            }
+          : {}),
       });
 
-      setEvents((prev) =>
+      const optimisticEvent: CalendarEvent = {
+        ...updatedEvent,
+        id: String(updated.id),
+        title: updated.title,
+        date: updated.startsAt.slice(0, 10),
+        endDate: updated.endsAt.slice(0, 10),
+        time: updated.allDay ? undefined : updated.startsAt.slice(11, 16),
+        description: updated.memo ?? updatedEvent.description,
+        completed: updated.completed ?? updatedEvent.completed,
+        assigneeIds: updatedEvent.assigneeIds ?? [],
+      };
+
+      const replaceEvent = (prev: CalendarEvent[]) =>
         prev.map((event) =>
-          event.id === updatedEvent.id
-            ? {
-                ...updatedEvent,
-                id: String(updated.id),
-                title: updated.title,
-                date: updated.startsAt.slice(0, 10),
-                endDate: updated.endsAt.slice(0, 10),
-                time: updated.allDay
-                  ? undefined
-                  : updated.startsAt.slice(11, 16),
-                description: updated.memo ?? updatedEvent.description,
-                completed: updated.completed ?? updatedEvent.completed,
-              }
-            : event,
-        ),
-      );
+          event.id === updatedEvent.id ? optimisticEvent : event,
+        );
+      setEvents(replaceEvent);
+      setMyEvents(replaceEvent);
+
+      // 서버의 mine 필터까지 다시 맞춘다. 날짜가 바뀌면 이전 달도 갱신한다.
+      if (previousEvent && previousEvent.date !== updatedEvent.date) {
+        reloadMonthOf(previousEvent.date);
+      }
+      reloadMonthOf(updatedEvent.date);
       showToast("일정을 수정했습니다", "success");
     } catch (error) {
       console.error("일정 수정 실패:", error);
@@ -340,10 +485,19 @@ function AppContent() {
   };
 
   const handleDeleteEvent = async (eventId: string) => {
+    const targetEvent = [...events, ...myEvents].find(
+      (event) => event.id === eventId,
+    );
+
+    if (targetEvent?.type === "회의" && !canManageMeetings) {
+      showToast("보드 회의 삭제는 부장만 할 수 있습니다.");
+      return;
+    }
+
     try {
       await deleteCalendarEvent(Number(eventId));
-
       setEvents((prev) => prev.filter((event) => event.id !== eventId));
+      setMyEvents((prev) => prev.filter((event) => event.id !== eventId));
       showToast("일정을 삭제했습니다", "success");
     } catch (error) {
       console.error("일정 삭제 실패:", error);
@@ -473,6 +627,8 @@ function AppContent() {
             element={
               <CalendarPage
                 events={events}
+                myEvents={myEvents}
+                canManageMeetings={canManageMeetings}
                 boards={boards}
                 activeMenu="통합 캘린더"
                 onNavigate={handleNavigate}
@@ -513,6 +669,7 @@ function AppContent() {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onAddEvent={handleAddEvent}
+        canManageMeetings={canManageMeetings}
         // 부장이면 마감을 보드에 등록할 수 있게 (끝난 보드는 빼고)
         boards={boards.filter((board) => board.status !== "CLOSED")}
       />

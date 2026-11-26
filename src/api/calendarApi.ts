@@ -32,7 +32,12 @@ export interface EventWriteRequest {
   startsAt: string;
   endsAt: string;
   allDay: boolean;
-  // 수정(PATCH) 때만 사용. 값이 없으면 서버는 완료 상태를 바꾸지 않는다.
+  // 보드 회의에만 사용한다. 개인 일정은 type을 생략한다.
+  type?: "MEETING";
+  boardId?: number;
+  // 회의 참석자 회원 ID (최대 20명). PATCH에서 []는 전체 해제.
+  assigneeIds?: number[];
+  // 개인 일정 완료 상태 수정에 사용한다.
   completed?: boolean;
 }
 export interface BoardCreateRequest {
