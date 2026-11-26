@@ -77,7 +77,7 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
   const [formError, setFormError] = useState("");
 
   // ☆ 보드 목록이 있으면 부장 → 마감을 보드에 등록할 수 있다
-  const canMakeDeadline = boards.length > 0;
+  const canMakeDeadline = canManageMeetings && boards.length > 0;
   // ☆ 지금 "보드 마감" 화면인지 (마감 + 부장)
   const isDeadlineMode = type === "마감" && canMakeDeadline;
   const isMeetingMode = type === "회의";
@@ -183,7 +183,9 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
       endDate: endDate || undefined,
       description: description.trim(),
       // ☆ 화면용 이름 / 서버용 번호 (번호 없는 사람은 빼고)
-      assignees: isDeadlineMode ? picked.map((p) => p.name) : [],
+      assignees: canPickMembers ? picked.map((p) => p.name) : [],
+
+
 
       assigneeIds: canPickMembers
         ? picked
@@ -391,11 +393,13 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
             />
           </div>
 
-          {/* ☆ 담당자: 보드 마감일 때만 (부장만 보인다) */}
+
           {canPickMembers && (
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <label className="font-bold text-gray-700">담당자</label>
+                <label className="font-bold text-gray-700">
+                  {isMeetingMode ? "참석자" : "담당자"}
+                </label>
                 <span className="text-[10px] text-gray-400">
                   {picked.length} / {MAX_ASSIGNEES}명
                 </span>
@@ -511,9 +515,13 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
               className="h-4 w-4 shrink-0 mt-0.5 text-amber-600"
             />
             <div>
-              <p className="font-bold">마감 알림이 자동 등록됩니다</p>
+              <p className="font-bold">
+                {isMeetingMode ? "회의 참석자" : "마감 알림"}
+              </p>
               <p className="mt-0.5 text-[11px] text-amber-700/90 leading-relaxed">
-                선택한 D-day 단계에 따라 담당 팀원에게 알림 메시지가 발송됩니다.
+                {isMeetingMode
+                  ? "선택한 팀원이 회의 참석자로 지정됩니다. 참석자는 최대 20명까지 선택할 수 있습니다."
+                  : "선택한 D-day 단계에 따라 담당 팀원에게 알림 메시지가 발송됩니다."}
               </p>
             </div>
           </div>
