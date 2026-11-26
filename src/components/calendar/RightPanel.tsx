@@ -1,9 +1,12 @@
 import React, { useState } from "react";
 import type { BoardFilter, MilestoneItem } from "../../types/calendar";
+import type { BoardCreateRequest } from "../../api/calendarApi";
 
 interface RightPanelProps {
   boardFilters?: BoardFilter[];
   milestones?: MilestoneItem[];
+  canCreateBoard?: boolean;
+  onCreateBoard?: (request: BoardCreateRequest) => Promise<void>;
   onToggleFilter?: (id: string) => void;
   onAddMilestone?: (title: string, date: string) => void;
   onApplyMilestonesToCalendar?: () => void;
@@ -12,6 +15,8 @@ interface RightPanelProps {
 export const RightPanel: React.FC<RightPanelProps> = ({
   boardFilters = [],
   milestones = [],
+  canCreateBoard = false,
+  onCreateBoard,
   onToggleFilter,
   onAddMilestone,
   onApplyMilestonesToCalendar,
@@ -21,6 +26,19 @@ export const RightPanel: React.FC<RightPanelProps> = ({
   const [newDate, setNewDate] = useState("");
 
   const [milestoneError, setMilestoneError] = useState<string | null>(null);
+  const [isBoardCreateOpen, setIsBoardCreateOpen] = useState(false);
+  const [newBoardName, setNewBoardName] = useState("");
+  const [newBoardType, setNewBoardType] = useState<"PROJECT" | "CONTEST">("PROJECT");
+  const [newBoardColor, setNewBoardColor] = useState("#3b82f6");
+  const [newBoardStartDate, setNewBoardStartDate] = useState(() => new Date().toLocaleDateString("sv-SE"));
+  const [newBoardEndDate, setNewBoardEndDate] = useState(() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 14);
+    return date.toLocaleDateString("sv-SE");
+  });
+  const [newBoardAlertDays, setNewBoardAlertDays] = useState<number[]>([7, 3, 1, 0]);
+  const [isCreatingBoard, setIsCreatingBoard] = useState(false);
+  const [boardCreateError, setBoardCreateError] = useState("");
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,10 +62,131 @@ export const RightPanel: React.FC<RightPanelProps> = ({
     setNewDate("");
   };
 
+  const toggleBoardAlertDay = (day: number) => {
+    setNewBoardAlertDays((previous) =>
+      previous.includes(day) ? previous.filter((item) => item !== day) : [...previous, day],
+    );
+  };
+
+  const handleCreateBoard = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setBoardCreateError("");
+
+    if (!newBoardName.trim()) {
+      setBoardCreateError("보드 이름을 입력해 주세요.");
+      return;
+    }
+    if (!newBoardStartDate || !newBoardEndDate) {
+      setBoardCreateError("시작일과 종료일을 모두 선택해 주세요.");
+      return;
+    }
+    if (newBoardEndDate < newBoardStartDate) {
+      setBoardCreateError("종료일은 시작일 이후여야 합니다.");
+      return;
+    }
+    if (!onCreateBoard) {
+      setBoardCreateError("보드 생성 기능을 사용할 수 없습니다.");
+      return;
+    }
+
+    try {
+      setIsCreatingBoard(true);
+      await onCreateBoard({
+        name: newBoardName.trim(),
+        type: newBoardType,
+        color: newBoardColor,
+        startDate: newBoardStartDate,
+        endDate: newBoardEndDate,
+        alertDays: [...newBoardAlertDays].sort((a, b) => b - a),
+      });
+      setNewBoardName("");
+      setNewBoardType("PROJECT");
+      setNewBoardColor("#3b82f6");
+      setNewBoardAlertDays([7, 3, 1, 0]);
+      setIsBoardCreateOpen(false);
+    } catch (error) {
+      setBoardCreateError(
+        error instanceof Error ? error.message : "보드를 생성하지 못했습니다.",
+      );
+    } finally {
+      setIsCreatingBoard(false);
+    }
+  };
+
   return (
     <div className="flex w-80 flex-col space-y-5 shrink-0 select-none overflow-y-auto">
       <div className="rounded-3xl bg-white p-5 shadow-xs">
-        <h3 className="text-xs font-bold text-gray-900 mb-3">보드 필터</h3>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h3 className="text-xs font-bold text-gray-900">보드 필터</h3>
+          {canCreateBoard && (
+            <button
+              type="button"
+              onClick={() => {
+                setIsBoardCreateOpen((open) => !open);
+                setBoardCreateError("");
+              }}
+              className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-[10px] font-bold text-gray-700 transition hover:bg-gray-50"
+            >
+              {isBoardCreateOpen ? "닫기" : "+ 보드 생성"}
+            </button>
+          )}
+        </div>
+
+        {canCreateBoard && isBoardCreateOpen && (
+          <form onSubmit={handleCreateBoard} className="mb-4 space-y-3 rounded-2xl border border-gray-100 bg-gray-50 p-3">
+            <div>
+              <label htmlFor="calendar-new-board-name" className="mb-1 block text-[11px] font-bold text-gray-700">보드 이름</label>
+              <input
+                id="calendar-new-board-name"
+                value={newBoardName}
+                onChange={(event) => setNewBoardName(event.target.value)}
+                maxLength={100}
+                placeholder="예: 2026 프로젝트"
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs outline-none focus:border-black"
+              />
+            </div>
+            <div>
+              <label htmlFor="calendar-new-board-type" className="mb-1 block text-[11px] font-bold text-gray-700">보드 유형</label>
+              <select
+                id="calendar-new-board-type"
+                value={newBoardType}
+                onChange={(event) => setNewBoardType(event.target.value as "PROJECT" | "CONTEST")}
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs outline-none focus:border-black"
+              >
+                <option value="PROJECT">프로젝트</option>
+                <option value="CONTEST">대회</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label htmlFor="calendar-new-board-start" className="mb-1 block text-[11px] font-bold text-gray-700">시작일</label>
+                <input id="calendar-new-board-start" type="date" value={newBoardStartDate} onChange={(event) => setNewBoardStartDate(event.target.value)} className="w-full min-w-0 rounded-lg border border-gray-200 bg-white px-2 py-2 text-[10px] outline-none focus:border-black" />
+              </div>
+              <div>
+                <label htmlFor="calendar-new-board-end" className="mb-1 block text-[11px] font-bold text-gray-700">종료일</label>
+                <input id="calendar-new-board-end" type="date" min={newBoardStartDate || undefined} value={newBoardEndDate} onChange={(event) => setNewBoardEndDate(event.target.value)} className="w-full min-w-0 rounded-lg border border-gray-200 bg-white px-2 py-2 text-[10px] outline-none focus:border-black" />
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <label htmlFor="calendar-new-board-color" className="text-[11px] font-bold text-gray-700">보드 색상</label>
+              <input id="calendar-new-board-color" type="color" value={newBoardColor} onChange={(event) => setNewBoardColor(event.target.value)} className="h-8 w-12 cursor-pointer rounded border border-gray-200 bg-white p-1" />
+            </div>
+            <div>
+              <p className="mb-2 text-[11px] font-bold text-gray-700">D-day 알림</p>
+              <div className="flex flex-wrap gap-1.5">
+                {([{ label: "D-14", value: 14 }, { label: "D-7", value: 7 }, { label: "D-3", value: 3 }, { label: "D-1", value: 1 }, { label: "당일", value: 0 }] as const).map((item) => (
+                  <button key={item.value} type="button" onClick={() => toggleBoardAlertDay(item.value)} className={`rounded-full border px-2 py-1 text-[10px] font-bold ${newBoardAlertDays.includes(item.value) ? "border-black bg-black text-white" : "border-gray-200 bg-white text-gray-500"}`}>
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {boardCreateError && <p role="alert" className="text-[11px] font-semibold text-red-600">{boardCreateError}</p>}
+            <button type="submit" disabled={isCreatingBoard} className="w-full rounded-xl bg-black py-2.5 text-xs font-bold text-white transition hover:bg-gray-800 disabled:opacity-50">
+              {isCreatingBoard ? "생성 중..." : "보드 생성하기"}
+            </button>
+          </form>
+        )}
         <div className="space-y-2.5">
           {boardFilters.length === 0 && (
             <p className="text-[11px] leading-relaxed text-gray-400">

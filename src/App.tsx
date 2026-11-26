@@ -1,5 +1,6 @@
 // useCallback: 함수를 한 번만 만들어 두고 재사용하게 해주는 기능 (토스트 닫기에 사용)
 import { useCallback, useEffect, useRef, useState } from "react";
+import { getMembers } from "./apis/members";
 // ★ useLocation: 지금 주소를 알려준다 (입장 화면인지 확인용)
 import {
   Routes,
@@ -38,11 +39,13 @@ import {
   createCalendarEvent,
   // 보드 마감 만들기
   createDeadline,
+  createBoard,
   deleteCalendarEvent,
   getBoards,
   getCalendarEvents,
   updateCalendarEvent,
   type ApiBoard,
+  type BoardCreateRequest,
 } from "./api/calendarApi";
 
 // 토스트 하나의 모양 (id가 바뀌면 같은 문구여도 새로 뜬다)
@@ -65,6 +68,12 @@ function AppContent() {
 
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [boards, setBoards] = useState<ApiBoard[]>([]);
+  const [canManageMeetings, setCanManageMeetings] = useState(false);
+
+  const [, setMyEvents] = useState<CalendarEvent[]>([]);
+
+  const memberNamesRef = useRef<Map<number, string>>(new Map());
+  const boardNamesRef = useRef<Map<number, string>>(new Map());
   const [homeTodos, setHomeTodos] = useState<HomeTodoItem[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   // 지금 떠 있는 토스트 (null이면 안 보임)
@@ -148,15 +157,34 @@ function AppContent() {
                   : isActivity
                     ? "활동"
                     : "개인 일정",
-            board: isActivity ? "지정된 보드 없음" : "",
+
+            board: isActivity
+              ? "지정된 보드 없음"
+              : event.boardId != null
+                ? (boardNamesRef.current.get(event.boardId) ??
+                  `보드 #${event.boardId}`)
+                : "",
+
             date: event.startsAt.slice(0, 10),
             endDate: event.endsAt.slice(0, 10),
             time: event.allDay ? undefined : event.startsAt.slice(11, 16),
             description: event.memo ?? "",
-            completed: event.completed ?? false,
+
+            completed:
+              event.type === "PERSONAL"
+                ? (event.completed ?? false)
+                : undefined,
+
             boardId: event.boardId,
             assigneeIds: event.assigneeIds ?? [],
-            assignees: isActivity ? [leaderName || "스터디장"] : [],
+
+            assignees: isActivity
+              ? [leaderName || "스터디장"]
+              : (event.assigneeIds ?? []).map(
+                  (memberId) =>
+                    memberNamesRef.current.get(memberId) ?? `회원 ${memberId}`,
+                ),
+
             isMyEvent: true,
           };
         });
@@ -215,19 +243,60 @@ function AppContent() {
           console.error("오늘 할 일 API 조회 실패:", error);
         }
       });
+    getMembers()
+      .then((members) => {
+        if (cancelled) return;
+
+        const names = new Map<number, string>();
+
+        members.forEach((member) => {
+          names.set(member.memberId, member.name);
+        });
+
+        memberNamesRef.current = names;
+
+        const applyMemberNames = (items: CalendarEvent[]) =>
+          items.map((event) => {
+            if (event.type === "활동" || !event.assigneeIds?.length) {
+              return event;
+            }
+
+            return {
+              ...event,
+              assignees: event.assigneeIds.map(
+                (memberId) => names.get(memberId) ?? `회원 ${memberId}`,
+              ),
+            };
+          });
+
+        setEvents(applyMemberNames);
+        setMyEvents(applyMemberNames);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          console.error("참석자 이름 조회 실패:", error);
+        }
+      });
 
     // 회원 정보 및 보드 조회
     apiRequest<{ roles: string[] }>("/members/me")
       .then((member) => {
         if (cancelled) return;
+        const isLeader = member.roles?.includes("LEADER") ?? false;
 
-        if (member.roles?.includes("LEADER")) {
+        setCanManageMeetings(isLeader);
+        if (isLeader) {
           return getBoards().then((data) => {
-            if (!cancelled) setBoards(data);
+            if (cancelled) return;
+            setBoards(data);
+            boardNamesRef.current = new Map(
+              data.map((board) => [board.id, board.name]),
+            );
           });
         }
 
         setBoards([]);
+        boardNamesRef.current = new Map();
       })
       .catch((error: unknown) => {
         if (!cancelled) {
@@ -240,6 +309,57 @@ function AppContent() {
     };
     // ★ 입장 화면 → 일반 화면으로 바뀌면 그때 불러온다
   }, [isPublicPage]);
+
+  // 보드 생성: POST 성공 직후 화면에 반영하고, GET /boards로 서버 저장 결과를 확인한다.
+  const handleCreateBoard = async (
+    request: BoardCreateRequest,
+  ): Promise<void> => {
+    if (!canManageMeetings) {
+      throw new Error("보드 생성은 부장만 할 수 있습니다.");
+    }
+
+    const createdBoard = await createBoard(request);
+
+    // 생성 결과를 즉시 반영해 화면에서 보드가 사라지지 않게 한다.
+    setBoards((previous) => {
+      const byId = new Map(previous.map((board) => [board.id, board]));
+      byId.set(createdBoard.id, createdBoard);
+      return Array.from(byId.values());
+    });
+    boardNamesRef.current.set(createdBoard.id, createdBoard.name);
+
+    try {
+      // 백엔드 명세상 GET /boards는 진행 중/종료 보드를 모두 반환한다.
+      const latestBoards = await getBoards();
+      const persisted = latestBoards.some(
+        (board) => board.id === createdBoard.id,
+      );
+
+      if (persisted) {
+        setBoards(latestBoards);
+        boardNamesRef.current = new Map(
+          latestBoards.map((board) => [board.id, board.name]),
+        );
+        showToast("보드를 생성했습니다.", "success");
+        return;
+      }
+
+      // POST 응답에는 있었지만 목록 조회에 없다면 프론트에서만 숨기지 않고 경고한다.
+      setBoards((previous) => {
+        const byId = new Map(previous.map((board) => [board.id, board]));
+        byId.set(createdBoard.id, createdBoard);
+        return Array.from(byId.values());
+      });
+      showToast(
+        "보드 생성은 완료됐지만 GET /boards 응답에 새 보드가 없습니다. 백엔드 저장 및 조회 결과를 확인해 주세요.",
+      );
+    } catch (error) {
+      console.error("생성 후 보드 목록 재조회 실패:", error);
+      showToast(
+        "보드는 생성됐지만 목록을 다시 불러오지 못했습니다. 새로고침 후 목록을 확인해 주세요.",
+      );
+    }
+  };
 
   const handleAddEvent = async (newEvent: CalendarEvent) => {
     // 보드 마감 (부장이 마감 + 보드를 고른 경우): 보드 마감 API로 저장
@@ -286,9 +406,21 @@ function AppContent() {
         startsAt,
         endsAt,
         allDay: !newEvent.time,
+
+        ...(newEvent.type === "회의"
+          ? {
+              type: "MEETING" as const,
+              boardId: newEvent.boardId!,
+              assigneeIds: newEvent.assigneeIds ?? [],
+            }
+          : {}),
       });
 
-      setEvents((prev) => [...prev, { ...newEvent, id: String(created.id) }]);
+      if (newEvent.type === "회의") {
+        reloadMonthOf(newEvent.date);
+      } else {
+        setEvents((prev) => [...prev, { ...newEvent, id: String(created.id) }]);
+      }
 
       setIsAddModalOpen(false);
       showToast("일정을 추가했습니다", "success");
@@ -481,6 +613,8 @@ function AppContent() {
                 onDeleteEvent={handleDeleteEvent}
                 onUpdateEvent={handleUpdateEvent}
                 onMonthChange={loadMonth}
+                canManageMeetings={canManageMeetings}
+                onCreateBoard={handleCreateBoard}
               />
             }
           />
@@ -511,6 +645,7 @@ function AppContent() {
 
       <AddEventModal
         isOpen={isAddModalOpen}
+        canManageMeetings={canManageMeetings}
         onClose={() => setIsAddModalOpen(false)}
         onAddEvent={handleAddEvent}
         // 부장이면 마감을 보드에 등록할 수 있게 (끝난 보드는 빼고)

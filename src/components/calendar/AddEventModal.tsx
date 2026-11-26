@@ -15,13 +15,12 @@ type PickedMember = { memberId: number | null; name: string };
 
 interface AddEventModalProps {
   isOpen: boolean;
+  canManageMeetings?: boolean;
   onClose: () => void;
   onAddEvent?: (newEvent: CalendarEvent) => void;
   initialEvent?: CalendarEvent | null;
   onUpdateEvent?: (updatedEvent: CalendarEvent) => void;
-  // 새 일정을 만들 때 날짜 칸에 미리 넣어 둘 날짜 (캘린더에서 날짜를 눌렀을 때)
   initialDate?: string;
-  // ☆ 마감을 걸 수 있는 보드 목록 (App이 부장일 때만 불러온다 → 있으면 부장)
   boards?: { id: number; name: string }[];
 }
 
@@ -39,6 +38,7 @@ const toPicked = (event: CalendarEvent | null): PickedMember[] =>
 
 export const AddEventModal: React.FC<AddEventModalProps> = ({
   isOpen,
+  canManageMeetings = false,
   onClose,
   onAddEvent,
   initialEvent = null,
@@ -75,7 +75,7 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
   const [formError, setFormError] = useState("");
 
   // ☆ 보드 목록이 있으면 부장 → 마감을 보드에 등록할 수 있다
-  const canMakeDeadline = boards.length > 0;
+  const canMakeDeadline = canManageMeetings && boards.length > 0;
   // ☆ 지금 "보드 마감" 화면인지 (마감 + 부장)
   const isDeadlineMode = type === "마감" && canMakeDeadline;
 
@@ -89,8 +89,7 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
   // ☆ 가입된 팀원 중 아직 안 고른 사람만 (번호로 비교)
   const pickableMembers = (membersQuery.data ?? []).filter(
     (m) =>
-      m.status === "JOINED" &&
-      !picked.some((p) => p.memberId === m.memberId),
+      m.status === "JOINED" && !picked.some((p) => p.memberId === m.memberId),
   );
 
   // useEffect 대신 렌더링 단계에서 isOpen 상태 변화를 감지해 폼 초기화 (ESLint 에러 방지)
@@ -245,7 +244,8 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
             {/* ☆ 부장이 아닌데 마감을 고르면 안내 */}
             {type === "마감" && !canMakeDeadline && (
               <p className="mt-2 text-[11px] text-gray-400">
-                보드 마감은 부장만 등록할 수 있어요. 지금은 내 일정으로 저장됩니다.
+                보드 마감은 부장만 등록할 수 있어요. 지금은 내 일정으로
+                저장됩니다.
               </p>
             )}
           </div>
@@ -413,7 +413,11 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
                       onClick={() => setIsPickerOpen(!isPickerOpen)}
                       className="inline-flex items-center gap-1 rounded-full border border-dashed border-gray-300 px-3 py-1 font-semibold text-gray-500 hover:bg-gray-50 transition cursor-pointer"
                     >
-                      <img src={plusIcon} alt="" className="h-3 w-3 opacity-60" />
+                      <img
+                        src={plusIcon}
+                        alt=""
+                        className="h-3 w-3 opacity-60"
+                      />
                       <span>팀원 추가</span>
                     </button>
 
