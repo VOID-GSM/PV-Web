@@ -70,11 +70,7 @@ function AppContent() {
   const [boards, setBoards] = useState<ApiBoard[]>([]);
   const [canManageMeetings, setCanManageMeetings] = useState(false);
 
-
-  const [, setMyEvents] = useState<CalendarEvent[]>([]);
-
   const [myEvents, setMyEvents] = useState<CalendarEvent[]>([]);
-
 
   const memberNamesRef = useRef<Map<number, string>>(new Map());
   const boardNamesRef = useRef<Map<number, string>>(new Map());
@@ -192,11 +188,7 @@ function AppContent() {
                     memberNamesRef.current.get(memberId) ?? `회원 ${memberId}`,
                 ),
 
-
-            isMyEvent: true,
-
             isMyEvent: mine || event.type === "PERSONAL",
-
           };
         });
 
@@ -318,25 +310,17 @@ function AppContent() {
         const isLeader = member.roles?.includes("LEADER") ?? false;
 
         setCanManageMeetings(isLeader);
-
         if (isLeader) {
-          return getBoards().then((data) => {
-            if (cancelled) return;
-            setBoards(data);
-            boardNamesRef.current = new Map(
-              data.map((board) => [board.id, board.name]),
-            );
-
-        if (member.roles?.includes("LEADER")) {
           return getBoards().then((data) => {
             if (cancelled) return;
 
             setBoards(data);
             const names = new Map<number, string>(
-              data.map((board) => [board.id, board.name]),
+              data.map((board) => [board.id, board.name] as const),
             );
             boardNamesRef.current = names;
 
+            // 캘린더를 먼저 불러온 경우에도 보드 ID를 실제 이름으로 갱신한다.
             const applyBoardNames = (items: CalendarEvent[]) =>
               items.map((event) =>
                 event.boardId != null && names.has(event.boardId)
@@ -346,7 +330,6 @@ function AppContent() {
 
             setEvents(applyBoardNames);
             setMyEvents(applyBoardNames);
-
           });
         }
 
@@ -377,7 +360,7 @@ function AppContent() {
 
     // 생성 결과를 즉시 반영해 화면에서 보드가 사라지지 않게 한다.
     setBoards((previous) => {
-      const byId = new Map(previous.map((board) => [board.id, board]));
+      const byId = new Map<number, ApiBoard>(previous.map((board) => [board.id, board] as const));
       byId.set(createdBoard.id, createdBoard);
       return Array.from(byId.values());
     });
@@ -392,8 +375,8 @@ function AppContent() {
 
       if (persisted) {
         setBoards(latestBoards);
-        boardNamesRef.current = new Map(
-          latestBoards.map((board) => [board.id, board.name]),
+        boardNamesRef.current = new Map<number, string>(
+          latestBoards.map((board) => [board.id, board.name] as const),
         );
         showToast("보드를 생성했습니다.", "success");
         return;
@@ -401,7 +384,7 @@ function AppContent() {
 
       // POST 응답에는 있었지만 목록 조회에 없다면 프론트에서만 숨기지 않고 경고한다.
       setBoards((previous) => {
-        const byId = new Map(previous.map((board) => [board.id, board]));
+        const byId = new Map<number, ApiBoard>(previous.map((board) => [board.id, board] as const));
         byId.set(createdBoard.id, createdBoard);
         return Array.from(byId.values());
       });
@@ -473,19 +456,6 @@ function AppContent() {
         startsAt,
         endsAt,
         allDay: !newEvent.time,
-
-
-        ...(newEvent.type === "회의"
-          ? {
-              type: "MEETING" as const,
-              boardId: newEvent.boardId!,
-              assigneeIds: newEvent.assigneeIds ?? [],
-            }
-          : {}),
-      });
-
-
-
         ...(newEvent.type === "회의"
           ? {
               type: "MEETING" as const,
@@ -494,7 +464,6 @@ function AppContent() {
             }
           : {}),
       });
-
       if (newEvent.type === "회의") {
         reloadMonthOf(newEvent.date);
       } else {
@@ -731,7 +700,6 @@ function AppContent() {
                 onDeleteEvent={handleDeleteEvent}
                 onUpdateEvent={handleUpdateEvent}
                 onMonthChange={loadMonth}
-                canManageMeetings={canManageMeetings}
                 onCreateBoard={handleCreateBoard}
               />
             }

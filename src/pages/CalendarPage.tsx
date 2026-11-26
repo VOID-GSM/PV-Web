@@ -31,14 +31,9 @@ interface CalendarPageProps {
   onAddEvent?: (newEvent: CalendarEvent) => void;
   onDeleteEvent?: (eventId: string) => void;
   onUpdateEvent?: (event: CalendarEvent) => void;
-
-  onMonthChange?: (date: Date) => void;
-  canManageMeetings?: boolean;
-  onCreateBoard?: (request: BoardCreateRequest) => Promise<void>;
-
   onMonthChange?: (date: Date, mine?: boolean) => void;
   canManageMeetings?: boolean;
-
+  onCreateBoard?: (request: BoardCreateRequest) => Promise<void>;
 }
 
 export default function CalendarPage({
@@ -51,9 +46,7 @@ export default function CalendarPage({
   onUpdateEvent = () => {},
   onMonthChange,
   canManageMeetings = false,
-
   onCreateBoard,
-
 }: CalendarPageProps = {}) {
   const [viewMode, setViewMode] = useState<ViewMode>("월간");
   const [onlyMyEvents, setOnlyMyEvents] = useState(false);
@@ -89,7 +82,10 @@ export default function CalendarPage({
   ];
   const eventBoardNames = [...events, ...myEvents]
     .map((event) => event.board?.trim())
-    .filter((name): name is string => Boolean(name));
+    .filter(
+      (name): name is string =>
+        Boolean(name) && name !== "지정된 보드 없음",
+    );
   const boardNames = Array.from(
     new Set([...boards.map((board) => board.name), ...eventBoardNames]),
   );
@@ -163,20 +159,14 @@ export default function CalendarPage({
     .filter((filter) => filter.checked)
     .map((filter) => filter.name);
 
-  const filteredEvents = events.filter(
-    (event) =>
-      (!onlyMyEvents || event.isMyEvent) &&
-      (!event.board || activeFilters.includes(event.board)),
-
   const eventsToDisplay: CalendarEvent[] = onlyMyEvents ? myEvents : events;
 
   const filteredEvents: CalendarEvent[] = eventsToDisplay.filter(
-    (calendarEvent: CalendarEvent) =>
+    (calendarEvent) =>
       (!onlyMyEvents || calendarEvent.isMyEvent) &&
       (!calendarEvent.board ||
         calendarEvent.board === "지정된 보드 없음" ||
         activeFilters.includes(calendarEvent.board)),
-
   );
 
   return (
