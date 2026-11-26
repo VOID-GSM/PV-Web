@@ -1,11 +1,14 @@
 import { useCallback, useState } from "react";
+// ☆ 헤더에서 보낸 쪽지(state)를 읽고, 다 쓰면 지우려고
+import { useLocation, useNavigate } from "react-router-dom";
 import { Header } from "../components/layout/Header";
 import Toast from "../components/common/Toast";
 import WorklogFilterBar from "../components/worklog/WorklogFilterBar";
 import WorklogCard from "../components/worklog/WorklogCard";
 import WorklogQuickWrite from "../components/worklog/WorklogQuickWrite";
 import BoardProgressCard from "../components/worklog/BoardProgressCard";
-import { BOARDS, type NewWorklog, type Worklog } from "../constants/worklog";
+// ☆ BOARDS(빈 목록)는 더 안 쓴다
+import { type NewWorklog, type Worklog } from "../constants/worklog";
 // 서버 연동
 import {
   useBoards,
@@ -16,7 +19,7 @@ import {
 } from "../hooks/useWorklogs";
 // 진짜 내 이름·번호
 import { useMyName } from "../hooks/useMyName";
-// ★ 팀원 목록 (댓글 작성자 이름 찾기용)
+// 팀원 목록 (댓글 작성자 이름 찾기용)
 import { useTeamMembers } from "../hooks/useTeam";
 import type { Worklog as ServerWorklog } from "../apis/worklogs";
 import type { Board as ServerBoard } from "../apis/boards";
@@ -25,6 +28,10 @@ import { tokenStorage } from "../apis/tokenStorage";
 
 // Date를 "2026-10-26" 모양으로 (한국 시간 기준)
 const formatDate = (d: Date) => d.toLocaleDateString("sv-SE");
+
+// ☆ 헤더 "새로 만들기 → 업무일지 쓰기"가 보낸 쪽지인지
+const wantsWrite = (state: unknown) =>
+  typeof state === "object" && state !== null && "openWrite" in state && state.openWrite === true;
 
 // ─────────────────────────────────────────────
 // 항목(오늘 한 일 등) ↔ 서버 글 하나 바꾸기
@@ -59,7 +66,7 @@ function toPageWorklog(w: ServerWorklog, boards: ServerBoard[]): Worklog {
   return {
     id: w.id,
     author: w.authorName,
-    // ☆ 작성자 번호 (프로필 사진용)
+    // 작성자 번호 (프로필 사진용)
     authorId: w.authorId,
     date: formatDate(created),
     time: created.toTimeString().slice(0, 5),
@@ -92,7 +99,7 @@ function WorklogCardWithComments({ worklog, isMine, names, onError }: WorklogCar
     id: c.id,
     // 이름표에서 찾고, 그래도 못 찾으면 "팀원"
     author: names.get(c.authorId) ?? "팀원",
-    // ☆ 댓글 작성자 번호 (프로필 사진용)
+    // 댓글 작성자 번호 (프로필 사진용)
     authorId: c.authorId,
     content: c.content,
   }));
@@ -133,11 +140,15 @@ function EmptyState({ title, description, onReset }: EmptyStateProps) {
 type ToastState = { id: number; message: string; type: "success" | "info" };
 
 export default function WorklogPage() {
+  // ☆ 지금 주소 정보(쪽지 포함)와 이동 도구
+  const location = useLocation();
+  const navigate = useNavigate();
+
   // 서버 데이터
   const worklogsQuery = useWorklogs();
   const boardsQuery = useBoards();
   const createWorklog = useCreateWorklog();
-  // ★ 팀원 전체 (못 불러와도 아래에서 일지 작성자 이름으로 채운다)
+  // 팀원 전체 (못 불러와도 아래에서 일지 작성자 이름으로 채운다)
   const teamQuery = useTeamMembers();
 
   // 진짜 내 정보. 회원 번호를 아직 못 불러왔으면 토큰에서 꺼낸 번호를 쓴다
@@ -155,6 +166,16 @@ export default function WorklogPage() {
     setToast((prev) => ({ id: (prev?.id ?? 0) + 1, message, type }));
   };
   const closeToast = useCallback(() => setToast(null), []);
+
+  // ☆ 헤더에서 "업무일지 쓰기"로 왔으면, 이번 이동 번호를 작성 창 열기 신호로 쓴다
+  const openWriteKey = wantsWrite(location.state) ? location.key : null;
+
+  // ☆ 작성 창이 닫히면 쪽지를 지운다 (새로고침했을 때 또 열리지 않게)
+  const handleWriteModalClose = () => {
+    if (wantsWrite(location.state)) {
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  };
 
   // 기간을 골랐을 때 시작 날짜를 계산해 둔다
   const handlePeriodChange = (value: string) => {
@@ -186,10 +207,15 @@ export default function WorklogPage() {
   const boards = boardsQuery.data ?? [];
   const worklogs = serverWorklogs.map((w) => toPageWorklog(w, boards));
 
+  // ☆ 작성 창·카드에 넘길 서버 보드 (진행 중인 것만, 색이 없으면 회색)
+  const boardOptions = boards
+    .filter((b) => b.status !== "CLOSED")
+    .map((b) => ({ id: b.id, name: b.name, color: b.color || "#a3a3a3" }));
+
   // 내가 쓴 일지 번호들 ("내 일지" 탭, 검은 테두리에 사용)
   const myWorklogIds = new Set(serverWorklogs.filter((w) => w.authorId === myId).map((w) => w.id));
 
-  // ★ 회원 번호 → 이름 표 (뒤에 넣은 것이 앞의 것을 덮어쓴다)
+  // 회원 번호 → 이름 표 (뒤에 넣은 것이 앞의 것을 덮어쓴다)
   // ① 팀원 전체 ② 일지 작성자 ③ 나
   const names = new Map<number, string>();
   (teamQuery.data ?? []).forEach((m) => names.set(m.memberId, m.name));
@@ -203,12 +229,17 @@ export default function WorklogPage() {
       showToast("항목을 하나 이상 입력해 주세요");
       return;
     }
+    // ☆ 고른 보드 이름 → 서버 보드 번호 (안 골랐으면 보내지 않는다)
+    const boardId = boards.find((b) => b.name === data.boards[0])?.id;
+
     createWorklog.mutate(
       {
         // 서버는 제목이 필수라서 날짜로 자동으로 만든다
-        title: `${formatDate(new Date())} 업무일지`,
+        title: `${data.date || formatDate(new Date())} 업무일지`,
         content,
         visibility: data.isPublic ? "PUBLIC" : "PRIVATE",
+        // ☆ 보드 태그
+        boardId,
       },
       {
         onSuccess: () => showToast("일지를 올렸습니다", "success"),
@@ -227,10 +258,15 @@ export default function WorklogPage() {
     return true;
   });
 
-  const groupedByBoard = BOARDS.map((b) => ({
-    ...b,
-    items: visibleWorklogs.filter((w) => w.boards.includes(b.name)),
-  })).filter((group) => group.items.length > 0);
+  // ☆ 보드별 모아보기: 빈 목록(BOARDS) 대신 서버 보드로 묶는다
+  const groupedByBoard = boards
+    .map((b) => ({
+      id: b.id,
+      name: b.name,
+      color: b.color || "#a3a3a3",
+      items: visibleWorklogs.filter((w) => w.boards.includes(b.name)),
+    }))
+    .filter((group) => group.items.length > 0);
 
   const isFiltered =
     activeTab !== "팀 전체" || (board !== "" && board !== "전체") || (period !== "" && period !== "전체");
@@ -281,9 +317,10 @@ export default function WorklogPage() {
         );
       }
       return groupedByBoard.map((group) => (
-        <section key={group.name} className="flex flex-col gap-3">
+        <section key={group.id} className="flex flex-col gap-3">
           <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <span className={`h-2 w-2 rounded-full ${group.dotColor}`} />
+            {/* ☆ 서버 보드 색 점 */}
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: group.color }} />
             {group.name}
             <span className="text-xs font-normal text-neutral-400">{group.items.length}개</span>
           </h3>
@@ -327,7 +364,14 @@ export default function WorklogPage() {
 
           {/* 오른쪽: 작성 카드 + 보드별 진행 기록 */}
           <aside className="flex w-full flex-col gap-4 self-start lg:w-80">
-            <WorklogQuickWrite onSubmit={handleAddWorklog} />
+            <WorklogQuickWrite
+              onSubmit={handleAddWorklog}
+              // ☆ 서버 보드
+              boards={boardOptions}
+              // ☆ 헤더에서 왔으면 작성 창 바로 열기
+              openRequestKey={openWriteKey}
+              onModalClose={handleWriteModalClose}
+            />
             <BoardProgressCard worklogs={readableWorklogs} />
           </aside>
         </div>

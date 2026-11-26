@@ -1,5 +1,9 @@
 import { useState } from "react";
-import { BOARDS, TEMPLATES, type NewWorklog } from "../../constants/worklog";
+// ☆ BOARDS(빈 목록)는 더 안 쓴다 → 서버 보드를 받는다
+import { TEMPLATES, type NewWorklog } from "../../constants/worklog";
+
+// ☆ 서버 보드 하나 (페이지가 넘겨준다)
+export type BoardOption = { id: number; name: string; color: string };
 
 // 작성 창에서는 "자유 형식"까지 4개
 const MODAL_TEMPLATES = [...TEMPLATES, "자유 형식"];
@@ -19,6 +23,8 @@ type WorklogWriteModalProps = {
   initialTemplates: string[];
   initialBoards: string[];
   initialPublic: boolean;
+  // ☆ 고를 수 있는 서버 보드들
+  boards: BoardOption[];
 };
 
 export default function WorklogWriteModal({
@@ -27,6 +33,7 @@ export default function WorklogWriteModal({
   initialTemplates,
   initialBoards,
   initialPublic,
+  boards,
 }: WorklogWriteModalProps) {
   const [date, setDate] = useState("");
   const [isPublic, setIsPublic] = useState(initialPublic);
@@ -34,12 +41,9 @@ export default function WorklogWriteModal({
   const [checkedTemplates, setCheckedTemplates] = useState<string[]>(initialTemplates);
   const [contents, setContents] = useState<Record<string, string>>({});
 
+  // ☆ 보드는 하나만 (서버가 일지 하나에 보드 하나만 받는다). 같은 걸 다시 누르면 해제
   const toggleBoard = (boardName: string) => {
-    if (selectedBoards.includes(boardName)) {
-      setSelectedBoards(selectedBoards.filter((b) => b !== boardName));
-    } else {
-      setSelectedBoards([...selectedBoards, boardName]);
-    }
+    setSelectedBoards((prev) => (prev[0] === boardName ? [] : [boardName]));
   };
 
   const toggleTemplate = (template: string) => {
@@ -96,7 +100,7 @@ export default function WorklogWriteModal({
               쓰고 싶을 때만 쓰면 됩니다 · 작성 알림이나 미작성 체크는 없습니다
             </p>
           </div>
-          <button onClick={onClose} className="text-xl text-neutral-400">
+          <button type="button" onClick={onClose} className="text-xl text-neutral-400">
             ×
           </button>
         </div>
@@ -120,6 +124,7 @@ export default function WorklogWriteModal({
               <div className="mt-1 flex items-center justify-between rounded border px-3 py-2">
                 <span className="text-sm">팀 전체 공개</span>
                 <button
+                  type="button"
                   onClick={() => setIsPublic(!isPublic)}
                   className={`relative h-6 w-11 shrink-0 rounded-full transition ${
                     isPublic ? "bg-black" : "bg-neutral-200"
@@ -139,25 +144,29 @@ export default function WorklogWriteModal({
           <div>
             <div className="flex justify-between">
               <p className="text-xs font-medium">보드 태그</p>
-              <p className="text-[11px] text-neutral-400">복수 선택</p>
+              {/* ☆ 하나만 고를 수 있다고 안내 */}
+              <p className="text-[11px] text-neutral-400">하나 선택 (선택 사항)</p>
             </div>
-            {/* ★ 보드가 없으면 안내 문구 */}
-            {BOARDS.length === 0 ? (
+            {/* ☆ 서버 보드가 없으면 안내 문구 */}
+            {boards.length === 0 ? (
               <p className="mt-2 rounded border border-dashed py-4 text-center text-xs text-neutral-400">
                 등록된 보드가 없습니다
               </p>
             ) : (
               <div className="mt-2 flex flex-wrap gap-2">
-                {BOARDS.map((board) => {
+                {boards.map((board) => {
                   const isSelected = selectedBoards.includes(board.name);
                   return (
                     <button
-                      key={board.name}
+                      key={board.id}
+                      type="button"
                       onClick={() => toggleBoard(board.name)}
-                      className={`rounded-full border px-3 py-1.5 text-xs ${
+                      className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs ${
                         isSelected ? "border-black font-semibold" : "border-neutral-200 text-neutral-500"
                       }`}
                     >
+                      {/* ☆ 서버 보드 색 점 */}
+                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: board.color }} />
                       {isSelected && "✓ "}
                       {board.name}
                     </button>
@@ -225,6 +234,7 @@ export default function WorklogWriteModal({
           </p>
           <div className="flex shrink-0 gap-2">
             <button
+              type="button"
               onClick={handleSavePrivate}
               disabled={!hasContent}
               className="rounded border px-4 py-2 text-sm disabled:opacity-40"
@@ -232,6 +242,7 @@ export default function WorklogWriteModal({
               비공개로 저장
             </button>
             <button
+              type="button"
               onClick={handleSubmit}
               disabled={!hasContent}
               className="rounded bg-black px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
