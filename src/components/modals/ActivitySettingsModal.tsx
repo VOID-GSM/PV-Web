@@ -5,9 +5,8 @@ import type {
   ActivityStatus,
   ActivityUpdateRequest,
   Major,
-  Generation,
 } from "../../api/activityApi";
-import { getGenerations } from "../../api/activityApi";
+import { getGenerations, type Generation } from "../../api/generationApi";
 import {
   formatActivityPeriod,
   formatActivitySchedule,
@@ -166,14 +165,19 @@ export const ActivitySettingsModal: React.FC<ActivitySettingsModalProps> = ({
       changes.targetMajors = majors;
     }
 
+    // 서버가 내려준 기수 ID와 비교하고, 변경된 경우 정확한 필드명으로 전송한다.
+    // 선택을 모두 해제한 경우 빈 배열을 보내 기존 대상 기수 제한을 해제한다.
     const originalGenerationIds =
       activity.targetGenerations?.map((generation) => generation.id) ?? [];
+    const selectedTargetGenerationIds = [...new Set(generationIds)].filter(
+      (id) => Number.isInteger(id) && id > 0,
+    );
+    const sameGenerationIds =
+      selectedTargetGenerationIds.length === originalGenerationIds.length &&
+      selectedTargetGenerationIds.every((id) => originalGenerationIds.includes(id));
 
-    if (
-      generationIds.length !== originalGenerationIds.length ||
-      generationIds.some((id) => !originalGenerationIds.includes(id))
-    ) {
-      changes.targetGenerationIds = generationIds;
+    if (!sameGenerationIds) {
+      changes.targetGenerationIds = selectedTargetGenerationIds;
     }
 
     if (status !== activity.summary.status) {
