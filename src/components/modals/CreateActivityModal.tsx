@@ -6,7 +6,8 @@ import { getGenerations, type Generation } from "../../api/activityApi";
 export interface ActivityFormData {
   title: string;
   type: string;
-  generationIds: number[];
+  // 서버에 전달할 실제 기수 ID 배열 (기수 번호가 아님)
+  targetGenerationIds: number[];
   departments: string[];
   memberCount: string;
   startDate: string;
@@ -153,10 +154,15 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
       return;
     }
 
+    // 화면에서 선택한 generation.id만 전달한다. generation.number는 보내지 않는다.
+    const selectedTargetGenerationIds = generations
+      .filter((generation) => generationIds.includes(generation.id))
+      .map((generation) => generation.id);
+
     onCreateSuccess?.({
       title: title.trim(),
       type,
-      generationIds,
+      targetGenerationIds: selectedTargetGenerationIds,
       departments,
       memberCount,
       startDate,
