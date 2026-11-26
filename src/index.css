@@ -56,11 +56,22 @@ body {
   }
 }
 
-/* scrollbar-hide: 스크롤은 동작하되 스크롤바는 숨김 */
+/* scrollbar-hide: 스크롤은 동작하되 스크롤바는 숨김 (특정 칸에만 쓰고 싶을 때) */
 @utility scrollbar-hide {
   scrollbar-width: none; /* 파이어폭스용 */
 
   &::-webkit-scrollbar {
     display: none; /* 크롬, 엣지, 사파리용 */
   }
+}
+
+/* ★ 앱 전체 스크롤바 숨기기 (QA: 스크롤바 디자인이 화면마다 달라 보여서 전부 없앤다)
+   스크롤 기능은 그대로고, 막대만 안 보인다 */
+* {
+  scrollbar-width: none; /* 파이어폭스 · 최신 크롬 */
+  -ms-overflow-style: none; /* 예전 엣지 */
+}
+
+*::-webkit-scrollbar {
+  display: none; /* 크롬 · 엣지 · 사파리 */
 }
