@@ -1,5 +1,6 @@
 // useCallback: 함수를 한 번만 만들어 두고 재사용하게 해주는 기능 (토스트 닫기에 사용)
 import { useCallback, useEffect, useRef, useState } from "react";
+import { getMembers } from "./apis/members";
 // ★ useLocation: 지금 주소를 알려준다 (입장 화면인지 확인용)
 import {
   Routes,
@@ -65,6 +66,11 @@ function AppContent() {
 
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [boards, setBoards] = useState<ApiBoard[]>([]);
+  const [canManageMeetings, setCanManageMeetings] = useState(false);
+
+  const [, setMyEvents] = useState<CalendarEvent[]>([]);
+  const memberNamesRef = useRef<Map<number, string>>(new Map());
+  const boardNamesRef = useRef<Map<number, string>>(new Map());
   const [homeTodos, setHomeTodos] = useState<HomeTodoItem[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   // 지금 떠 있는 토스트 (null이면 안 보임)
@@ -148,15 +154,34 @@ function AppContent() {
                   : isActivity
                     ? "활동"
                     : "개인 일정",
-            board: isActivity ? "지정된 보드 없음" : "",
+
+            board: isActivity
+              ? "지정된 보드 없음"
+              : event.boardId != null
+                ? (boardNamesRef.current.get(event.boardId) ??
+                  `보드 #${event.boardId}`)
+                : "",
+
             date: event.startsAt.slice(0, 10),
             endDate: event.endsAt.slice(0, 10),
             time: event.allDay ? undefined : event.startsAt.slice(11, 16),
             description: event.memo ?? "",
-            completed: event.completed ?? false,
+
+            completed:
+              event.type === "PERSONAL"
+                ? (event.completed ?? false)
+                : undefined,
+
             boardId: event.boardId,
             assigneeIds: event.assigneeIds ?? [],
-            assignees: isActivity ? [leaderName || "스터디장"] : [],
+
+            assignees: isActivity
+              ? [leaderName || "스터디장"]
+              : (event.assigneeIds ?? []).map(
+                  (memberId) =>
+                    memberNamesRef.current.get(memberId) ?? `회원 ${memberId}`,
+                ),
+
             isMyEvent: true,
           };
         });
@@ -215,12 +240,48 @@ function AppContent() {
           console.error("오늘 할 일 API 조회 실패:", error);
         }
       });
+    getMembers()
+      .then((members) => {
+        if (cancelled) return;
+
+        const names = new Map<number, string>();
+
+        members.forEach((member) => {
+          names.set(member.memberId, member.name);
+        });
+
+        memberNamesRef.current = names;
+
+        const applyMemberNames = (items: CalendarEvent[]) =>
+          items.map((event) => {
+            if (event.type === "활동" || !event.assigneeIds?.length) {
+              return event;
+            }
+
+            return {
+              ...event,
+              assignees: event.assigneeIds.map(
+                (memberId) => names.get(memberId) ?? `회원 ${memberId}`,
+              ),
+            };
+          });
+
+        setEvents(applyMemberNames);
+        setMyEvents(applyMemberNames);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          console.error("참석자 이름 조회 실패:", error);
+        }
+      });
 
     // 회원 정보 및 보드 조회
     apiRequest<{ roles: string[] }>("/members/me")
       .then((member) => {
         if (cancelled) return;
+        const isLeader = member.roles?.includes("LEADER") ?? false;
 
+        setCanManageMeetings(isLeader);
         if (member.roles?.includes("LEADER")) {
           return getBoards().then((data) => {
             if (!cancelled) setBoards(data);
@@ -286,9 +347,21 @@ function AppContent() {
         startsAt,
         endsAt,
         allDay: !newEvent.time,
+
+        ...(newEvent.type === "회의"
+          ? {
+              type: "MEETING" as const,
+              boardId: newEvent.boardId!,
+              assigneeIds: newEvent.assigneeIds ?? [],
+            }
+          : {}),
       });
 
-      setEvents((prev) => [...prev, { ...newEvent, id: String(created.id) }]);
+      if (newEvent.type === "회의") {
+        reloadMonthOf(newEvent.date);
+      } else {
+        setEvents((prev) => [...prev, { ...newEvent, id: String(created.id) }]);
+      }
 
       setIsAddModalOpen(false);
       showToast("일정을 추가했습니다", "success");
@@ -481,6 +554,7 @@ function AppContent() {
                 onDeleteEvent={handleDeleteEvent}
                 onUpdateEvent={handleUpdateEvent}
                 onMonthChange={loadMonth}
+                canManageMeetings={canManageMeetings}
               />
             }
           />
@@ -511,6 +585,7 @@ function AppContent() {
 
       <AddEventModal
         isOpen={isAddModalOpen}
+        canManageMeetings={canManageMeetings}
         onClose={() => setIsAddModalOpen(false)}
         onAddEvent={handleAddEvent}
         // 부장이면 마감을 보드에 등록할 수 있게 (끝난 보드는 빼고)
