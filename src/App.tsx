@@ -70,6 +70,9 @@ function AppContent() {
 
   const [myEvents, setMyEvents] = useState<CalendarEvent[]>([]);
 
+
+  const [, setMyEvents] = useState<CalendarEvent[]>([]);
+
   const memberNamesRef = useRef<Map<number, string>>(new Map());
   const boardNamesRef = useRef<Map<number, string>>(new Map());
   const [homeTodos, setHomeTodos] = useState<HomeTodoItem[]>([]);
@@ -175,6 +178,19 @@ function AppContent() {
 
             boardId: event.boardId,
             assigneeIds: event.assigneeIds ?? [],
+
+
+            assignees: isActivity
+              ? [leaderName || "스터디장"]
+              : (event.assigneeIds ?? []).map(
+                  (memberId) =>
+                    memberNamesRef.current.get(memberId) ?? `회원 ${memberId}`,
+                ),
+
+            isMyEvent: true,
+          };
+        });
+
 
             assignees: isActivity
               ? [leaderName || "스터디장"]
@@ -395,8 +411,13 @@ function AppContent() {
         ...(newEvent.type === "회의"
           ? {
               type: "MEETING" as const,
+
               boardId: newEvent.boardId as number,
               assigneeIds: (newEvent.assigneeIds ?? []).slice(0, 20),
+
+              boardId: newEvent.boardId!,
+              assigneeIds: newEvent.assigneeIds ?? [],
+
             }
           : {}),
       });
@@ -637,6 +658,7 @@ function AppContent() {
                 onDeleteEvent={handleDeleteEvent}
                 onUpdateEvent={handleUpdateEvent}
                 onMonthChange={loadMonth}
+                canManageMeetings={canManageMeetings}
               />
             }
           />
@@ -667,6 +689,7 @@ function AppContent() {
 
       <AddEventModal
         isOpen={isAddModalOpen}
+        canManageMeetings={canManageMeetings}
         onClose={() => setIsAddModalOpen(false)}
         onAddEvent={handleAddEvent}
         canManageMeetings={canManageMeetings}

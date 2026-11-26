@@ -183,7 +183,11 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
       endDate: endDate || undefined,
       description: description.trim(),
       // ☆ 화면용 이름 / 서버용 번호 (번호 없는 사람은 빼고)
+ure/calendar-event-assignees
       assignees: canPickMembers ? picked.map((p) => p.name) : [],
+
+      assignees: isDeadlineMode ? picked.map((p) => p.name) : [],
+
 
       assigneeIds: canPickMembers
         ? picked
@@ -257,7 +261,7 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
             </div>
 
             {/* ☆ 부장이 아닌데 마감을 고르면 안내 */}
-            {type === "마감" && !canMakeDeadline && (
+            {!initialEvent && type === "마감" && !canManageMeetings && (
               <p className="mt-2 text-[11px] text-gray-400">
                 보드 마감은 부장만 등록할 수 있어요. 지금은 내 일정으로
                 저장됩니다.
@@ -391,7 +395,7 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
             />
           </div>
 
-          {/* 보드 마감 담당자 또는 회의 참석자 */}
+
           {canPickMembers && (
             <div>
               <div className="mb-2 flex items-center justify-between">
