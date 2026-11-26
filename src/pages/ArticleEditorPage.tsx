@@ -23,6 +23,7 @@ import {
 import type { ArticleDraft } from "../utils/articles";
 
 import { createPost, getPost, updatePost } from "../api/postApi";
+import { getMembers, type Member } from "../apis/members";
 
 import {
   getActivities,
@@ -32,7 +33,6 @@ import {
 
 const defaultRoundOptions = ["회차 선택", "1회차", "2회차", "3회차", "4회차"];
 
-const memberOptions = ["지정할 팀원 선택", "등록된 팀원 없음"];
 
 export default function ArticleEditorPage() {
   const navigate = useNavigate();
@@ -90,6 +90,8 @@ export default function ArticleEditorPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   const [apiActivities, setApiActivities] = useState<ActivitySummary[]>([]);
+  const [teamMembers, setTeamMembers] = useState<Member[]>([]);
+  const participatingActivities = apiActivities.filter((item) => item.isMember === true);
 
   const [availableRounds, setAvailableRounds] =
     useState<string[]>(defaultRoundOptions);
@@ -105,8 +107,13 @@ export default function ArticleEditorPage() {
       .then((activities) => {
         if (!cancelled) setApiActivities(activities);
       })
-
       .catch((error: unknown) => console.error("활동 목록 조회 실패:", error));
+
+    getMembers()
+      .then((members) => {
+        if (!cancelled) setTeamMembers(members.filter((member) => member.status === "JOINED"));
+      })
+      .catch((error: unknown) => console.error("팀원 목록 조회 실패:", error));
 
     return () => {
       cancelled = true;
@@ -189,7 +196,7 @@ export default function ArticleEditorPage() {
 
     setSessionIdByRound({});
 
-    const selected = apiActivities.find((item) => item.name === name);
+    const selected = participatingActivities.find((item) => item.name === name);
 
     if (!selected) return;
 
@@ -464,7 +471,7 @@ export default function ArticleEditorPage() {
           <div className="h-4 w-px bg-gray-200" />
 
           <Dropdown
-            options={["활동 선택", ...apiActivities.map((item) => item.name)]}
+            options={["활동 선택", ...participatingActivities.map((item) => item.name)]}
             value={activity}
             onChange={handleActivityChange}
           />
@@ -769,13 +776,13 @@ export default function ArticleEditorPage() {
                   {feedbackOption === "custom" && (
                     <div className="pl-3 pr-1 pt-1 space-y-1.5 animate-in fade-in duration-150">
                       <Dropdown
-                        options={memberOptions}
+                        options={["지정할 팀원 선택", ...teamMembers.map((member) => member.name)]}
                         value={selectedMember}
                         onChange={setSelectedMember}
                       />
 
                       <p className="text-[10px] text-gray-400 pl-1">
-                        * 등록된 팀원이 없을 경우 지정할 수 없습니다.
+                        * 가입된 팀원 중 한 명을 선택할 수 있습니다.
                       </p>
                     </div>
                   )}

@@ -4,14 +4,13 @@ import {
   getAssignments,
   getSubmissionStatus,
   passSubmission,
-  // ★ 미제출자 알림
-  remindAssignment,
   requestResubmission,
   resubmitAssignment,
   submitAssignment,
   type AssignmentListType,
   type SubmissionRequest,
 } from "../apis/assignments";
+// ★ updateSkill, SkillUpdateRequest 추가
 import {
   createSkill,
   getMySkills,
@@ -48,14 +47,6 @@ export function useCreateAssignment() {
   return useMutation({
     mutationFn: createAssignment,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: assignmentKeys.all }),
-  });
-}
-
-// ★ 미제출자 알림 (알림만 보내고 화면 데이터는 바뀌지 않아서 다시 불러올 것 없음)
-export function useRemindAssignment() {
-  return useMutation({
-    mutationFn: ({ assignmentId, discordEnabled }: { assignmentId: number; discordEnabled?: boolean }) =>
-      remindAssignment(assignmentId, discordEnabled),
   });
 }
 
@@ -144,7 +135,7 @@ export function useCreateSkill() {
   });
 }
 
-// 역량 항목 수정·숨기기 (부장만) → 역량 목록·내 점수를 다시 불러온다
+// ★ 역량 항목 수정·숨기기 (부장만) → 역량 목록·내 점수를 다시 불러온다
 export function useUpdateSkill() {
   const queryClient = useQueryClient();
   return useMutation({

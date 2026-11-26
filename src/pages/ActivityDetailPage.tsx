@@ -409,14 +409,8 @@ export default function ActivityDetailPage() {
   const hasClosedVotingTopic = sessions.some(
     (session) => session.title !== "주제 미정" && session.votingOpen !== true,
   );
-      // ★ 주제 지정은 이 활동의 스터디장 또는 부장 (서버 규칙과 같게)
-  const canSetAssignedTopic = canManage;
-  // ★ 지정형에서 주제를 정할 회차: 아직 진행 전인 회차 중 가장 앞 회차 (없으면 첫 회차)
-  // (예전에는 항상 1회차에 저장돼서, 이미 끝난 회차에 주제가 들어갈 수 있었다)
-  const assignedTargetSession =
-    sessions.find((session) => session.status === "진행 예정") ??
-    sessions[0] ??
-    null;
+  // 주제 지정은 부장이 아닌, 해당 활동의 스터디장만 가능
+  const canSetAssignedTopic = myActivityRole === "LEADER";
   // 이 활동에 참여 중인지 (서버가 알려주는 값을 우선한다)
   const isMember =
     currentDetail?.summary.isMember ??
@@ -1026,10 +1020,9 @@ export default function ActivityDetailPage() {
     };
   }, [id, navigate, refreshTopicCandidates, applyDetail]);
 
-   const handleProposeTopic = () => {
-    // ★ 지정형은 "주제 정할 회차"가 있는지, 투표형은 "투표 열린 회차"가 있는지
+  const handleProposeTopic = () => {
     const hasTargetSession = isAssignedTopicMode
-      ? assignedTargetSession !== null
+      ? sessions.length > 0
       : topicSessionId !== null;
 
     if (!id || !hasTargetSession) {
@@ -1042,13 +1035,11 @@ export default function ActivityDetailPage() {
     }
 
     if (isAssignedTopicMode && !canSetAssignedTopic) {
-      // ★ 부장도 할 수 있게 안내 문구 수정
-      showToast("주제 지정은 스터디장 또는 부장만 할 수 있습니다.");
+      showToast("주제 지정은 스터디장만 할 수 있습니다.");
       return;
     }
 
-    // ★ 1회차가 아니라 "주제 정할 회차"의 지금 주제
-    const currentTopic = assignedTargetSession?.title;
+    const currentTopic = sessions[0]?.title;
 
     setTopicTitle(
       isAssignedTopicMode && currentTopic && currentTopic !== "주제 미정"
@@ -1059,7 +1050,7 @@ export default function ActivityDetailPage() {
     setIsTopicModalOpen(true);
   };
 
-    const handleSubmitTopic = async () => {
+  const handleSubmitTopic = async () => {
     const title = topicTitle.trim();
 
     if (!title) {
@@ -1071,10 +1062,9 @@ export default function ActivityDetailPage() {
       return;
     }
 
-    // ★ 지정형은 "주제 정할 회차", 투표형은 "투표 열린 회차"
     const sessionId = isAssignedTopicMode
-      ? assignedTargetSession
-        ? Number(assignedTargetSession.id)
+      ? sessions[0]
+        ? Number(sessions[0].id)
         : null
       : topicSessionId;
 
@@ -1095,10 +1085,9 @@ export default function ActivityDetailPage() {
       if (isAssignedTopicMode) {
         await updateActivitySessionTopic(activityId, sessionId, title);
 
-        // ★ 저장한 그 회차만 주제를 바꾼다 (예전에는 항상 첫 번째 회차)
         setSessions((previous) =>
-          previous.map((session) =>
-            Number(session.id) === sessionId ? { ...session, title } : session,
+          previous.map((session, index) =>
+            index === 0 ? { ...session, title } : session,
           ),
         );
 
@@ -1135,6 +1124,7 @@ export default function ActivityDetailPage() {
       setIsSubmittingTopic(false);
     }
   };
+
   const handleVoteCandidate = async () => {
     if (!id || topicSessionId === null) {
       showToast("현재 투표 기간이 열린 회차가 없습니다.");
@@ -1381,6 +1371,29 @@ export default function ActivityDetailPage() {
                 <p className="mt-2 max-w-[560px] text-xs leading-relaxed text-gray-500">
                   {currentDetail.description}
                 </p>
+              )}
+
+              {currentDetail && (
+                <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+                  {(currentDetail.targetMajors ?? []).map((major) => (
+                    <span key={major} className="rounded-full bg-violet-50 px-2.5 py-1 font-semibold text-violet-700">
+                      {{
+                        FRONTEND: "Front-end",
+                        BACKEND: "Back-end",
+                        DEVOPS: "DevOps",
+                        DESIGN: "Design",
+                      }[major] ?? major}
+                    </span>
+                  ))}
+                  {(currentDetail.targetGenerations ?? []).map((generation) => (
+                    <span key={generation.id} className="rounded-full bg-gray-100 px-2.5 py-1 font-semibold text-gray-600">
+                      {generation.number}기
+                    </span>
+                  ))}
+                  {!(currentDetail.targetMajors?.length) && !(currentDetail.targetGenerations?.length) && (
+                    <span className="text-gray-400">대상 전공·기수 미지정</span>
+                  )}
+                </div>
               )}
 
               <div className="mt-3 flex flex-wrap items-center gap-4 text-xs font-medium text-gray-400">
@@ -1766,15 +1779,14 @@ export default function ActivityDetailPage() {
 
           <div className="col-span-4 space-y-4">
             {isAssignedTopicMode ? (
-                      <div className="space-y-4 rounded-3xl border border-gray-100 bg-white p-5 text-xs shadow-xs">
+              <div className="space-y-4 rounded-3xl border border-gray-100 bg-white p-5 text-xs shadow-xs">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-bold text-gray-900">
                       주제 지정
                     </h3>
                     <p className="mt-1 text-[11px] text-gray-400">
-                      {/* ★ 부장도 할 수 있다고 안내 */}
-                      스터디장 또는 부장이 회차 주제를 직접 지정합니다.
+                      스터디장이 회차 주제를 직접 지정합니다.
                     </p>
                   </div>
 
@@ -1782,42 +1794,38 @@ export default function ActivityDetailPage() {
                     <button
                       type="button"
                       onClick={handleProposeTopic}
-                      // ★ 주제 정할 회차가 없으면 비활성화
-                      disabled={isSubmittingTopic || assignedTargetSession === null}
+                      disabled={isSubmittingTopic || sessions.length === 0}
                       className="rounded-xl bg-black px-3 py-2 text-[11px] font-bold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {isSubmittingTopic
                         ? "저장 중..."
-                        : assignedTargetSession &&
-                            assignedTargetSession.title !== "주제 미정"
+                        : sessions[0]?.title &&
+                            sessions[0].title !== "주제 미정"
                           ? "주제 변경"
                           : "주제 입력"}
                     </button>
                   )}
                 </div>
 
-                {/* ★ 1회차가 아니라 "주제 정할 회차"를 보여준다 */}
-                {assignedTargetSession === null ? (
+                {sessions.length === 0 ? (
                   <div className="py-8 text-center text-gray-400">
                     회차가 등록되면 주제를 지정할 수 있습니다.
                   </div>
                 ) : (
                   <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
                     <p className="text-[11px] font-semibold text-gray-400">
-                      {assignedTargetSession.sessionNum}{" "}
-                      {assignedTargetSession.date} 주제
+                      {sessions[0].sessionNum} 주제
                     </p>
 
                     <p className="mt-2 break-words text-sm font-bold text-gray-900">
-                      {assignedTargetSession.title}
+                      {sessions[0].title}
                     </p>
                   </div>
                 )}
 
                 {!canSetAssignedTopic && (
                   <p className="text-[11px] text-gray-400">
-                    주제 입력 및 변경은 이 활동의 스터디장 또는 부장만 할 수
-                    있습니다.
+                    주제 입력 및 변경은 해당 활동의 스터디장만 할 수 있습니다.
                   </p>
                 )}
               </div>

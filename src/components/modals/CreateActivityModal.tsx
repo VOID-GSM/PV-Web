@@ -407,12 +407,20 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
                 <label className="mb-2 block font-bold text-gray-700">
                   투표 개설 시점
                 </label>
-                <input
-                  type="text"
+                <select
                   value={voteTime}
                   onChange={(e) => setVoteTime(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 p-3 outline-none focus:border-black"
-                />
+                  className="w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:border-black"
+                >
+                  {[
+                    { label: "회차 3일 전", value: "회차 3일 전" },
+                    { label: "회차 2일 전", value: "회차 2일 전" },
+                    { label: "회차 1일 전", value: "회차 1일 전" },
+                    { label: "회차 당일", value: "회차 0일 전" },
+                  ].map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
               </div>
             )}
 
