@@ -20,9 +20,7 @@ interface AddEventModalProps {
   onAddEvent?: (newEvent: CalendarEvent) => void;
   initialEvent?: CalendarEvent | null;
   onUpdateEvent?: (updatedEvent: CalendarEvent) => void;
-  // 새 일정을 만들 때 날짜 칸에 미리 넣어 둘 날짜 (캘린더에서 날짜를 눌렀을 때)
   initialDate?: string;
-  // ☆ 마감을 걸 수 있는 보드 목록 (App이 부장일 때만 불러온다 → 있으면 부장)
   boards?: { id: number; name: string }[];
 }
 

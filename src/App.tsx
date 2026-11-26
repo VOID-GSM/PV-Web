@@ -39,11 +39,13 @@ import {
   createCalendarEvent,
   // 보드 마감 만들기
   createDeadline,
+  createBoard,
   deleteCalendarEvent,
   getBoards,
   getCalendarEvents,
   updateCalendarEvent,
   type ApiBoard,
+  type BoardCreateRequest,
 } from "./api/calendarApi";
 
 // 토스트 하나의 모양 (id가 바뀌면 같은 문구여도 새로 뜬다)
@@ -308,16 +310,17 @@ function AppContent() {
         const isLeader = member.roles?.includes("LEADER") ?? false;
 
         setCanManageMeetings(isLeader);
-        if (member.roles?.includes("LEADER")) {
+        if (isLeader) {
           return getBoards().then((data) => {
             if (cancelled) return;
 
             setBoards(data);
             const names = new Map<number, string>(
-              data.map((board) => [board.id, board.name]),
+              data.map((board) => [board.id, board.name] as const),
             );
             boardNamesRef.current = names;
 
+            // 캘린더를 먼저 불러온 경우에도 보드 ID를 실제 이름으로 갱신한다.
             const applyBoardNames = (items: CalendarEvent[]) =>
               items.map((event) =>
                 event.boardId != null && names.has(event.boardId)
@@ -331,6 +334,7 @@ function AppContent() {
         }
 
         setBoards([]);
+        boardNamesRef.current = new Map();
       })
       .catch((error: unknown) => {
         if (!cancelled) {
@@ -343,6 +347,57 @@ function AppContent() {
     };
     // ★ 입장 화면 → 일반 화면으로 바뀌면 그때 불러온다
   }, [isPublicPage]);
+
+  // 보드 생성: POST 성공 직후 화면에 반영하고, GET /boards로 서버 저장 결과를 확인한다.
+  const handleCreateBoard = async (
+    request: BoardCreateRequest,
+  ): Promise<void> => {
+    if (!canManageMeetings) {
+      throw new Error("보드 생성은 부장만 할 수 있습니다.");
+    }
+
+    const createdBoard = await createBoard(request);
+
+    // 생성 결과를 즉시 반영해 화면에서 보드가 사라지지 않게 한다.
+    setBoards((previous) => {
+      const byId = new Map<number, ApiBoard>(previous.map((board) => [board.id, board] as const));
+      byId.set(createdBoard.id, createdBoard);
+      return Array.from(byId.values());
+    });
+    boardNamesRef.current.set(createdBoard.id, createdBoard.name);
+
+    try {
+      // 백엔드 명세상 GET /boards는 진행 중/종료 보드를 모두 반환한다.
+      const latestBoards = await getBoards();
+      const persisted = latestBoards.some(
+        (board) => board.id === createdBoard.id,
+      );
+
+      if (persisted) {
+        setBoards(latestBoards);
+        boardNamesRef.current = new Map<number, string>(
+          latestBoards.map((board) => [board.id, board.name] as const),
+        );
+        showToast("보드를 생성했습니다.", "success");
+        return;
+      }
+
+      // POST 응답에는 있었지만 목록 조회에 없다면 프론트에서만 숨기지 않고 경고한다.
+      setBoards((previous) => {
+        const byId = new Map<number, ApiBoard>(previous.map((board) => [board.id, board] as const));
+        byId.set(createdBoard.id, createdBoard);
+        return Array.from(byId.values());
+      });
+      showToast(
+        "보드 생성은 완료됐지만 GET /boards 응답에 새 보드가 없습니다. 백엔드 저장 및 조회 결과를 확인해 주세요.",
+      );
+    } catch (error) {
+      console.error("생성 후 보드 목록 재조회 실패:", error);
+      showToast(
+        "보드는 생성됐지만 목록을 다시 불러오지 못했습니다. 새로고침 후 목록을 확인해 주세요.",
+      );
+    }
+  };
 
   const handleAddEvent = async (newEvent: CalendarEvent) => {
     // 보드 마감 (부장이 마감 + 보드를 고른 경우): 보드 마감 API로 저장
@@ -401,7 +456,6 @@ function AppContent() {
         startsAt,
         endsAt,
         allDay: !newEvent.time,
-
         ...(newEvent.type === "회의"
           ? {
               type: "MEETING" as const,
@@ -646,6 +700,7 @@ function AppContent() {
                 onDeleteEvent={handleDeleteEvent}
                 onUpdateEvent={handleUpdateEvent}
                 onMonthChange={loadMonth}
+                onCreateBoard={handleCreateBoard}
               />
             }
           />

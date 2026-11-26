@@ -7,6 +7,7 @@ import { CalendarGrid } from "../components/calendar/CalendarGrid";
 import { RightPanel } from "../components/calendar/RightPanel";
 import { EventDetailModal } from "../components/calendar/EventDetailModal";
 import { AddEventModal } from "../components/calendar/AddEventModal";
+import type { BoardCreateRequest } from "../api/calendarApi";
 
 import type {
   CalendarEvent,
@@ -32,6 +33,7 @@ interface CalendarPageProps {
   onUpdateEvent?: (event: CalendarEvent) => void;
   onMonthChange?: (date: Date, mine?: boolean) => void;
   canManageMeetings?: boolean;
+  onCreateBoard?: (request: BoardCreateRequest) => Promise<void>;
 }
 
 export default function CalendarPage({
@@ -44,6 +46,7 @@ export default function CalendarPage({
   onUpdateEvent = () => {},
   onMonthChange,
   canManageMeetings = false,
+  onCreateBoard,
 }: CalendarPageProps = {}) {
   const [viewMode, setViewMode] = useState<ViewMode>("월간");
   const [onlyMyEvents, setOnlyMyEvents] = useState(false);
@@ -79,7 +82,10 @@ export default function CalendarPage({
   ];
   const eventBoardNames = [...events, ...myEvents]
     .map((event) => event.board?.trim())
-    .filter((name): name is string => Boolean(name));
+    .filter(
+      (name): name is string =>
+        Boolean(name) && name !== "지정된 보드 없음",
+    );
   const boardNames = Array.from(
     new Set([...boards.map((board) => board.name), ...eventBoardNames]),
   );
@@ -152,10 +158,11 @@ export default function CalendarPage({
   const activeFilters = boardFilters
     .filter((filter) => filter.checked)
     .map((filter) => filter.name);
+
   const eventsToDisplay: CalendarEvent[] = onlyMyEvents ? myEvents : events;
 
   const filteredEvents: CalendarEvent[] = eventsToDisplay.filter(
-    (calendarEvent: CalendarEvent) =>
+    (calendarEvent) =>
       (!onlyMyEvents || calendarEvent.isMyEvent) &&
       (!calendarEvent.board ||
         calendarEvent.board === "지정된 보드 없음" ||
@@ -196,6 +203,8 @@ export default function CalendarPage({
         <RightPanel
           boardFilters={boardFilters}
           milestones={milestones}
+          canCreateBoard={canManageMeetings}
+          onCreateBoard={onCreateBoard}
           onToggleFilter={(id) => {
             setUncheckedBoards((prev) => ({
               ...prev,
