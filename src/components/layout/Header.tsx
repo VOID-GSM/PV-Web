@@ -17,12 +17,9 @@ import CreateNoticeModal from "../modals/CreateNoticeModal";
 // ☆ 예전 작은 작성 창(CreateArticleModal)은 이제 안 쓴다 → 각 기능 화면으로 바로 보낸다
 import Toast from "../common/Toast";
 import { notifyActivitiesChanged } from "../../utils/activityEvents";
-<<<<<<< HEAD
 // ☆ 부장인지 (과제 출제는 부장만)
 import { useMyName } from "../../hooks/useMyName";
-=======
 import { getNotice, type NoticeItem } from "../../api/noticeApi";
->>>>>>> origin/develop
 
 import {
   getNotifications,
@@ -570,6 +567,47 @@ export const Header: React.FC<HeaderProps> = ({
           showToast("공지를 보냈습니다", "success");
         }}
       />
+
+      {/* 친구 코드: 알림을 누르면 뜨는 공지 상세 창 */}
+      {(selectedNotice || noticePreview || isLoadingSelectedNotice || selectedNoticeError) && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4 font-pretendard" role="dialog" aria-modal="true" aria-label="공지 상세">
+          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 pb-4">
+              <div>
+                <p className="text-xs font-bold text-gray-400">공지 상세</p>
+                <h2 className="mt-1 text-lg font-bold text-gray-900">
+                  {selectedNotice?.title ?? noticePreview?.title ?? "공지 불러오기"}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedNotice(null);
+                  setNoticePreview(null);
+                  setSelectedNoticeError("");
+                  setIsLoadingSelectedNotice(false);
+                }}
+                aria-label="공지 닫기"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="whitespace-pre-wrap break-words py-5 text-sm leading-7 text-gray-700">
+              {isLoadingSelectedNotice
+                ? "공지 내용을 불러오는 중입니다."
+                : selectedNoticeError
+                  ? selectedNoticeError
+                  : selectedNotice?.content ?? noticePreview?.content ?? "공지 내용이 없습니다."}
+            </div>
+            {selectedNotice?.createdAt && (
+              <p className="border-t border-gray-100 pt-3 text-xs text-gray-400">
+                {new Date(selectedNotice.createdAt).toLocaleString("ko-KR")}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {toast && (
         <Toast
