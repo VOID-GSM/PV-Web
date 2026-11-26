@@ -13,11 +13,12 @@ import CreateActivityModal, {
   type ActivityFormData,
 } from "../modals/CreateActivityModal";
 import { createActivity } from "../../api/activityApi";
-import { createPost } from "../../api/postApi";
 import CreateNoticeModal from "../modals/CreateNoticeModal";
-import CreateArticleModal from "../modals/CreateArticleModal";
+// ☆ 예전 작은 작성 창(CreateArticleModal)은 이제 안 쓴다 → 각 기능 화면으로 바로 보낸다
 import Toast from "../common/Toast";
 import { notifyActivitiesChanged } from "../../utils/activityEvents";
+// ☆ 부장인지 (과제 출제는 부장만)
+import { useMyName } from "../../hooks/useMyName";
 import { getNotice, type NoticeItem } from "../../api/noticeApi";
 
 import {
@@ -60,6 +61,8 @@ export const Header: React.FC<HeaderProps> = ({
   const outletContext = useOutletContext<OutletContextType | null>();
   const handleAddModal = onOpenAddModal || outletContext?.onOpenAddModal;
   const navigate = useNavigate();
+  // ☆ 부장인지 (못 불러왔으면 false → 과제 출제 메뉴가 잠깐 숨겨진다)
+  const { isLeader } = useMyName();
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isNoticeOpen, setIsNoticeOpen] = useState(false);
@@ -67,11 +70,6 @@ export const Header: React.FC<HeaderProps> = ({
 
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
   const [isNoticeModalOpen, setIsNoticeModalOpen] = useState(false);
-  const [isArticleModalOpen, setIsArticleModalOpen] = useState(false);
-
-  const [articleModalMode, setArticleModalMode] = useState<
-    "article" | "assignment" | "journal" | "interview"
-  >("article");
 
   const [notifications, setNotifications] = useState<ApiNotification[]>([]);
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -93,6 +91,13 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const closeToast = useCallback(() => setToast(null), []);
+
+  // ☆ 새로 만들기 메뉴를 닫고 그 기능 화면으로 이동
+  // state: 이동한 화면에 "바로 작성 창을 열어줘"라고 알려주는 쪽지 (과제 출제에서 사용)
+  const goTo = (path: string, state?: Record<string, unknown>) => {
+    setIsCreateOpen(false);
+    navigate(path, state ? { state } : undefined);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -469,22 +474,23 @@ export const Header: React.FC<HeaderProps> = ({
                       <span>공지 보내기</span>
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsCreateOpen(false);
-                        setArticleModalMode("assignment");
-                        setIsArticleModalOpen(true);
-                      }}
-                      className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 font-semibold text-gray-800 transition hover:bg-gray-100"
-                    >
-                      <img
-                        src={fileTextIcon}
-                        alt=""
-                        className="h-4 w-4 opacity-70"
-                      />
-                      <span>과제 출제</span>
-                    </button>
+                    {/* ☆ 과제 출제: 부장만 보이고, 누르면 과제 화면에서 출제 창이 바로 열린다 */}
+                    {isLeader && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          goTo("/assignments", { openCreate: true })
+                        }
+                        className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 font-semibold text-gray-800 transition hover:bg-gray-100"
+                      >
+                        <img
+                          src={fileTextIcon}
+                          alt=""
+                          className="h-4 w-4 opacity-70"
+                        />
+                        <span>과제 출제</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -496,13 +502,10 @@ export const Header: React.FC<HeaderProps> = ({
                   </p>
 
                   <div className="mt-1 space-y-0.5">
+                    {/* ☆ 정리글 작성: 활동·회차까지 고를 수 있는 정리글 작성 화면으로 */}
                     <button
                       type="button"
-                      onClick={() => {
-                        setIsCreateOpen(false);
-                        setArticleModalMode("article");
-                        setIsArticleModalOpen(true);
-                      }}
+                      onClick={() => goTo("/editor")}
                       className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 font-semibold text-gray-800 transition hover:bg-gray-100"
                     >
                       <img
@@ -513,13 +516,10 @@ export const Header: React.FC<HeaderProps> = ({
                       <span>정리글 작성</span>
                     </button>
 
+                    {/* ☆ 업무일지 쓰기: 업무일지 화면 (오른쪽 "오늘의 일지 쓰기") */}
                     <button
                       type="button"
-                      onClick={() => {
-                        setIsCreateOpen(false);
-                        setArticleModalMode("journal");
-                        setIsArticleModalOpen(true);
-                      }}
+                      onClick={() => goTo("/worklog")}
                       className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 font-semibold text-gray-800 transition hover:bg-gray-100"
                     >
                       <img
@@ -530,13 +530,10 @@ export const Header: React.FC<HeaderProps> = ({
                       <span>업무일지 쓰기</span>
                     </button>
 
+                    {/* ☆ 면접 답변 남기기: 질문을 골라 답할 수 있는 면접 질문 뱅크로 */}
                     <button
                       type="button"
-                      onClick={() => {
-                        setIsCreateOpen(false);
-                        setArticleModalMode("interview");
-                        setIsArticleModalOpen(true);
-                      }}
+                      onClick={() => goTo("/questions")}
                       className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 font-semibold text-gray-800 transition hover:bg-gray-100"
                     >
                       <img
@@ -571,35 +568,7 @@ export const Header: React.FC<HeaderProps> = ({
         }}
       />
 
-      <CreateArticleModal
-        isOpen={isArticleModalOpen}
-        onClose={() => setIsArticleModalOpen(false)}
-        mode={articleModalMode}
-        onSubmitSuccess={async (data) => {
-          if (data.mode !== "article") {
-            showToast(
-              "이 유형은 추가 필수 정보가 필요해 해당 화면에서 작성해 주세요.",
-            );
-            return;
-          }
-
-          try {
-            await createPost({
-              title: data.title.trim(),
-              content: data.content,
-            });
-            showToast("정리글을 저장했습니다.", "success");
-          } catch (error) {
-            console.error("정리글 생성 실패:", error);
-            showToast(
-              error instanceof Error
-                ? error.message
-                : "정리글을 저장하지 못했습니다.",
-            );
-          }
-        }}
-      />
-
+      {/* 친구 코드: 알림을 누르면 뜨는 공지 상세 창 */}
       {(selectedNotice || noticePreview || isLoadingSelectedNotice || selectedNoticeError) && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4 font-pretendard" role="dialog" aria-modal="true" aria-label="공지 상세">
           <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl">
