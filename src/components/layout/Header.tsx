@@ -17,8 +17,12 @@ import CreateNoticeModal from "../modals/CreateNoticeModal";
 // ☆ 예전 작은 작성 창(CreateArticleModal)은 이제 안 쓴다 → 각 기능 화면으로 바로 보낸다
 import Toast from "../common/Toast";
 import { notifyActivitiesChanged } from "../../utils/activityEvents";
+<<<<<<< HEAD
 // ☆ 부장인지 (과제 출제는 부장만)
 import { useMyName } from "../../hooks/useMyName";
+=======
+import { getNotice, type NoticeItem } from "../../api/noticeApi";
+>>>>>>> origin/develop
 
 import {
   getNotifications,
@@ -72,6 +76,10 @@ export const Header: React.FC<HeaderProps> = ({
 
   const [notifications, setNotifications] = useState<ApiNotification[]>([]);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [selectedNotice, setSelectedNotice] = useState<NoticeItem | null>(null);
+  const [noticePreview, setNoticePreview] = useState<{ title: string; content: string } | null>(null);
+  const [isLoadingSelectedNotice, setIsLoadingSelectedNotice] = useState(false);
+  const [selectedNoticeError, setSelectedNoticeError] = useState("");
 
   const filteredNotifications = notifications.filter(
     (item) => activeNoticeTab !== "안 읽음" || !item.read,
@@ -149,16 +157,59 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const handleClickNotification = (notification: ApiNotification) => {
-    handleReadNotification(notification);
+    void handleReadNotification(notification);
+    setIsNoticeOpen(false);
+
+    const notificationType = String(notification.type ?? "").toUpperCase();
+    if (notificationType.includes("NOTICE")) {
+      if (notification.noticeId) {
+        setSelectedNotice(null);
+        setNoticePreview(null);
+        setSelectedNoticeError("");
+        setIsLoadingSelectedNotice(true);
+        void getNotice(notification.noticeId)
+          .then((notice) => setSelectedNotice(notice))
+          .catch((error: unknown) => {
+            console.error("알림에서 공지 상세 조회 실패:", error);
+            setSelectedNoticeError(
+              error instanceof Error ? error.message : "공지 내용을 불러오지 못했습니다.",
+            );
+          })
+          .finally(() => setIsLoadingSelectedNotice(false));
+        return;
+      }
+
+      // noticeId가 없으면 서버가 제공한 이동 경로나 활동 ID를 사용한다.
+      if (notification.targetUrl?.startsWith("/") && !notification.targetUrl.startsWith("//")) {
+        navigate(notification.targetUrl);
+        return;
+      }
+      if (notification.activityId) {
+        navigate(`/activity/${notification.activityId}?tab=공지`);
+        return;
+      }
+
+      // noticeId가 없는 기존 응답도 알림 본문을 표시한다. 실제 공지 상세 API 응답과는 구분한다.
+      if (notification.content?.trim()) {
+        setNoticePreview({
+          title: notification.title || "공지 알림",
+          content: notification.content,
+        });
+      } else {
+        showToast("공지 상세 정보가 알림 응답에 없습니다.");
+      }
+      return;
+    }
+
+    // 서버가 제공한 내부 경로를 우선 사용한다.
+    if (notification.targetUrl?.startsWith("/") && !notification.targetUrl.startsWith("//")) {
+      navigate(notification.targetUrl);
+      return;
+    }
 
     const comment = COMMENT_NOTIFICATIONS[String(notification.type)];
-
-    if (comment) {
-      setIsNoticeOpen(false);
-      navigate(comment.path);
-    }
+    if (comment) navigate(comment.path);
   };
-
   const handleCreateActivity = async (form: ActivityFormData) => {
     const majorMap: Record<
       string,
@@ -209,9 +260,12 @@ export const Header: React.FC<HeaderProps> = ({
               Boolean(major),
           ),
 
-        // 기수 번호가 아닌 기수 ID 전달
+        // 모달에서 검증한 실제 기수 ID를 API 필드명 그대로 전달한다.
+        // '전체'를 선택하면 빈 배열이므로 제한 필드는 생략한다.
         targetGenerationIds:
-          form.generationIds.length > 0 ? form.generationIds : undefined,
+          form.targetGenerationIds.length > 0
+            ? [...form.targetGenerationIds]
+            : undefined,
 
         recruitMode:
           form.confirmMode === "스터디장 승인" ? "APPROVAL" : "FIRST_COME",

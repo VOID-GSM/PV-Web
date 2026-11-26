@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   getActivities,
   getActivity,
@@ -10,6 +10,7 @@ import {
   proposeTopicCandidate,
   voteTopicCandidate,
   cancelTopicVote,
+  updateActivitySessionTopic,
   getActivityApplications,
   applyToActivity,
   cancelActivityApplication,
@@ -70,8 +71,91 @@ interface SessionItem {
   title: string;
   description: string;
   status: "진행 예정" | "완료" | "휴강";
+  votingOpen?: boolean;
+}
+interface TopicVotingWindow {
+  opensAt: Date | null;
+  closesAt: Date;
 }
 
+interface TopicVotingSchedule extends TopicVotingWindow {
+  session: SessionItem;
+}
+
+type ScheduledTopicVotingWindow = TopicVotingSchedule & {
+  opensAt: Date;
+};
+
+// 회차 날짜와 투표 개설 기준으로 KST 시작·종료 시각 계산
+function getTopicVotingWindow(
+  sessionDateValue: string,
+  daysBefore?: number | null,
+): TopicVotingWindow | null {
+  const dateText = sessionDateValue.slice(0, 10);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateText)) {
+    return null;
+  }
+
+  const [year, month, day] = dateText.split("-").map(Number);
+
+  const sessionCalendarDay = new Date(Date.UTC(year, month - 1, day));
+
+  // 잘못된 날짜는 계산하지 않는다.
+  if (
+    sessionCalendarDay.getUTCFullYear() !== year ||
+    sessionCalendarDay.getUTCMonth() !== month - 1 ||
+    sessionCalendarDay.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  // 회차 날짜 당일 15:00 KST에 종료
+  const closesAt = new Date(`${dateText}T15:00:00+09:00`);
+
+  if (Number.isNaN(closesAt.getTime())) {
+    return null;
+  }
+
+  let opensAt: Date | null = null;
+
+  if (
+    typeof daysBefore === "number" &&
+    Number.isFinite(daysBefore) &&
+    daysBefore >= 0
+  ) {
+    const openingCalendarDay = new Date(sessionCalendarDay);
+
+    openingCalendarDay.setUTCDate(
+      openingCalendarDay.getUTCDate() - Math.floor(daysBefore),
+    );
+
+    const openingDateText = openingCalendarDay.toISOString().slice(0, 10);
+
+    // 시작일 00:00 KST
+    opensAt = new Date(`${openingDateText}T00:00:00+09:00`);
+
+    if (Number.isNaN(opensAt.getTime())) {
+      opensAt = null;
+    }
+  }
+
+  return { opensAt, closesAt };
+}
+
+// 브라우저의 시간대와 관계없이 한국 시간으로 표시
+function formatKstDateTime(date: Date): string {
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
 interface VoteItem {
   id: string;
   text: string;
@@ -97,6 +181,7 @@ const PAGE_SUBTITLE = "모든 보드의 마감·회의·활동을 한 화면에�
 export default function ActivityDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const activityId = Number(id);
 
   // 내 정보 (내 회원 번호와 부장 여부를 알기 위해 쓴다)
@@ -104,6 +189,11 @@ export default function ActivityDetailPage() {
   const me = profileQuery.data;
 
   const [activeTab, setActiveTab] = useState("회차");
+  useEffect(() => {
+    if (searchParams.get("tab") === "공지") {
+      setActiveTab("공지");
+    }
+  }, [searchParams]);
 
   // 서버에서 받은 활동 상세 (설정 창과 권한 판단에 쓴다)
   const [detail, setDetail] = useState<ActivityDetail | null>(null);
@@ -120,6 +210,7 @@ export default function ActivityDetailPage() {
   const [allActivities, setAllActivities] = useState<ActivitySummary[]>([]);
 
   const [sessions, setSessions] = useState<SessionItem[]>([]);
+  const [topicSessionId, setTopicSessionId] = useState<number | null>(null);
   const [votes, setVotes] = useState<VoteItem[]>([]);
   const [selectedVoteOption, setSelectedVoteOption] = useState<number | null>(
     null,
@@ -252,6 +343,74 @@ export default function ActivityDetailPage() {
     (member) => member.memberId === myId,
   )?.role;
   const canManage = isSystemLeader || myActivityRole === "LEADER";
+  // 주제 지정형인지 확인
+  const isAssignedTopicMode = currentDetail?.topicMode === "ASSIGNED";
+  const topicOpenDaysBefore = currentDetail?.topicOpenDaysBefore;
+
+  // 서버의 votingOpen이 true인 회차만 현재 투표 중인 회차로 판단
+  const activeVotingSession =
+    sessions.find((session) => session.votingOpen === true) ?? null;
+
+  const activeVotingWindow = activeVotingSession
+    ? getTopicVotingWindow(activeVotingSession.date, topicOpenDaysBefore)
+    : null;
+
+  // 아직 주제가 정해지지 않은 회차의 투표 일정
+  const topicVotingSchedules: TopicVotingSchedule[] = sessions.flatMap(
+    (session) => {
+      if (session.title !== "주제 미정") {
+        return [];
+      }
+
+      const window = getTopicVotingWindow(session.date, topicOpenDaysBefore);
+
+      return window ? [{ session, ...window }] : [];
+    },
+  );
+
+  const schedulesWithStart: ScheduledTopicVotingWindow[] =
+    topicVotingSchedules.filter(
+      (schedule): schedule is ScheduledTopicVotingWindow =>
+        schedule.opensAt !== null,
+    );
+
+  const now = Date.now();
+
+  // 아직 시작하지 않은 가장 가까운 투표 일정
+  const upcomingVotingSchedule =
+    schedulesWithStart
+      .filter(
+        ({ session, opensAt, closesAt }) =>
+          session.status === "진행 예정" &&
+          opensAt.getTime() > now &&
+          closesAt.getTime() > now,
+      )
+      .sort((a, b) => a.opensAt.getTime() - b.opensAt.getTime())[0] ?? null;
+
+  // 계산상 투표 기간이지만 서버에서는 닫혀 있는 경우
+  const votingWindowButNotOpen =
+    schedulesWithStart
+      .filter(
+        ({ session, opensAt, closesAt }) =>
+          session.status === "진행 예정" &&
+          opensAt.getTime() <= now &&
+          closesAt.getTime() > now &&
+          session.votingOpen !== true,
+      )
+      .sort((a, b) => a.closesAt.getTime() - b.closesAt.getTime())[0] ?? null;
+
+  // 투표 기간이 지났는데 아직 주제가 정해지지 않은 회차
+  const expiredUnresolvedVotingSchedule =
+    topicVotingSchedules
+      .filter(({ closesAt }) => closesAt.getTime() <= now)
+      .sort((a, b) => b.closesAt.getTime() - a.closesAt.getTime())[0] ?? null;
+
+  // 직접 지정되었거나 자동 확정된 주제가 있는지 확인
+  const hasClosedVotingTopic = sessions.some(
+    (session) => session.title !== "주제 미정" && session.votingOpen !== true,
+  );
+  // 주제 지정은 부장이 아닌, 해당 활동의 스터디장만 가능
+  const canSetAssignedTopic = myActivityRole === "LEADER";
   // 이 활동에 참여 중인지 (서버가 알려주는 값을 우선한다)
   const isMember =
     currentDetail?.summary.isMember ??
@@ -748,6 +907,7 @@ export default function ActivityDetailPage() {
               : session.status === "CANCELLED"
                 ? "휴강"
                 : "진행 예정",
+          votingOpen: session.votingOpen === true,
         }));
         setSessions(mappedSessions);
 
@@ -814,17 +974,28 @@ export default function ActivityDetailPage() {
             })),
         );
 
-        if (apiSessions[0]) {
+        const openVotingSession = apiSessions.find(
+          (session) => session.votingOpen === true,
+        );
+
+        if (nextDetail.topicMode !== "ASSIGNED" && openVotingSession) {
+          setTopicSessionId(openVotingSession.id);
+
           try {
-            await refreshTopicCandidates(currentActivityId, apiSessions[0].id);
+            await refreshTopicCandidates(
+              currentActivityId,
+              openVotingSession.id,
+            );
           } catch (error) {
             console.error("주제 후보 조회 실패:", error);
+
             if (!cancelled) {
               setVotes([]);
               setSelectedVoteOption(null);
             }
           }
         } else {
+          setTopicSessionId(null);
           setVotes([]);
           setSelectedVoteOption(null);
         }
@@ -850,12 +1021,32 @@ export default function ActivityDetailPage() {
   }, [id, navigate, refreshTopicCandidates, applyDetail]);
 
   const handleProposeTopic = () => {
-    if (!id || !sessions[0]) {
-      showToast("주제를 제안할 회차가 없습니다.");
+    const hasTargetSession = isAssignedTopicMode
+      ? sessions.length > 0
+      : topicSessionId !== null;
+
+    if (!id || !hasTargetSession) {
+      showToast(
+        isAssignedTopicMode
+          ? "주제를 지정할 회차가 없습니다."
+          : "현재 주제 제안 기간이 열린 회차가 없습니다.",
+      );
       return;
     }
 
-    setTopicTitle("");
+    if (isAssignedTopicMode && !canSetAssignedTopic) {
+      showToast("주제 지정은 스터디장만 할 수 있습니다.");
+      return;
+    }
+
+    const currentTopic = sessions[0]?.title;
+
+    setTopicTitle(
+      isAssignedTopicMode && currentTopic && currentTopic !== "주제 미정"
+        ? currentTopic
+        : "",
+    );
+
     setIsTopicModalOpen(true);
   };
 
@@ -863,22 +1054,53 @@ export default function ActivityDetailPage() {
     const title = topicTitle.trim();
 
     if (!title) {
-      showToast("제안할 주제를 입력해 주세요.");
+      showToast(
+        isAssignedTopicMode
+          ? "지정할 주제를 입력해 주세요."
+          : "제안할 주제를 입력해 주세요.",
+      );
       return;
     }
 
-    if (!sessions[0]) {
-      showToast("주제를 제안할 회차가 없습니다.");
+    const sessionId = isAssignedTopicMode
+      ? sessions[0]
+        ? Number(sessions[0].id)
+        : null
+      : topicSessionId;
+
+    if (sessionId === null) {
+      showToast(
+        isAssignedTopicMode
+          ? "주제를 지정할 회차가 없습니다."
+          : "현재 주제 제안 기간이 열린 회차가 없습니다.",
+      );
+
       setIsTopicModalOpen(false);
       return;
     }
-
-    const sessionId = Number(sessions[0].id);
-
     try {
       setIsSubmittingTopic(true);
 
+      // 지정형: 투표 후보 등록 없이 회차 주제를 직접 저장한다.
+      if (isAssignedTopicMode) {
+        await updateActivitySessionTopic(activityId, sessionId, title);
+
+        setSessions((previous) =>
+          previous.map((session, index) =>
+            index === 0 ? { ...session, title } : session,
+          ),
+        );
+
+        setIsTopicModalOpen(false);
+        setTopicTitle("");
+
+        showToast("회차 주제가 지정되었습니다.", "success");
+        return;
+      }
+
+      // 투표형: 기존 동작을 그대로 유지한다.
       await proposeTopicCandidate(activityId, sessionId, title);
+
       await refreshTopicCandidates(activityId, sessionId);
 
       setIsTopicModalOpen(false);
@@ -886,10 +1108,17 @@ export default function ActivityDetailPage() {
 
       showToast("주제가 제안되었습니다.", "success");
     } catch (error) {
-      console.error("주제 제안 실패:", error);
+      console.error(
+        isAssignedTopicMode ? "회차 주제 지정 실패:" : "주제 제안 실패:",
+        error,
+      );
 
       showToast(
-        error instanceof Error ? error.message : "주제를 제안하지 못했습니다.",
+        error instanceof Error
+          ? error.message
+          : isAssignedTopicMode
+            ? "주제를 지정하지 못했습니다."
+            : "주제를 제안하지 못했습니다.",
       );
     } finally {
       setIsSubmittingTopic(false);
@@ -897,8 +1126,8 @@ export default function ActivityDetailPage() {
   };
 
   const handleVoteCandidate = async () => {
-    if (!id || !sessions[0]) {
-      showToast("투표할 회차가 없습니다.");
+    if (!id || topicSessionId === null) {
+      showToast("현재 투표 기간이 열린 회차가 없습니다.");
       return;
     }
     if (selectedVoteOption === null) {
@@ -909,7 +1138,7 @@ export default function ActivityDetailPage() {
     const selectedCandidate = votes[selectedVoteOption];
     if (!selectedCandidate) return;
 
-    const sessionId = Number(sessions[0].id);
+    const sessionId = topicSessionId;
     const candidateId = Number(selectedCandidate.id);
 
     try {
@@ -1526,95 +1755,260 @@ export default function ActivityDetailPage() {
           </div>
 
           <div className="col-span-4 space-y-4">
-            <div className="space-y-4 rounded-3xl border border-gray-100 bg-white p-5 text-xs shadow-xs">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-bold text-gray-900">주제 투표</h3>
-                  <p className="mt-1 text-[11px] text-gray-400">
-                    함께 진행할 활동 주제를 정해 보세요.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleProposeTopic}
-                  disabled={isSubmittingTopic || sessions.length === 0}
-                  className="rounded-xl bg-black px-3 py-2 text-[11px] font-bold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {isSubmittingTopic ? "등록 중..." : "+ 주제 제안"}
-                </button>
-              </div>
-
-              {sessions.length === 0 ? (
-                <div className="py-8 text-center text-gray-400">
-                  회차가 등록되면 주제를 제안할 수 있습니다.
-                </div>
-              ) : votes.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-gray-200 py-8 text-center">
-                  <p className="font-semibold text-gray-600">
-                    아직 등록된 주제가 없습니다.
-                  </p>
-                  <p className="mt-1 text-[11px] text-gray-400">
-                    첫 번째 주제를 제안해 보세요.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <div className="space-y-2 pt-1">
-                    {votes.map((item, index) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        disabled={isVoting}
-                        onClick={() => setSelectedVoteOption(index)}
-                        className={`flex w-full items-center justify-between rounded-xl border p-3 text-left transition disabled:opacity-60 ${
-                          selectedVoteOption === index
-                            ? "border-black bg-gray-50 ring-1 ring-black"
-                            : "border-gray-200 hover:bg-gray-50"
-                        }`}
-                      >
-                        <span className="flex min-w-0 items-center gap-2">
-                          <span
-                            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
-                              selectedVoteOption === index
-                                ? "border-black bg-black"
-                                : "border-gray-300 bg-white"
-                            }`}
-                          >
-                            {selectedVoteOption === index && (
-                              <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                            )}
-                          </span>
-                          <span className="truncate font-medium text-gray-800">
-                            {item.text}
-                          </span>
-                        </span>
-                        <span className="ml-2 shrink-0 text-[11px] font-bold text-gray-400">
-                          {item.votes}표
-                        </span>
-                      </button>
-                    ))}
+            {isAssignedTopicMode ? (
+              <div className="space-y-4 rounded-3xl border border-gray-100 bg-white p-5 text-xs shadow-xs">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900">
+                      주제 지정
+                    </h3>
+                    <p className="mt-1 text-[11px] text-gray-400">
+                      스터디장이 회차 주제를 직접 지정합니다.
+                    </p>
                   </div>
 
+                  {canSetAssignedTopic && (
+                    <button
+                      type="button"
+                      onClick={handleProposeTopic}
+                      disabled={isSubmittingTopic || sessions.length === 0}
+                      className="rounded-xl bg-black px-3 py-2 text-[11px] font-bold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {isSubmittingTopic
+                        ? "저장 중..."
+                        : sessions[0]?.title &&
+                            sessions[0].title !== "주제 미정"
+                          ? "주제 변경"
+                          : "주제 입력"}
+                    </button>
+                  )}
+                </div>
+
+                {sessions.length === 0 ? (
+                  <div className="py-8 text-center text-gray-400">
+                    회차가 등록되면 주제를 지정할 수 있습니다.
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                    <p className="text-[11px] font-semibold text-gray-400">
+                      {sessions[0].sessionNum} 주제
+                    </p>
+
+                    <p className="mt-2 break-words text-sm font-bold text-gray-900">
+                      {sessions[0].title}
+                    </p>
+                  </div>
+                )}
+
+                {!canSetAssignedTopic && (
+                  <p className="text-[11px] text-gray-400">
+                    주제 입력 및 변경은 해당 활동의 스터디장만 할 수 있습니다.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4 rounded-3xl border border-gray-100 bg-white p-5 text-xs shadow-xs">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900">
+                      주제 투표
+                    </h3>
+                    <p className="mt-1 text-[11px] text-gray-400">
+                      함께 진행할 활동 주제를 정해 보세요.
+                    </p>
+                  </div>
                   <button
                     type="button"
-                    onClick={handleVoteCandidate}
-                    disabled={isVoting || selectedVoteOption === null}
-                    className="w-full rounded-xl bg-black py-3 font-bold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+                    onClick={handleProposeTopic}
+                    disabled={isSubmittingTopic || topicSessionId === null}
+                    className="rounded-xl bg-black px-3 py-2 text-[11px] font-bold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    {isVoting
-                      ? "처리 중..."
-                      : selectedVoteOption !== null &&
-                          votes[selectedVoteOption]?.voted
-                        ? "선택한 투표 취소하기"
-                        : "선택한 주제에 투표하기"}
+                    {isSubmittingTopic ? "등록 중..." : "+ 주제 제안"}
                   </button>
-                </>
-              )}
-            </div>
+                </div>
+                <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-3 text-[11px] leading-5 text-blue-800">
+                  {activeVotingSession ? (
+                    <>
+                      <p className="font-bold">
+                        현재 {activeVotingSession.sessionNum} 주제 투표가 진행
+                        중입니다.
+                      </p>
+
+                      {activeVotingWindow?.opensAt && (
+                        <p>
+                          투표 시작:{" "}
+                          {formatKstDateTime(activeVotingWindow.opensAt)} (KST)
+                        </p>
+                      )}
+
+                      {activeVotingWindow ? (
+                        <p>
+                          투표 종료 예정:{" "}
+                          {formatKstDateTime(activeVotingWindow.closesAt)} (KST)
+                        </p>
+                      ) : (
+                        <p>투표는 회차 날짜 당일 15:00 (KST)에 종료됩니다.</p>
+                      )}
+                    </>
+                  ) : upcomingVotingSchedule ? (
+                    <>
+                      <p className="font-bold">
+                        다음 투표 개설 예정일:{" "}
+                        {formatKstDateTime(upcomingVotingSchedule.opensAt)}{" "}
+                        (KST)
+                      </p>
+
+                      <p>
+                        대상 회차: {upcomingVotingSchedule.session.sessionNum}
+                      </p>
+
+                      <p>
+                        투표 종료 예정:{" "}
+                        {formatKstDateTime(upcomingVotingSchedule.closesAt)}{" "}
+                        (KST)
+                      </p>
+                    </>
+                  ) : votingWindowButNotOpen ? (
+                    <>
+                      <p className="font-bold">
+                        예정된 투표 기간에 해당하지만 현재 서버에서 투표가 열려
+                        있지 않습니다.
+                      </p>
+
+                      <p>
+                        계산된 기간:{" "}
+                        {formatKstDateTime(votingWindowButNotOpen.opensAt)} ~{" "}
+                        {formatKstDateTime(votingWindowButNotOpen.closesAt)}{" "}
+                        (KST)
+                      </p>
+
+                      <p>회차 정보를 새로고침한 뒤 다시 확인해 주세요.</p>
+                    </>
+                  ) : expiredUnresolvedVotingSchedule ? (
+                    <>
+                      <p className="font-bold">
+                        이 회차의 투표 기간이 종료되었습니다.
+                      </p>
+
+                      <p>
+                        종료 시각:{" "}
+                        {formatKstDateTime(
+                          expiredUnresolvedVotingSchedule.closesAt,
+                        )}{" "}
+                        (KST)
+                      </p>
+
+                      <p>
+                        득표가 있으면 서버가 최다 득표 후보를 자동 확정합니다.
+                        득표가 없으면 주제는 미정으로 남습니다.
+                      </p>
+                    </>
+                  ) : hasClosedVotingTopic ? (
+                    <p>
+                      주제가 직접 지정되거나 자동 확정되어 투표가
+                      종료되었습니다.
+                    </p>
+                  ) : topicOpenDaysBefore != null ? (
+                    <>
+                      <p>
+                        투표는 회차 {topicOpenDaysBefore}일 전 00:00 (KST)에
+                        시작하여 회차 당일 15:00 (KST)에 종료됩니다.
+                      </p>
+
+                      <p>예정된 회차가 등록되면 정확한 일정을 표시합니다.</p>
+                    </>
+                  ) : (
+                    <p>
+                      투표 개설 기준 정보를 확인할 수 없어 예정일을 계산할 수
+                      없습니다.
+                    </p>
+                  )}
+
+                  <div className="mt-2 border-t border-blue-100 pt-2 text-[10px] text-blue-700">
+                    <p>
+                      스터디장 또는 부장이 회차 주제를 직접 입력하면 투표는 즉시
+                      종료됩니다.
+                    </p>
+
+                    <p>
+                      회차 당일 15:00 (KST) 이후 서버가 1분 이내 최다 득표
+                      후보를 확정합니다. 동점이면 먼저 제안된 후보가 우선합니다.
+                    </p>
+
+                    <p>득표가 없으면 주제는 확정되지 않고 투표만 종료됩니다.</p>
+                  </div>
+                </div>
+                {topicSessionId === null ? (
+                  <div className="py-8 text-center text-gray-400">
+                    현재 주제 제안 및 투표가 가능한 회차가 없습니다.
+                  </div>
+                ) : votes.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-gray-200 py-8 text-center">
+                    <p className="font-semibold text-gray-600">
+                      아직 등록된 주제가 없습니다.
+                    </p>
+                    <p className="mt-1 text-[11px] text-gray-400">
+                      첫 번째 주제를 제안해 보세요.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-2 pt-1">
+                      {votes.map((item, index) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          disabled={isVoting}
+                          onClick={() => setSelectedVoteOption(index)}
+                          className={`flex w-full items-center justify-between rounded-xl border p-3 text-left transition disabled:opacity-60 ${
+                            selectedVoteOption === index
+                              ? "border-black bg-gray-50 ring-1 ring-black"
+                              : "border-gray-200 hover:bg-gray-50"
+                          }`}
+                        >
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span
+                              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+                                selectedVoteOption === index
+                                  ? "border-black bg-black"
+                                  : "border-gray-300 bg-white"
+                              }`}
+                            >
+                              {selectedVoteOption === index && (
+                                <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                              )}
+                            </span>
+                            <span className="truncate font-medium text-gray-800">
+                              {item.text}
+                            </span>
+                          </span>
+                          <span className="ml-2 shrink-0 text-[11px] font-bold text-gray-400">
+                            {item.votes}표
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleVoteCandidate}
+                      disabled={isVoting || selectedVoteOption === null}
+                      className="w-full rounded-xl bg-black py-3 font-bold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+                    >
+                      {isVoting
+                        ? "처리 중..."
+                        : selectedVoteOption !== null &&
+                            votes[selectedVoteOption]?.voted
+                          ? "선택한 투표 취소하기"
+                          : "선택한 주제에 투표하기"}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* 참여 신청 대기: 승인 모집 활동에서만 부장과 스터디장에게 보인다 */}
-            {canManage &&
-              currentDetail?.summary.recruitMode === "APPROVAL" && (
+            {canManage && currentDetail?.summary.recruitMode === "APPROVAL" && (
               <div className="space-y-3 rounded-3xl border border-gray-100 bg-white p-5 text-xs shadow-xs">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold text-gray-900">
@@ -1751,11 +2145,13 @@ export default function ActivityDetailPage() {
             onClick={(event) => event.stopPropagation()}
           >
             <h2 className="text-lg font-bold text-gray-900">
-              새로운 주제 제안
+              {isAssignedTopicMode ? "회차 주제 지정" : "새로운 주제 제안"}
             </h2>
 
             <p className="mt-2 text-sm text-gray-500">
-              함께 진행하고 싶은 활동 주제를 입력해 주세요.
+              {isAssignedTopicMode
+                ? "이 회차에서 진행할 주제를 입력해 주세요."
+                : "함께 진행하고 싶은 활동 주제를 입력해 주세요."}
             </p>
 
             <form
@@ -1768,7 +2164,11 @@ export default function ActivityDetailPage() {
                 type="text"
                 value={topicTitle}
                 onChange={(event) => setTopicTitle(event.target.value)}
-                placeholder="주제 이름을 입력해 주세요."
+                placeholder={
+                  isAssignedTopicMode
+                    ? "지정할 회차 주제를 입력해 주세요."
+                    : "주제 이름을 입력해 주세요."
+                }
                 maxLength={100}
                 autoFocus
                 disabled={isSubmittingTopic}
@@ -1790,7 +2190,11 @@ export default function ActivityDetailPage() {
                   disabled={isSubmittingTopic || !topicTitle.trim()}
                   className="rounded-xl bg-black px-5 py-2.5 text-sm font-bold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  {isSubmittingTopic ? "등록 중..." : "주제 제안"}
+                  {isSubmittingTopic
+                    ? "저장 중..."
+                    : isAssignedTopicMode
+                      ? "주제 저장"
+                      : "주제 제안"}
                 </button>
               </div>
             </form>

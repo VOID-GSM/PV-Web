@@ -7,6 +7,7 @@ import { CalendarGrid } from "../components/calendar/CalendarGrid";
 import { RightPanel } from "../components/calendar/RightPanel";
 import { EventDetailModal } from "../components/calendar/EventDetailModal";
 import { AddEventModal } from "../components/calendar/AddEventModal";
+import type { BoardCreateRequest } from "../api/calendarApi";
 
 import type {
   CalendarEvent,
@@ -17,24 +18,35 @@ import type {
 
 interface CalendarPageProps {
   events?: CalendarEvent[];
-  boards?: { id: number; name: string; color: string; status?: string }[];
+  myEvents?: CalendarEvent[];
+  boards?: {
+    id: number;
+    name: string;
+    color: string;
+    status?: string;
+  }[];
   activeMenu?: string;
   onNavigate?: (menu: string) => void;
   onOpenAddModal?: () => void;
   onAddEvent?: (newEvent: CalendarEvent) => void;
   onDeleteEvent?: (eventId: string) => void;
   onUpdateEvent?: (event: CalendarEvent) => void;
-  onMonthChange?: (date: Date) => void;
+  onMonthChange?: (date: Date, mine?: boolean) => void;
+  canManageMeetings?: boolean;
+  onCreateBoard?: (request: BoardCreateRequest) => Promise<void>;
 }
 
 export default function CalendarPage({
   events = [],
+  myEvents = [],
   boards = [],
   onOpenAddModal = () => {},
   onAddEvent = () => {},
   onDeleteEvent = () => {},
   onUpdateEvent = () => {},
   onMonthChange,
+  canManageMeetings = false,
+  onCreateBoard,
 }: CalendarPageProps = {}) {
   const [viewMode, setViewMode] = useState<ViewMode>("월간");
   const [onlyMyEvents, setOnlyMyEvents] = useState(false);
@@ -42,8 +54,8 @@ export default function CalendarPage({
 
   // 보는 달이 바뀌면 그 달의 일정을 불러온다 (이미 불러온 달은 App에서 건너뜀)
   useEffect(() => {
-    onMonthChange?.(currentDate);
-  }, [currentDate, onMonthChange]);
+    onMonthChange?.(currentDate, onlyMyEvents);
+  }, [currentDate, onlyMyEvents, onMonthChange]);
 
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
     null,
@@ -68,9 +80,12 @@ export default function CalendarPage({
     "#ec4899",
     "#f59e0b",
   ];
-  const eventBoardNames = events
+  const eventBoardNames = [...events, ...myEvents]
     .map((event) => event.board?.trim())
-    .filter((name): name is string => Boolean(name));
+    .filter(
+      (name): name is string =>
+        Boolean(name) && name !== "지정된 보드 없음",
+    );
   const boardNames = Array.from(
     new Set([...boards.map((board) => board.name), ...eventBoardNames]),
   );
@@ -143,10 +158,15 @@ export default function CalendarPage({
   const activeFilters = boardFilters
     .filter((filter) => filter.checked)
     .map((filter) => filter.name);
-  const filteredEvents = events.filter(
-    (event) =>
-      (!onlyMyEvents || event.isMyEvent) &&
-      (!event.board || activeFilters.includes(event.board)),
+
+  const eventsToDisplay: CalendarEvent[] = onlyMyEvents ? myEvents : events;
+
+  const filteredEvents: CalendarEvent[] = eventsToDisplay.filter(
+    (calendarEvent) =>
+      (!onlyMyEvents || calendarEvent.isMyEvent) &&
+      (!calendarEvent.board ||
+        calendarEvent.board === "지정된 보드 없음" ||
+        activeFilters.includes(calendarEvent.board)),
   );
 
   return (
@@ -183,6 +203,8 @@ export default function CalendarPage({
         <RightPanel
           boardFilters={boardFilters}
           milestones={milestones}
+          canCreateBoard={canManageMeetings}
+          onCreateBoard={onCreateBoard}
           onToggleFilter={(id) => {
             setUncheckedBoards((prev) => ({
               ...prev,
@@ -197,6 +219,7 @@ export default function CalendarPage({
       {selectedEvent && !isEditModalOpen && (
         <EventDetailModal
           event={selectedEvent}
+          canManageMeetings={canManageMeetings}
           onClose={() => setSelectedEvent(null)}
           onDelete={handleDeleteEvent}
           onEdit={() => setIsEditModalOpen(true)}
@@ -206,6 +229,7 @@ export default function CalendarPage({
       {selectedEvent && (
         <AddEventModal
           isOpen={isEditModalOpen}
+          canManageMeetings={canManageMeetings}
           initialEvent={selectedEvent}
           onUpdateEvent={onUpdateEvent}
           // ☆ 수정 창에도 보드 목록 (마감 화면을 똑같이 보여주려고)
@@ -220,6 +244,7 @@ export default function CalendarPage({
       {/* 날짜 칸을 눌러서 여는 일정 추가 창 (그 날짜가 미리 채워진다) */}
       <AddEventModal
         isOpen={addDate !== null}
+        canManageMeetings={canManageMeetings}
         initialDate={addDate ?? undefined}
         onAddEvent={onAddEvent}
         // ☆ 부장이면 마감을 보드에 등록할 수 있게 보드 목록 넘기기

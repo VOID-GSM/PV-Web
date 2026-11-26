@@ -15,13 +15,12 @@ type PickedMember = { memberId: number | null; name: string };
 
 interface AddEventModalProps {
   isOpen: boolean;
+  canManageMeetings?: boolean;
   onClose: () => void;
   onAddEvent?: (newEvent: CalendarEvent) => void;
   initialEvent?: CalendarEvent | null;
   onUpdateEvent?: (updatedEvent: CalendarEvent) => void;
-  // 새 일정을 만들 때 날짜 칸에 미리 넣어 둘 날짜 (캘린더에서 날짜를 눌렀을 때)
   initialDate?: string;
-  // ☆ 마감을 걸 수 있는 보드 목록 (App이 부장일 때만 불러온다 → 있으면 부장)
   boards?: { id: number; name: string }[];
 }
 
@@ -39,6 +38,7 @@ const toPicked = (event: CalendarEvent | null): PickedMember[] =>
 
 export const AddEventModal: React.FC<AddEventModalProps> = ({
   isOpen,
+  canManageMeetings = false,
   onClose,
   onAddEvent,
   initialEvent = null,
@@ -75,9 +75,11 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
   const [formError, setFormError] = useState("");
 
   // ☆ 보드 목록이 있으면 부장 → 마감을 보드에 등록할 수 있다
-  const canMakeDeadline = boards.length > 0;
+  const canMakeDeadline = canManageMeetings && boards.length > 0;
   // ☆ 지금 "보드 마감" 화면인지 (마감 + 부장)
   const isDeadlineMode = type === "마감" && canMakeDeadline;
+  const isMeetingMode = type === "회의";
+  const canPickMembers = isDeadlineMode || isMeetingMode;
 
   // ★ 팀원 목록: 고르기 목록을 열었을 때만 서버에 요청한다
   // (훅은 아래 "if (!isOpen) return null"보다 위에 있어야 해서 여기에 둔다)
@@ -89,8 +91,7 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
   // ☆ 가입된 팀원 중 아직 안 고른 사람만 (번호로 비교)
   const pickableMembers = (membersQuery.data ?? []).filter(
     (m) =>
-      m.status === "JOINED" &&
-      !picked.some((p) => p.memberId === m.memberId),
+      m.status === "JOINED" && !picked.some((p) => p.memberId === m.memberId),
   );
 
   // useEffect 대신 렌더링 단계에서 isOpen 상태 변화를 감지해 폼 초기화 (ESLint 에러 방지)
@@ -146,22 +147,29 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
       return;
     }
 
-    // ☆ 보드 마감이면 보드를 꼭 골라야 한다
-    if (isDeadlineMode && boardId === null) {
-      setFormError("마감을 등록할 보드를 골라 주세요.");
+    if (isMeetingMode && !canManageMeetings) {
+      setFormError("보드 회의 생성 및 수정은 부장만 할 수 있어요.");
       return;
     }
 
-    // ☆ 그 외에는 지금처럼 보드 이름을 입력해야 한다
-    if (!isDeadlineMode && !board.trim()) {
+    if ((isDeadlineMode || isMeetingMode) && boardId === null) {
+      setFormError(
+        isMeetingMode
+          ? "회의를 등록할 보드를 선택해 주세요."
+          : "마감을 등록할 보드를 골라 주세요.",
+      );
+      return;
+    }
+
+    if (!isDeadlineMode && !isMeetingMode && !board.trim()) {
       setFormError("보드 이름을 입력해 주세요.");
       return;
     }
 
-    // ☆ 보드 마감이면 고른 보드의 이름을 쓴다
-    const boardName = isDeadlineMode
-      ? (boards.find((b) => b.id === boardId)?.name ?? "")
-      : board.trim();
+    const boardName =
+      isDeadlineMode || isMeetingMode
+        ? (boards.find((b) => b.id === boardId)?.name ?? "")
+        : board.trim();
 
     const eventData: CalendarEvent = {
       ...(initialEvent ?? { id: Date.now().toString() }),
@@ -173,14 +181,18 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
       endDate: endDate || undefined,
       description: description.trim(),
       // ☆ 화면용 이름 / 서버용 번호 (번호 없는 사람은 빼고)
-      assignees: isDeadlineMode ? picked.map((p) => p.name) : [],
-      assigneeIds: isDeadlineMode
+      assignees: canPickMembers ? picked.map((p) => p.name) : [],
+
+
+
+      assigneeIds: canPickMembers
         ? picked
             .map((p) => p.memberId)
-            .filter((id): id is number => id !== null)
+            .filter((memberId): memberId is number => memberId !== null)
         : [],
-      // ☆ 보드 마감이면 보드 번호 (App이 이걸 보고 마감 API로 저장한다)
-      boardId: isDeadlineMode ? (boardId ?? undefined) : undefined,
+
+      boardId:
+        isDeadlineMode || isMeetingMode ? (boardId ?? undefined) : undefined,
       isMyEvent: true,
     };
     if (initialEvent) onUpdateEvent?.(eventData);
@@ -218,9 +230,11 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
             <div className="flex gap-2">
               {(["마감", "회의", "활동", "개인 일정"] as const).map((item) => (
                 <button
+                  disabled={item === "회의" && !canManageMeetings}
                   key={item}
                   type="button"
                   onClick={() => {
+                    if (item === "회의" && !canManageMeetings) return;
                     setType(item);
                     setFormError("");
                   }}
@@ -243,9 +257,10 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
             </div>
 
             {/* ☆ 부장이 아닌데 마감을 고르면 안내 */}
-            {type === "마감" && !canMakeDeadline && (
+            {!initialEvent && type === "마감" && !canManageMeetings && (
               <p className="mt-2 text-[11px] text-gray-400">
-                보드 마감은 부장만 등록할 수 있어요. 지금은 내 일정으로 저장됩니다.
+                보드 마감은 부장만 등록할 수 있어요. 지금은 내 일정으로
+                저장됩니다.
               </p>
             )}
           </div>
@@ -268,7 +283,7 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
               <label className="block font-bold text-gray-700 mb-1.5">
                 보드
               </label>
-              {isDeadlineMode ? (
+              {isDeadlineMode || isMeetingMode ? (
                 // ☆ 보드 마감: 서버 보드 목록에서 고르기
                 <select
                   value={boardId ?? ""}
@@ -376,11 +391,13 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
             />
           </div>
 
-          {/* ☆ 담당자: 보드 마감일 때만 (부장만 보인다) */}
-          {isDeadlineMode && (
+
+          {canPickMembers && (
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <label className="font-bold text-gray-700">담당자</label>
+                <label className="font-bold text-gray-700">
+                  {isMeetingMode ? "참석자" : "담당자"}
+                </label>
                 <span className="text-[10px] text-gray-400">
                   {picked.length} / {MAX_ASSIGNEES}명
                 </span>
@@ -413,7 +430,11 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
                       onClick={() => setIsPickerOpen(!isPickerOpen)}
                       className="inline-flex items-center gap-1 rounded-full border border-dashed border-gray-300 px-3 py-1 font-semibold text-gray-500 hover:bg-gray-50 transition cursor-pointer"
                     >
-                      <img src={plusIcon} alt="" className="h-3 w-3 opacity-60" />
+                      <img
+                        src={plusIcon}
+                        alt=""
+                        className="h-3 w-3 opacity-60"
+                      />
                       <span>팀원 추가</span>
                     </button>
 
@@ -492,9 +513,13 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
               className="h-4 w-4 shrink-0 mt-0.5 text-amber-600"
             />
             <div>
-              <p className="font-bold">마감 알림이 자동 등록됩니다</p>
+              <p className="font-bold">
+                {isMeetingMode ? "회의 참석자" : "마감 알림"}
+              </p>
               <p className="mt-0.5 text-[11px] text-amber-700/90 leading-relaxed">
-                선택한 D-day 단계에 따라 담당 팀원에게 알림 메시지가 발송됩니다.
+                {isMeetingMode
+                  ? "선택한 팀원이 회의 참석자로 지정됩니다. 참석자는 최대 20명까지 선택할 수 있습니다."
+                  : "선택한 D-day 단계에 따라 담당 팀원에게 알림 메시지가 발송됩니다."}
               </p>
             </div>
           </div>
