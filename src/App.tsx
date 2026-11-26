@@ -70,9 +70,6 @@ function AppContent() {
 
   const [myEvents, setMyEvents] = useState<CalendarEvent[]>([]);
 
-
-  const [, setMyEvents] = useState<CalendarEvent[]>([]);
-
   const memberNamesRef = useRef<Map<number, string>>(new Map());
   const boardNamesRef = useRef<Map<number, string>>(new Map());
   const [homeTodos, setHomeTodos] = useState<HomeTodoItem[]>([]);
@@ -150,6 +147,7 @@ function AppContent() {
           return {
             id: String(event.id),
             title: event.title,
+
             type:
               event.type === "DEADLINE"
                 ? "마감"
@@ -168,7 +166,9 @@ function AppContent() {
 
             date: event.startsAt.slice(0, 10),
             endDate: event.endsAt.slice(0, 10),
+
             time: event.allDay ? undefined : event.startsAt.slice(11, 16),
+
             description: event.memo ?? "",
 
             completed:
@@ -178,19 +178,6 @@ function AppContent() {
 
             boardId: event.boardId,
             assigneeIds: event.assigneeIds ?? [],
-
-
-            assignees: isActivity
-              ? [leaderName || "스터디장"]
-              : (event.assigneeIds ?? []).map(
-                  (memberId) =>
-                    memberNamesRef.current.get(memberId) ?? `회원 ${memberId}`,
-                ),
-
-            isMyEvent: true,
-          };
-        });
-
 
             assignees: isActivity
               ? [leaderName || "스터디장"]
@@ -203,21 +190,29 @@ function AppContent() {
           };
         });
 
-        const mergeEventsForRange = (prev: CalendarEvent[]) => {
+        const mergeEventsForRange = (
+          previous: CalendarEvent[],
+        ): CalendarEvent[] => {
           const fromKey = formatDate(fromDate);
           const toKey = formatDate(toDate);
 
-          // 현재 조회 범위의 서버 일정은 새 응답으로 교체하고,
-          // 화면에서만 만든 마일스톤은 유지한다.
-          const outsideRange = prev.filter(
-            (item) =>
-              item.date < fromKey ||
-              item.date > toKey ||
-              item.id.startsWith("ms-"),
+          const outsideRange = previous.filter(
+            (event) =>
+              event.date < fromKey ||
+              event.date > toKey ||
+              event.id.startsWith("ms-"),
           );
-          const merged = new Map(outsideRange.map((item) => [item.id, item]));
 
-          loadedEvents.forEach((item) => merged.set(item.id, item));
+          const merged = new Map<string, CalendarEvent>();
+
+          outsideRange.forEach((event) => {
+            merged.set(event.id, event);
+          });
+
+          loadedEvents.forEach((event) => {
+            merged.set(event.id, event);
+          });
+
           return Array.from(merged.values());
         };
 
@@ -233,20 +228,19 @@ function AppContent() {
       });
   }, []);
 
-  // 어떤 날짜가 속한 달을 서버에서 다시 불러온다 (마감을 만든 뒤 캘린더에 바로 보이게)
   const reloadMonthOf = useCallback(
     (dateStr: string) => {
-      // "2026-11-30" → 그 날짜 정오 (시간대 때문에 날짜가 밀리지 않게)
       const base = new Date(`${dateStr}T12:00:00`);
       const monthPrefix = `${base.getFullYear()}-${base.getMonth()}`;
+
       loadedMonthsRef.current.delete(`${monthPrefix}-all`);
       loadedMonthsRef.current.delete(`${monthPrefix}-mine`);
+
       loadMonth(base, false);
       loadMonth(base, true);
     },
     [loadMonth],
   );
-
   // 처음에는 이번 달만 불러온다
   useEffect(() => {
     // ★ 입장·재입장 화면에서는 부르지 않는다
@@ -411,17 +405,11 @@ function AppContent() {
         ...(newEvent.type === "회의"
           ? {
               type: "MEETING" as const,
-
-              boardId: newEvent.boardId as number,
-              assigneeIds: (newEvent.assigneeIds ?? []).slice(0, 20),
-
               boardId: newEvent.boardId!,
-              assigneeIds: newEvent.assigneeIds ?? [],
-
+              assigneeIds: (newEvent.assigneeIds ?? []).slice(0, 20),
             }
           : {}),
       });
-
       if (newEvent.type === "회의") {
         reloadMonthOf(newEvent.date);
       } else {
@@ -658,7 +646,6 @@ function AppContent() {
                 onDeleteEvent={handleDeleteEvent}
                 onUpdateEvent={handleUpdateEvent}
                 onMonthChange={loadMonth}
-                canManageMeetings={canManageMeetings}
               />
             }
           />
@@ -692,7 +679,6 @@ function AppContent() {
         canManageMeetings={canManageMeetings}
         onClose={() => setIsAddModalOpen(false)}
         onAddEvent={handleAddEvent}
-        canManageMeetings={canManageMeetings}
         // 부장이면 마감을 보드에 등록할 수 있게 (끝난 보드는 빼고)
         boards={boards.filter((board) => board.status !== "CLOSED")}
       />

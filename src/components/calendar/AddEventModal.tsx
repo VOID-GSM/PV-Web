@@ -183,10 +183,8 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
       endDate: endDate || undefined,
       description: description.trim(),
       // ☆ 화면용 이름 / 서버용 번호 (번호 없는 사람은 빼고)
-ure/calendar-event-assignees
       assignees: canPickMembers ? picked.map((p) => p.name) : [],
 
-      assignees: isDeadlineMode ? picked.map((p) => p.name) : [],
 
 
       assigneeIds: canPickMembers

@@ -18,26 +18,25 @@ import type {
 interface CalendarPageProps {
   events?: CalendarEvent[];
   myEvents?: CalendarEvent[];
-  canManageMeetings?: boolean;
-  boards?: { id: number; name: string; color: string; status?: string }[];
+  boards?: {
+    id: number;
+    name: string;
+    color: string;
+    status?: string;
+  }[];
   activeMenu?: string;
   onNavigate?: (menu: string) => void;
   onOpenAddModal?: () => void;
   onAddEvent?: (newEvent: CalendarEvent) => void;
   onDeleteEvent?: (eventId: string) => void;
   onUpdateEvent?: (event: CalendarEvent) => void;
-
   onMonthChange?: (date: Date, mine?: boolean) => void;
-
-  onMonthChange?: (date: Date) => void;
   canManageMeetings?: boolean;
-
 }
 
 export default function CalendarPage({
   events = [],
   myEvents = [],
-  canManageMeetings = false,
   boards = [],
   onOpenAddModal = () => {},
   onAddEvent = () => {},
@@ -153,17 +152,14 @@ export default function CalendarPage({
   const activeFilters = boardFilters
     .filter((filter) => filter.checked)
     .map((filter) => filter.name);
-  const eventsToDisplay = onlyMyEvents ? myEvents : events;
-  const filteredEvents = eventsToDisplay.filter(
-    (event) =>
+  const eventsToDisplay: CalendarEvent[] = onlyMyEvents ? myEvents : events;
 
-      !event.board ||
-      event.board === "지정된 보드 없음" ||
-      activeFilters.includes(event.board),
-
-      (!onlyMyEvents || event.isMyEvent) &&
-      (!event.board || activeFilters.includes(event.board)),
-
+  const filteredEvents: CalendarEvent[] = eventsToDisplay.filter(
+    (calendarEvent: CalendarEvent) =>
+      (!onlyMyEvents || calendarEvent.isMyEvent) &&
+      (!calendarEvent.board ||
+        calendarEvent.board === "지정된 보드 없음" ||
+        activeFilters.includes(calendarEvent.board)),
   );
 
   return (
@@ -226,7 +222,6 @@ export default function CalendarPage({
           isOpen={isEditModalOpen}
           canManageMeetings={canManageMeetings}
           initialEvent={selectedEvent}
-          canManageMeetings={canManageMeetings}
           onUpdateEvent={onUpdateEvent}
           // ☆ 수정 창에도 보드 목록 (마감 화면을 똑같이 보여주려고)
           boards={deadlineBoards}
