@@ -1,4 +1,5 @@
-import { useState } from "react";
+// ☆ useRef: 숨겨둔 파일 선택 칸을 버튼으로 대신 누르려고
+import { useRef, useState } from "react";
 import {
   STATUS_BADGE,
   formatDday,
@@ -13,9 +14,9 @@ type MySubmissionsProps = {
   assignments: Assignment[];
   // 내 제출물들
   submissions: Submission[];
-  // ★ 파일 첨부면 진짜 파일(file)도 같이 넘긴다
-  onSubmit: (assignmentId: number, type: string, content: string, file: File | null) => void;
-  // ★ 제출(또는 파일 업로드) 중인 과제 번호 (그 카드의 버튼만 잠근다)
+  // ☆ 파일 첨부면 진짜 파일(file)도 같이 넘긴다. 성공하면 true, 실패하면 false를 돌려준다
+  onSubmit: (assignmentId: number, type: string, content: string, file: File | null) => Promise<boolean>;
+  // 제출(또는 파일 업로드) 중인 과제 번호 (그 카드의 버튼만 잠근다)
   submittingId: number | null;
 };
 
@@ -47,7 +48,7 @@ export default function MySubmissions({ assignments, submissions, onSubmit, subm
 type MySubmissionCardProps = {
   assignment: Assignment;
   submission: Submission | undefined;
-  onSubmit: (assignmentId: number, type: string, content: string, file: File | null) => void;
+  onSubmit: (assignmentId: number, type: string, content: string, file: File | null) => Promise<boolean>;
   isSubmitting: boolean;
 };
 
@@ -59,22 +60,32 @@ function MySubmissionCard({ assignment, submission, onSubmit, isSubmitting }: My
   // 제출 형식과 내용. 처음엔 비어 있음
   const [type, setType] = useState("");
   const [content, setContent] = useState("");
-  // ★ 고른 파일 (파일 첨부일 때만)
+  // 고른 파일 (파일 첨부일 때만)
   const [file, setFile] = useState<File | null>(null);
+  // ☆ 숨겨둔 진짜 파일 선택 칸 (버튼을 누르면 이걸 대신 누른다)
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const status = submission?.status ?? "미제출";
   // 아직 안 냈거나 재제출 요청을 받았으면 제출 칸을 보여준다
   const canSubmitNow = !submission || submission.status === "재제출 요청";
   const days = getDaysLeft(assignment.deadline);
 
-  // ★ 제출할 수 있는지: 파일 첨부는 파일이 있어야, 나머지는 내용이 있어야
+  // 제출할 수 있는지: 파일 첨부는 파일이 있어야, 나머지는 내용이 있어야
   const isReady = type === "파일 첨부" ? file !== null : type !== "" && content.trim() !== "";
 
-  const handleSubmit = () => {
-    onSubmit(assignment.id, type, content.trim(), type === "파일 첨부" ? file : null);
+  // ☆ 고른 파일 지우기 (같은 파일을 다시 고를 수 있게 칸의 값도 비운다)
+  const clearFile = () => {
+    setFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  // ☆ 제출: 성공했을 때만 입력을 비운다 (실패하면 고른 파일이 그대로 남아서 다시 누를 수 있다)
+  const handleSubmit = async () => {
+    const ok = await onSubmit(assignment.id, type, content.trim(), type === "파일 첨부" ? file : null);
+    if (!ok) return;
     setType("");
     setContent("");
-    setFile(null);
+    clearFile();
   };
 
   return (
@@ -113,10 +124,11 @@ function MySubmissionCard({ assignment, submission, onSubmit, isSubmitting }: My
             {assignment.submitTypes.map((t) => (
               <button
                 key={t}
+                type="button"
                 onClick={() => {
                   setType(t);
                   setContent("");
-                  setFile(null);
+                  clearFile();
                 }}
                 className={`rounded-full border px-3 py-1.5 text-xs ${
                   type === t ? "border-black font-semibold" : "border-neutral-200 text-neutral-500"
@@ -146,23 +158,47 @@ function MySubmissionCard({ assignment, submission, onSubmit, isSubmitting }: My
           )}
           {type === "파일 첨부" && (
             <div className="mt-2">
-              {/* ★ 진짜 파일을 기억한다 (files?.[0]: 고른 파일 중 첫 번째, 없으면 null) */}
+              {/* ☆ 진짜 파일 선택 칸은 숨기고(hidden), 아래 버튼이 대신 눌러준다 */}
               <input
+                ref={fileInputRef}
                 type="file"
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                className="block text-sm"
+                className="hidden"
               />
-              {file && (
-                <p className="mt-1 text-xs text-neutral-500">
-                  {file.name} · {formatSize(file.size)}
-                </p>
+
+              {file ? (
+                // ☆ 고른 파일: 이름 · 크기 · 지우기
+                <div className="flex items-center justify-between gap-2 rounded border bg-neutral-50 px-3 py-2">
+                  <span className="min-w-0 truncate text-sm">
+                    📎 {file.name}
+                    <span className="ml-2 text-xs text-neutral-400">{formatSize(file.size)}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={clearFile}
+                    disabled={isSubmitting}
+                    className="shrink-0 text-xs text-neutral-500 hover:text-black disabled:opacity-40"
+                  >
+                    지우기
+                  </button>
+                </div>
+              ) : (
+                // ☆ 누를 수 있다는 게 보이는 진짜 버튼
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full rounded border border-dashed px-3 py-4 text-sm text-neutral-500 hover:bg-neutral-50"
+                >
+                  + 파일 선택
+                </button>
               )}
             </div>
           )}
 
           <div className="mt-3 flex justify-end">
             <button
-              onClick={handleSubmit}
+              type="button"
+              onClick={() => void handleSubmit()}
               disabled={!isReady || isSubmitting}
               className="rounded bg-black px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
             >
