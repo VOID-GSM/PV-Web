@@ -36,6 +36,8 @@ export type Question = {
   category: string;
   // "10월 4주차" 모양
   week: string;
+  // ★ 들어 있는 그룹 번호 (모르면 null)
+  groupId?: number | null;
 };
 
 // 답변 하나의 모양
@@ -43,7 +45,7 @@ export type Answer = {
   id: number;
   questionId: number;
   author: string;
-  // ★ 답변 작성자 회원 번호 (프로필 사진을 찾을 때 쓴다. 모르면 null)
+  // 답변 작성자 회원 번호 (프로필 사진을 찾을 때 쓴다. 모르면 null)
   authorId?: number | null;
   generation: string;
   // "2026-10-26" 모양
@@ -65,7 +67,7 @@ export type PracticeRecord = {
   // 걸린 시간(초)
   seconds: number;
   status: PracticeStatus;
-  // ★ 글로 쓴 답변 내용 (말로 연습·건너뜀이면 "")
+  // 글로 쓴 답변 내용 (말로 연습·건너뜀이면 "")
   answer: string;
 };
 

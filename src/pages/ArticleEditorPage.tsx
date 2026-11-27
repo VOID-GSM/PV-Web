@@ -30,9 +30,14 @@ import {
   type ActivitySummary,
 } from "../api/activityApi";
 
+// ☆ 진짜 팀원 목록 (GET /members) · 내 회원 번호 (나는 목록에서 뺀다)
+import { useTeamMembers } from "../hooks/useTeam";
+import { useMyName } from "../hooks/useMyName";
+
 const defaultRoundOptions = ["회차 선택", "1회차", "2회차", "3회차", "4회차"];
 
-const memberOptions = ["지정할 팀원 선택", "등록된 팀원 없음"];
+// ☆ 팀원 드롭다운 맨 위 안내 글자 (가짜 목록 "등록된 팀원 없음"은 지웠다)
+const MEMBER_PLACEHOLDER = "지정할 팀원 선택";
 
 export default function ArticleEditorPage() {
   const navigate = useNavigate();
@@ -78,7 +83,7 @@ export default function ArticleEditorPage() {
   const [selectedMember, setSelectedMember] = useState(
     initialArticle?.selectedMember ??
       initialDraft?.selectedMember ??
-      "지정할 팀원 선택",
+      MEMBER_PLACEHOLDER,
   );
 
   const [tags, setTags] = useState<string[]>(
@@ -97,6 +102,31 @@ export default function ArticleEditorPage() {
   const [sessionIdByRound, setSessionIdByRound] = useState<
     Record<string, number>
   >({});
+
+  // ☆ 진짜 팀원: 가입 완료한 사람 중 나를 뺀다 (기수 높은 순 → 이름순)
+  const membersQuery = useTeamMembers();
+  const { myId } = useMyName();
+  const feedbackMembers = (membersQuery.data ?? [])
+    .filter((member) => member.status === "JOINED" && member.memberId !== myId)
+    .sort(
+      (a, b) =>
+        b.generation - a.generation || a.name.localeCompare(b.name, "ko"),
+    );
+
+  // ☆ 드롭다운 글자: "이다원 (10기)" 모양
+  const memberOptions = [
+    MEMBER_PLACEHOLDER,
+    ...feedbackMembers.map((member) => `${member.name} (${member.generation}기)`),
+  ];
+
+  // ☆ 팀원 목록 상태에 맞는 안내 문구
+  const memberHint = membersQuery.isPending
+    ? "팀원을 불러오는 중..."
+    : membersQuery.isError
+      ? "팀원 목록을 불러오지 못했습니다."
+      : feedbackMembers.length === 0
+        ? "지정할 수 있는 팀원이 없습니다."
+        : "피드백을 받고 싶은 팀원을 골라 주세요.";
 
   useEffect(() => {
     let cancelled = false;
@@ -382,6 +412,12 @@ export default function ArticleEditorPage() {
 
     if (!content.trim()) {
       alert("본문을 입력해주세요.");
+      return;
+    }
+
+    // ☆ 특정 팀원 지정을 골랐으면 팀원을 꼭 골라야 한다
+    if (feedbackOption === "custom" && selectedMember === MEMBER_PLACEHOLDER) {
+      alert("피드백을 요청할 팀원을 골라 주세요.");
       return;
     }
 
@@ -768,14 +804,16 @@ export default function ArticleEditorPage() {
 
                   {feedbackOption === "custom" && (
                     <div className="pl-3 pr-1 pt-1 space-y-1.5 animate-in fade-in duration-150">
+                      {/* ☆ 진짜 팀원 목록 */}
                       <Dropdown
                         options={memberOptions}
                         value={selectedMember}
                         onChange={setSelectedMember}
                       />
 
+                      {/* ☆ 상황에 맞는 안내 (불러오는 중 / 실패 / 없음 / 고르기) */}
                       <p className="text-[10px] text-gray-400 pl-1">
-                        * 등록된 팀원이 없을 경우 지정할 수 없습니다.
+                        * {memberHint}
                       </p>
                     </div>
                   )}

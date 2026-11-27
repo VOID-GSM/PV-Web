@@ -28,16 +28,20 @@ import {
   useDashboard,
   useDeleteInvite,
   useGrantRole,
+  // 초대 링크 목록 · 승인 모드 불러오기
+  useInvites,
   useIssueReEntryLink,
   useJoinRequests,
   useRemoveRole,
   useTeamMembers,
+  useTeamSettings,
   useUpdateMember,
   useUpdateTeamSettings,
 } from "../hooks/useTeam";
-// ★ 내 회원 번호 ("(나)" 표시용)
+// 내 회원 번호 ("(나)" 표시용)
 import { useMyName } from "../hooks/useMyName";
-import { ROLE_LABEL, type MemberUpdateRequest } from "../apis/members";
+// ☆ Role: 역할 이름표 (줄 수 있는 역할 목록 만들기용)
+import { ROLE_LABEL, type MemberUpdateRequest, type Role } from "../apis/members";
 import { MAJOR_LABEL, type Major } from "../apis/interviews";
 import { getErrorMessage } from "../apis/client";
 
@@ -62,6 +66,9 @@ function toShortDateTime(iso: string): string {
   return `${d.getMonth() + 1}/${d.getDate()} ${d.toTimeString().slice(0, 5)}`;
 }
 
+// ☆ 카드에서 줄 수 있는 역할 이름들 (기본인 "팀원(MEMBER)"은 뺀다)
+const ROLE_OPTIONS = (Object.keys(ROLE_LABEL) as Role[]).filter((r) => r !== "MEMBER").map((r) => ROLE_LABEL[r]);
+
 type ToastState = { id: number; message: string; type: "success" | "info" };
 
 export default function AdminDashboardPage() {
@@ -69,6 +76,9 @@ export default function AdminDashboardPage() {
   const membersQuery = useTeamMembers();
   const dashboardQuery = useDashboard();
   const joinRequestsQuery = useJoinRequests();
+  // 초대 링크 목록 · 승인 모드 (새로고침해도 유지된다)
+  const invitesQuery = useInvites();
+  const settingsQuery = useTeamSettings();
 
   // 서버로 보내는 도구들
   const updateMember = useUpdateMember();
@@ -80,13 +90,14 @@ export default function AdminDashboardPage() {
   const approveJoin = useApproveJoinRequest();
   const updateSettings = useUpdateTeamSettings();
 
-  // ★ 내 회원 번호
+  // 내 회원 번호
   const { myId } = useMyName();
 
-  // 초대 링크: 서버에 목록 API가 없어서 "이번에 만든 것"만 화면에 기억한다
-  const [links, setLinks] = useState<InviteLink[]>([]);
-  // 승인 모드: 현재 상태를 불러오는 API가 없어서 꺼짐으로 시작한다
-  const [approvalMode, setApprovalMode] = useState(false);
+  // 기본 기수는 서버에 저장되지 않아서, 이번에 만든 링크만 화면에 기억한다 (초대 번호 → "10기")
+  const [defaultGenerationById, setDefaultGenerationById] = useState<Record<number, string>>({});
+
+  // 승인 모드: 서버 값 (아직 못 불러왔으면 꺼짐으로 본다)
+  const approvalMode = settingsQuery.data?.approvalRequired ?? false;
 
   // 화면 상태
   const [activeTab, setActiveTab] = useState("전체");
@@ -143,11 +154,17 @@ export default function AdminDashboardPage() {
   const tabMembers =
     activeTab === "전체" ? members : activeTab === "비활성" ? [] : members.filter((m) => m.generation === activeTab);
 
-  // 만료 안 됐고 횟수가 남은 링크만
-  const today = formatDate(new Date());
-  const validLinks = links.filter(
-    (l) => (l.expiresAt === null || l.expiresAt >= today) && (l.remainingUses === null || l.remainingUses > 0)
-  );
+  // 서버 초대 링크 → 화면 모양 (만료·소진된 것은 서버가 알려준 값으로 뺀다)
+  const validLinks: InviteLink[] = (invitesQuery.data ?? [])
+    .filter((invite) => !invite.expired && !invite.exhausted)
+    .map((invite) => ({
+      id: invite.inviteId,
+      code: invite.code,
+      expiresAt: invite.expiresAt ? formatDate(new Date(invite.expiresAt)) : null,
+      // 남은 횟수: 무제한이면 null, 아니면 최대 - 쓴 횟수
+      remainingUses: invite.maxUses === null ? null : Math.max(invite.maxUses - invite.useCount, 0),
+      defaultGeneration: defaultGenerationById[invite.inviteId] ?? "",
+    }));
 
   // ===== 이벤트 처리 =====
 
@@ -195,15 +212,42 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // 역할 인수인계: 넘겨받을 사람에게 먼저 주고, 원래 사람에게서 뺀다
-  const handleHandover = async (roleLabel: string, fromId: number, toName: string) => {
+  // ☆ 고른 여러 명에게 역할 주기 (한 명씩 차례로 보낸다. 서버에 여러 명 API가 없어서)
+  const handleGrantRole = async (roleLabel: string, memberIds: number[]) => {
     const role = findKey(ROLE_LABEL, roleLabel);
-    const to = members.find((m) => m.name === toName);
-    if (!role || !to) return;
+    if (!role || memberIds.length === 0) return;
+
+    // 성공한 사람 / 실패한 사람 이름을 모아서 마지막에 한 번에 알려준다
+    const done: string[] = [];
+    const failed: string[] = [];
+    for (const memberId of memberIds) {
+      const name = members.find((m) => m.id === memberId)?.name ?? `회원 ${memberId}`;
+      try {
+        await grantRole.mutateAsync({ memberId, role });
+        done.push(name);
+      } catch {
+        failed.push(name);
+      }
+    }
+
+    if (failed.length === 0) {
+      showToast(`${done.length}명에게 ${roleLabel} 권한을 줬습니다`);
+    } else {
+      showToast(
+        `${done.length}명 완료 · ${failed.join(", ")} 님은 실패했습니다. 다시 시도해 주세요`,
+        "info"
+      );
+    }
+  };
+
+  // ☆ 한 명에게서 역할 빼기 (마지막 부장은 서버가 막는다)
+  const handleRemoveRole = async (roleLabel: string, memberId: number) => {
+    const role = findKey(ROLE_LABEL, roleLabel);
+    if (!role) return;
+    const name = members.find((m) => m.id === memberId)?.name ?? `회원 ${memberId}`;
     try {
-      await grantRole.mutateAsync({ memberId: to.id, role });
-      await removeRole.mutateAsync({ memberId: fromId, role });
-      showToast(`${roleLabel} 역할을 ${toName} 님에게 인계했습니다`);
+      await removeRole.mutateAsync({ memberId, role });
+      showToast(`${name} 님의 ${roleLabel} 권한을 해제했습니다`);
     } catch (error) {
       showToast(getErrorMessage(error), "info");
     }
@@ -233,22 +277,12 @@ export default function AdminDashboardPage() {
         expiresAt,
         maxUses: form.usage in uses ? uses[form.usage] : undefined,
       });
-      // 승인 모드를 바꿨으면 서버에도 반영
+      // 승인 모드를 바꿨으면 서버에도 반영 (저장되면 승인 모드를 다시 불러온다)
       if (form.requireApproval !== approvalMode) {
         await updateSettings.mutateAsync(form.requireApproval);
-        setApprovalMode(form.requireApproval);
       }
-      setLinks((prev) => [
-        {
-          id: created.inviteId,
-          code: created.code,
-          expiresAt: created.expiresAt ? formatDate(new Date(created.expiresAt)) : null,
-          remainingUses: created.maxUses ?? null,
-          // 서버에 기본 기수 설정이 없어서 화면에만 남긴다
-          defaultGeneration: form.defaultGeneration,
-        },
-        ...prev,
-      ]);
+      // 기본 기수만 화면에 기억 (링크 목록은 서버에서 다시 불러온다)
+      setDefaultGenerationById((prev) => ({ ...prev, [created.inviteId]: form.defaultGeneration }));
       copyToClipboard(INVITE_BASE + created.code, "초대 링크를 만들고 복사했습니다");
     } catch (error) {
       showToast(getErrorMessage(error), "info");
@@ -261,22 +295,20 @@ export default function AdminDashboardPage() {
     setRevokeTarget(null);
     if (!link) return;
     deleteInvite.mutate(link.id, {
-      onSuccess: () => {
-        setLinks((prev) => prev.filter((l) => l.id !== link.id));
-        showToast("초대 링크를 폐기했습니다");
-      },
+      // 목록은 훅이 서버에서 다시 불러온다
+      onSuccess: () => showToast("초대 링크를 폐기했습니다"),
       onError: (error) => showToast(getErrorMessage(error), "info"),
     });
   };
 
   // 승인 모드 켜기/끄기
   const handleToggleApproval = () => {
+    // 서버 값을 아직 못 불러왔으면 바꾸지 않는다 (잘못된 값으로 덮어쓰지 않게)
+    if (!settingsQuery.data) return;
     const next = !approvalMode;
     updateSettings.mutate(next, {
-      onSuccess: () => {
-        setApprovalMode(next);
-        showToast(next ? "부장 승인 모드를 켰습니다" : "부장 승인 모드를 껐습니다", "info");
-      },
+      // 화면 값은 훅이 서버에서 다시 불러온다
+      onSuccess: () => showToast(next ? "부장 승인 모드를 켰습니다" : "부장 승인 모드를 껐습니다", "info"),
       onError: (error) => showToast(getErrorMessage(error), "info"),
     });
   };
@@ -317,7 +349,7 @@ export default function AdminDashboardPage() {
             ) : (
               <MemberTable
                 members={tabMembers}
-                // ★ 내 줄에 (나) 표시
+                // 내 줄에 (나) 표시
                 myId={myId}
                 tabs={tabs}
                 activeTab={activeTab}
@@ -355,9 +387,12 @@ export default function AdminDashboardPage() {
               generations={generations}
               graduated={[]}
               members={members}
+              // ☆ 줄 수 있는 역할 · 여러 명 주기 · 해제
+              roleOptions={ROLE_OPTIONS}
               onAddGeneration={handleAddGeneration}
               onGraduate={handleGraduate}
-              onHandover={handleHandover}
+              onGrantRole={handleGrantRole}
+              onRemoveRole={handleRemoveRole}
             />
           </aside>
         </div>

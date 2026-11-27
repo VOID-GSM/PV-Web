@@ -519,7 +519,7 @@ export const Header: React.FC<HeaderProps> = ({
                     {/* ☆ 업무일지 쓰기: 업무일지 화면 (오른쪽 "오늘의 일지 쓰기") */}
                     <button
                       type="button"
-                      onClick={() => goTo("/worklog")}
+                                            onClick={() => goTo("/worklog", { openWrite: true })}
                       className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 font-semibold text-gray-800 transition hover:bg-gray-100"
                     >
                       <img
