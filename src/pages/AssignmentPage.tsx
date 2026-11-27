@@ -338,29 +338,36 @@ export default function AssignmentPage() {
     });
   };
 
-  // 출제 → 서버
-  const handleSubmitAssignment = (form: AssignmentForm, isDraft: boolean) => {
+   // 출제 → 서버
+  // ☆ targetMemberIds: 개인 지정으로 고른 팀원 회원 번호들 (개인 지정이 아니면 빈 배열)
+  const handleSubmitAssignment = (form: AssignmentForm, isDraft: boolean, targetMemberIds: number[] = []) => {
     if (isDraft) {
       showToast("임시 저장은 서버 연결을 준비 중입니다");
       return;
     }
-    if (form.targets.includes(TARGET_PERSONAL)) {
-      showToast("개인 지정 출제는 팀원 연동 후 지원됩니다. 전체나 전공으로 출제해 주세요");
-      return;
-    }
+
+    // ☆ 대상 종류 정하기 (서버는 한 종류만 받는다): 개인 지정 → 전체 → 전공
+    const isPersonal = form.targets.includes(TARGET_PERSONAL);
     const isAll = form.targets.includes(TARGET_ALL);
     const targetMajors = form.targets
       .map((t) => findKey(MAJOR_LABEL, t))
       .filter((m): m is Major => m !== undefined);
+
+    if (isPersonal && targetMemberIds.length === 0) {
+      showToast("개인 지정할 팀원을 한 명 이상 골라 주세요");
+      return;
+    }
 
     createAssignment.mutate(
       {
         title: form.title,
         description: form.description,
         deadline: new Date(form.deadline).toISOString(),
-        targetType: isAll ? "ALL" : "MAJOR",
-        targetMajors: isAll ? [] : targetMajors,
-        targetMemberIds: [],
+        // ☆ MEMBER: 개인 지정 / ALL: 전체 / MAJOR: 전공
+        targetType: isPersonal ? "MEMBER" : isAll ? "ALL" : "MAJOR",
+        targetMajors: isPersonal || isAll ? [] : targetMajors,
+        // ☆ 개인 지정이면 고른 팀원 번호들
+        targetMemberIds: isPersonal ? targetMemberIds : [],
         fileKeys: [],
         skillIds: form.skillId !== null ? [form.skillId] : [],
       },
@@ -370,7 +377,7 @@ export default function AssignmentPage() {
       }
     );
   };
-
+  
   // 제출 / 재제출 → 서버 (파일 첨부면 먼저 파일을 올린다)
   // async: 파일 업로드를 기다렸다가 제출해야 해서
   // ☆ 성공하면 true, 실패하면 false를 돌려준다 (카드가 성공했을 때만 입력을 비우게)
