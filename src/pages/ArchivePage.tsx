@@ -2,7 +2,7 @@
 // ★ useCallback: 토스트 닫기 함수를 한 번만 만들어 두려고
 import { useCallback, useState, useEffect } from "react";
 // ☆ useSearchParams: 주소의 ?activityId=3 을 읽는다 (활동 화면에서 바로 열 수 있게)
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 // ★ 다른 화면과 같은 공통 헤더 (진짜 알림 · 새로 만들기 메뉴)
 import { Header } from "../components/layout/Header";
 import Dropdown from "../components/common/Dropdown";
@@ -15,6 +15,7 @@ import {
   deletePost,
   getPost,
   getPosts,
+  getPostTags,
   type ApiPostSummary,
   // ☆ 서버에 보낼 검색 조건 모양
   type PostSearchCondition,
@@ -59,6 +60,7 @@ const toActivityId = (value: string | null) => {
 
 export default function ArchivePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
 
   // ★ 가짜 알림 창·새로 만들기 메뉴 상태는 지웠다 (공통 Header가 대신한다)
@@ -73,6 +75,7 @@ export default function ArchivePage() {
   // ☆ 서버의 진짜 활동 목록 (드롭다운·활동 이름 표시용)
   const [activities, setActivities] = useState<ActivitySummary[]>([]);
   const [selectedTag, setSelectedTag] = useState("전체 태그");
+  const [serverTags, setServerTags] = useState<string[]>([]);
   const [dateFilterMode, setDateFilterMode] = useState<"all" | "before" | "after" | "between">("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -101,7 +104,12 @@ export default function ArchivePage() {
   const selectedArticle =
     articles.find((article) => article.id === selectedArticleId) ?? null;
 
-  const tagOptions: string[] = Array.from(new Set<string>(articles.flatMap((article) => article.tags ?? []))).sort((a, b) => a.localeCompare(b, "ko"));
+  const tagOptions: string[] = Array.from(
+    new Set<string>([
+      ...serverTags,
+      ...articles.flatMap((article) => article.tags ?? []),
+    ]),
+  ).sort((a, b) => a.localeCompare(b, "ko"));
   const filteredArticles = articles.filter((article) => {
     const matchesSearch = `${article.title} ${article.content} ${activityLabel(article.activity)} ${(article.tags ?? []).join(" ")}`
       .toLowerCase()
@@ -121,10 +129,20 @@ export default function ArchivePage() {
 
   // ★ 지금 떠 있는 토스트 (null이면 안 보임)
   const [toast, setToast] = useState<ToastState | null>(null);
-  const showToast = (message: string, type: "success" | "info" = "info") => {
+  const showToast = useCallback((message: string, type: "success" | "info" = "info") => {
     setToast((prev) => ({ id: (prev?.id ?? 0) + 1, message, type }));
-  };
+  }, []);
   const closeToast = useCallback(() => setToast(null), []);
+
+  useEffect(() => {
+    const navigationState = location.state as
+      | { toastMessage?: string; toastType?: "success" | "info" }
+      | null;
+    if (!navigationState?.toastMessage) return;
+
+    showToast(navigationState.toastMessage, navigationState.toastType ?? "success");
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+  }, [location.key, location.pathname, location.search, location.state, navigate, showToast]);
 
   useEffect(() => {
     let cancelled = false;
@@ -133,6 +151,20 @@ export default function ArchivePage() {
         if (!cancelled) setMyMemberId(profile.memberId);
       })
       .catch((error: unknown) => console.error("내 회원 정보 조회 실패:", error));
+    return () => { cancelled = true; };
+  }, []);
+
+  // 서버에 실제 등록된 태그를 필터 옵션으로 사용한다.
+  useEffect(() => {
+    let cancelled = false;
+    getPostTags()
+      .then((tags) => {
+        if (!cancelled) setServerTags(Array.isArray(tags) ? tags : []);
+      })
+      .catch((error: unknown) => {
+        // 서버 태그 조회에 실패하면 글 응답에 포함된 태그로 필터를 유지한다.
+        console.error("태그 목록 조회 실패:", error);
+      });
     return () => { cancelled = true; };
   }, []);
 
@@ -182,9 +214,23 @@ export default function ArchivePage() {
 
         {
                     // ☆ 탭 조건(내가 쓴 글) + 활동 조건을 합친다
+          const dateCondition: Pick<PostSearchCondition, "from" | "to"> =
+            dateFilterMode === "before" && dateTo
+              ? { to: dateTo }
+              : dateFilterMode === "after" && dateFrom
+                ? { from: dateFrom }
+                : dateFilterMode === "between"
+                  ? {
+                      ...(dateFrom ? { from: dateFrom } : {}),
+                      ...(dateTo ? { to: dateTo } : {}),
+                    }
+                  : {};
+
           const condition: PostSearchCondition = {
             ...activityCondition,
+            ...dateCondition,
             ...(selectedTab === "my" ? { author: "me" as const } : {}),
+            ...(selectedTag !== "전체 태그" ? { tag: selectedTag } : {}),
           };
 
           const response = await getPosts(condition, 0, 50);
@@ -212,7 +258,7 @@ export default function ArchivePage() {
                   round: post.sessionId
                     ? `${post.sessionId}회차`
                     : "회차 미지정",
-                  tags: localArticle?.tags ?? [],
+                  tags: Array.isArray(post.tags) ? post.tags : (summary.tags ?? localArticle?.tags ?? []),
                   date: (post.createdAt || summary.createdAt || "").slice(
                     0,
                     10,
@@ -233,7 +279,7 @@ export default function ArchivePage() {
                   round: summary.sessionId
                     ? `${summary.sessionId}회차`
                     : "회차 미지정",
-                  tags: localArticle?.tags ?? [],
+                  tags: summary.tags ?? localArticle?.tags ?? [],
                   date: (summary.createdAt || "").slice(0, 10),
                   author: summary.authorName ?? "알 수 없음",
                   commentsCount: localArticle?.commentsCount ?? 0,
@@ -271,7 +317,15 @@ export default function ArchivePage() {
       cancelled = true;
     };
     // ☆ 탭이나 고른 활동이 바뀌면 다시 불러온다
-  }, [selectedTab, selectedActivityId, myMemberId]);
+  }, [
+    selectedTab,
+    selectedActivityId,
+    selectedTag,
+    myMemberId,
+    dateFilterMode,
+    dateFrom,
+    dateTo,
+  ]);
 
   useEffect(() => {
     if (!selectedArticleId || !/^\d+$/.test(selectedArticleId)) {

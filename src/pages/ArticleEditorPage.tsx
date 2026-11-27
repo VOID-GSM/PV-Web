@@ -1,6 +1,6 @@
 // src/pages/ArticleEditorPage.tsx
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useNavigate } from "react-router-dom";
 
@@ -9,6 +9,7 @@ import Dropdown from "../components/common/Dropdown";
 import { ArrowLeftIcon } from "../components/icons/ArrowLeftIcon";
 
 import MarkdownPreview from "../components/common/MarkdownPreview";
+import Toast from "../components/common/Toast";
 
 import { uploadImage } from "../api/fileApi";
 
@@ -23,6 +24,7 @@ import {
 import type { ArticleDraft } from "../utils/articles";
 
 import { createPost, getPost, updatePost } from "../api/postApi";
+import { createFeedbackRequest } from "../api/commentApi";
 import { getMembers, type Member } from "../apis/members";
 
 import {
@@ -88,6 +90,11 @@ export default function ArticleEditorPage() {
   const [tagInput, setTagInput] = useState("");
 
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>([]);
+  const [toast, setToast] = useState<{ id: number; message: string; type: "success" | "info" } | null>(null);
+  const closeToast = useCallback(() => setToast(null), []);
+  const showToast = (message: string, type: "success" | "info" = "info") =>
+    setToast((previous) => ({ id: (previous?.id ?? 0) + 1, message, type }));
 
   const [apiActivities, setApiActivities] = useState<ActivitySummary[]>([]);
   const [teamMembers, setTeamMembers] = useState<Member[]>([]);
@@ -120,6 +127,37 @@ export default function ArticleEditorPage() {
     };
   }, []);
 
+  // 임시 저장/기존 글에 남아 있는 팀원 이름을 회원 ID로 복원한다.
+  useEffect(() => {
+    if (teamMembers.length === 0 || selectedMemberIds.length > 0) return;
+    const savedNames = (selectedMember || "")
+      .split(",")
+      .map((name) => name.trim())
+      .filter(Boolean);
+    const restoredIds = teamMembers
+      .filter((member) => savedNames.includes(member.name))
+      .map((member) => member.memberId);
+    if (restoredIds.length > 0) setSelectedMemberIds(restoredIds);
+  }, [teamMembers, selectedMember, selectedMemberIds.length]);
+
+  const toggleFeedbackMember = (memberId: number) => {
+    const isSelected = selectedMemberIds.includes(memberId);
+    if (!isSelected && selectedMemberIds.length >= 20) {
+      showToast("피드백 요청 대상은 최대 20명까지 선택할 수 있습니다.");
+      return;
+    }
+    const nextIds = isSelected
+      ? selectedMemberIds.filter((id) => id !== memberId)
+      : [...selectedMemberIds, memberId];
+    setSelectedMemberIds(nextIds);
+    setSelectedMember(
+      teamMembers
+        .filter((member) => nextIds.includes(member.memberId))
+        .map((member) => member.name)
+        .join(", ") || "지정할 팀원 선택",
+    );
+  };
+
   const handleImageUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
@@ -130,7 +168,7 @@ export default function ArticleEditorPage() {
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      alert("이미지 파일만 업로드할 수 있습니다.");
+      showToast("이미지 파일만 업로드할 수 있습니다.");
 
       return;
     }
@@ -142,7 +180,7 @@ export default function ArticleEditorPage() {
     const memberId = Number(memberIdValue);
 
     if (!memberIdValue || !Number.isSafeInteger(memberId) || memberId <= 0) {
-      alert("회원 정보를 확인할 수 없습니다.");
+      showToast("회원 정보를 확인할 수 없습니다.");
 
       return;
     }
@@ -177,7 +215,7 @@ export default function ArticleEditorPage() {
     } catch (error) {
       console.error("이미지 업로드 실패:", error);
 
-      alert(
+      showToast(
         error instanceof Error
           ? error.message
           : "이미지를 업로드하지 못했습니다.",
@@ -215,7 +253,7 @@ export default function ArticleEditorPage() {
     } catch (error) {
       console.error("활동 회차 조회 실패:", error);
 
-      alert(
+      showToast(
         error instanceof Error
           ? error.message
           : "활동 회차를 불러오지 못했습니다.",
@@ -235,6 +273,8 @@ export default function ArticleEditorPage() {
         setTitle(post.title);
 
         setContent(post.content);
+
+        setTags(Array.isArray(post.tags) ? post.tags : []);
 
         if (post.activityId) {
           const activities = await getActivities();
@@ -277,7 +317,7 @@ export default function ArticleEditorPage() {
         console.error("정리글 조회 실패:", error);
 
         if (!cancelled)
-          alert(
+          showToast(
             error instanceof Error
               ? error.message
               : "수정할 정리글을 불러오지 못했습니다.",
@@ -290,11 +330,26 @@ export default function ArticleEditorPage() {
   }, [editId]);
 
   const handleAddTag = () => {
-    if (tagInput.trim() && !tags.includes(tagInput.trim())) {
-      setTags([...tags, tagInput.trim()]);
+    const normalizedTag = tagInput.trim().replace(/^#+/, "").trim();
+    if (!normalizedTag) return;
 
-      setTagInput("");
+    if (normalizedTag.length > 30) {
+      showToast("태그는 30자 이하로 입력해주세요.");
+      return;
     }
+
+    if (tags.some((tag) => tag.toLocaleLowerCase() === normalizedTag.toLocaleLowerCase())) {
+      setTagInput("");
+      return;
+    }
+
+    if (tags.length >= 10) {
+      showToast("태그는 최대 10개까지 등록할 수 있습니다.");
+      return;
+    }
+
+    setTags((current) => [...current, normalizedTag]);
+    setTagInput("");
   };
 
   const handleRemoveTag = (tagToRemove: string) => {
@@ -320,7 +375,7 @@ export default function ArticleEditorPage() {
   const handleSaveDraft = () => {
     saveArticleDraft(currentDraft);
 
-    alert("임시 저장했습니다. 이 브라우저에서 다시 이어 쓸 수 있어요.");
+    showToast("임시 저장했습니다. 이 브라우저에서 다시 이어 쓸 수 있어요.");
   };
 
   const applyMarkdown = (before: string, after = before, linePrefix = "") => {
@@ -383,17 +438,22 @@ export default function ArticleEditorPage() {
 
   const handlePublish = async () => {
     if (!title.trim()) {
-      alert("제목을 입력해주세요.");
+      showToast("제목을 입력해주세요.");
       return;
     }
 
     if (!content.trim()) {
-      alert("본문을 입력해주세요.");
+      showToast("본문을 입력해주세요.");
       return;
     }
 
     const isEdit = Boolean(editId && /^\d+$/.test(editId));
     const selectedSessionId = sessionIdByRound[round];
+
+    if (feedbackOption === "custom" && selectedMemberIds.length === 0) {
+      showToast("피드백 요청할 팀원을 한 명 이상 선택해주세요.");
+      return;
+    }
 
     // 새 정리글은 실제 회차 ID가 있어야 등록할 수 있다.
     if (
@@ -402,7 +462,7 @@ export default function ArticleEditorPage() {
         !Number.isSafeInteger(selectedSessionId) ||
         selectedSessionId <= 0)
     ) {
-      alert("활동과 회차를 선택해주세요.");
+      showToast("활동과 회차를 선택해주세요.");
       return;
     }
 
@@ -414,11 +474,13 @@ export default function ArticleEditorPage() {
         ? await updatePost(Number(editId), {
             title: title.trim(),
             content,
+            tags,
           })
         : await createPost({
             title: title.trim(),
             content,
             sessionId: selectedSessionId,
+            tags,
           });
 
       saveArticle({
@@ -426,7 +488,7 @@ export default function ArticleEditorPage() {
         title: response.title,
         activity,
         round,
-        tags,
+        tags: Array.isArray(response.tags) ? response.tags : tags,
         date: (
           response.createdAt || new Date().toLocaleDateString("sv-SE")
         ).slice(0, 10),
@@ -438,11 +500,40 @@ export default function ArticleEditorPage() {
       });
 
       clearArticleDraft();
-      alert(isEdit ? "정리글을 수정했습니다." : "정리글을 발행했습니다.");
-      navigate("/archive");
+
+      // 새 정리글 발행 시 선택한 팀원에게 실제 피드백 요청을 등록한다.
+      if (!isEdit && feedbackOption === "custom" && selectedMemberIds.length > 0) {
+        try {
+          await createFeedbackRequest({
+            targetType: "NOTE",
+            targetId: response.id,
+            memberIds: selectedMemberIds,
+          });
+        } catch (feedbackError) {
+          console.error("피드백 요청 등록 실패:", feedbackError);
+          const feedbackMessage =
+            feedbackError instanceof Error
+              ? feedbackError.message
+              : "피드백 요청 등록에 실패했습니다.";
+          navigate("/archive", {
+            state: {
+              toastMessage: `정리글은 저장됐지만 피드백 요청에 실패했습니다: ${feedbackMessage}`,
+              toastType: "info",
+            },
+          });
+          return;
+        }
+      }
+
+      navigate("/archive", {
+        state: {
+          toastMessage: isEdit ? "정리글을 수정했습니다." : "정리글을 발행했습니다.",
+          toastType: "success",
+        },
+      });
     } catch (error) {
       console.error("정리글 저장 실패:", error);
-      alert(
+      showToast(
         error instanceof Error
           ? error.message
           : "정리글을 저장하지 못했습니다.",
@@ -611,7 +702,7 @@ export default function ArticleEditorPage() {
                     if (url && /^https?:\/\//i.test(url))
                       applyMarkdown("[", `](${url})`);
                     else if (url)
-                      alert("http:// 또는 https:// 주소를 입력해주세요.");
+                      showToast("http:// 또는 https:// 주소를 입력해주세요.");
                   }}
                   className="p-1 hover:bg-gray-200 rounded text-xs"
                 >
@@ -775,14 +866,33 @@ export default function ArticleEditorPage() {
 
                   {feedbackOption === "custom" && (
                     <div className="pl-3 pr-1 pt-1 space-y-1.5 animate-in fade-in duration-150">
-                      <Dropdown
-                        options={["지정할 팀원 선택", ...teamMembers.map((member) => member.name)]}
-                        value={selectedMember}
-                        onChange={setSelectedMember}
-                      />
-
+                      <div className="max-h-40 overflow-y-auto rounded-lg border border-gray-200 p-2 space-y-1">
+                        {teamMembers.length === 0 ? (
+                          <p className="px-2 py-2 text-[10px] text-gray-400">
+                            선택할 수 있는 팀원이 없습니다.
+                          </p>
+                        ) : (
+                          teamMembers.map((member) => (
+                            <label
+                              key={member.memberId}
+                              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[11px] text-gray-700 hover:bg-gray-50"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedMemberIds.includes(member.memberId)}
+                                onChange={() => toggleFeedbackMember(member.memberId)}
+                                className="accent-black"
+                              />
+                              <span>{member.name}</span>
+                              <span className="ml-auto text-[10px] text-gray-400">
+                                {member.majors?.join(", ")} {member.generation ? `${member.generation}기` : ""}
+                              </span>
+                            </label>
+                          ))
+                        )}
+                      </div>
                       <p className="text-[10px] text-gray-400 pl-1">
-                        * 가입된 팀원 중 한 명을 선택할 수 있습니다.
+                        * 팀원을 여러 명 선택할 수 있습니다. 최대 20명까지 지정 가능합니다.
                       </p>
                     </div>
                   )}
@@ -828,8 +938,15 @@ export default function ArticleEditorPage() {
                 <input
                   type="text"
                   value={tagInput}
+                  maxLength={30}
                   onChange={(e) => setTagInput(e.target.value)}
-                  placeholder="태그 입력"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddTag();
+                    }
+                  }}
+                  placeholder="태그 입력 (최대 30자)"
                   className="flex-1 px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-black"
                 />
 
@@ -922,6 +1039,14 @@ export default function ArticleEditorPage() {
             </div>
           </div>
         </div>
+      )}
+      {toast && (
+        <Toast
+          key={toast.id}
+          message={toast.message}
+          type={toast.type}
+          onClose={closeToast}
+        />
       )}
     </div>
   );

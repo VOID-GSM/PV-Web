@@ -1,6 +1,7 @@
 // src/components/modals/CreateArticleModal.tsx
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import MarkdownPreview from "../common/MarkdownPreview";
+import Toast from "../common/Toast";
 
 // mode 타입에 "journal", "interview" 추가
 export type ArticleModalMode =
@@ -39,6 +40,10 @@ export const CreateArticleModal: React.FC<CreateArticleModalProps> = ({
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [activeTab, setActiveTab] = useState<"Write" | "Preview">("Write");
+  const [toast, setToast] = useState<{ id: number; message: string } | null>(null);
+  const closeToast = useCallback(() => setToast(null), []);
+  const showToast = (message: string) =>
+    setToast((previous) => ({ id: (previous?.id ?? 0) + 1, message }));
 
   // 렌더링 단계 폼 초기화 (ESLint 에러 방지)
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
@@ -49,6 +54,7 @@ export const CreateArticleModal: React.FC<CreateArticleModalProps> = ({
       setTitle("");
       setContent("");
       setActiveTab("Write");
+      setToast(null);
     }
   }
 
@@ -96,11 +102,11 @@ export const CreateArticleModal: React.FC<CreateArticleModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
-      window.alert("제목을 입력해 주세요.");
+      showToast("제목을 입력해 주세요.");
       return;
     }
     if (!content.trim()) {
-      window.alert("내용을 입력해 주세요.");
+      showToast("내용을 입력해 주세요.");
       return;
     }
     if (onSubmitSuccess) {
@@ -234,6 +240,14 @@ export const CreateArticleModal: React.FC<CreateArticleModalProps> = ({
           </div>
         </form>
       </div>
+      {toast && (
+        <Toast
+          key={toast.id}
+          message={toast.message}
+          type="info"
+          onClose={closeToast}
+        />
+      )}
     </div>
   );
 };

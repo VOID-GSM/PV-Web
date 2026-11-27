@@ -44,3 +44,16 @@ export function completeFeedbackRequest(requestId: number) {
     method: "POST",
   });
 }
+
+
+/** 정리글에 피드백을 요청할 팀원 지정 */
+export function createFeedbackRequest(body: {
+  targetType: CommentTargetType;
+  targetId: number;
+  memberIds: number[];
+}) {
+  return apiRequest<unknown>("/comments/feedback-requests", {
+    method: "POST",
+    body,
+  });
+}
