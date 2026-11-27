@@ -5,7 +5,10 @@ import {
   createInvite,
   deleteInvite,
   getDashboard,
+  // ★ 초대 링크 목록 · 팀 설정 불러오기
+  getInvites,
   getJoinRequests,
+  getTeamSettings,
   updateTeamSettings,
 } from "../apis/team";
 import { issueReEntryCode } from "../apis/auth";
@@ -18,6 +21,9 @@ export const teamKeys = {
   members: ["team", "members"] as const,
   dashboard: ["team", "dashboard"] as const,
   joinRequests: ["team", "join-requests"] as const,
+  // ★ 초대 링크 목록 · 팀 설정
+  invites: ["team", "invites"] as const,
+  settings: ["team", "settings"] as const,
 };
 
 // ─────────────────────────────────────────────
@@ -33,6 +39,16 @@ export function useDashboard() {
 
 export function useJoinRequests() {
   return useQuery({ queryKey: teamKeys.joinRequests, queryFn: getJoinRequests });
+}
+
+// ★ 초대 링크 목록 (새로고침해도 서버에서 다시 불러온다)
+export function useInvites() {
+  return useQuery({ queryKey: teamKeys.invites, queryFn: getInvites });
+}
+
+// ★ 승인 모드 (새로고침해도 서버에서 다시 불러온다)
+export function useTeamSettings() {
+  return useQuery({ queryKey: teamKeys.settings, queryFn: getTeamSettings });
 }
 
 // 팀 데이터가 바뀌면 팀 관련 전부 + 내 프로필을 다시 불러온다
@@ -79,12 +95,23 @@ export function useIssueReEntryLink() {
 // ─────────────────────────────────────────────
 // 초대 링크 · 입장 요청 · 승인 모드
 // ─────────────────────────────────────────────
+
+// ★ 만들면 초대 링크 목록을 다시 불러온다
 export function useCreateInvite() {
-  return useMutation({ mutationFn: createInvite });
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: createInvite,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: teamKeys.invites }),
+  });
 }
 
+// ★ 폐기하면 초대 링크 목록을 다시 불러온다
 export function useDeleteInvite() {
-  return useMutation({ mutationFn: deleteInvite });
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteInvite,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: teamKeys.invites }),
+  });
 }
 
 export function useApproveJoinRequest() {
@@ -92,6 +119,11 @@ export function useApproveJoinRequest() {
   return useMutation({ mutationFn: approveJoinRequest, onSuccess: invalidate });
 }
 
+// ★ 승인 모드를 바꾸면 팀 설정을 다시 불러온다
 export function useUpdateTeamSettings() {
-  return useMutation({ mutationFn: updateTeamSettings });
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: updateTeamSettings,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: teamKeys.settings }),
+  });
 }

@@ -1,17 +1,32 @@
 import { useState } from "react";
-import { BOARDS, TEMPLATES, type NewWorklog } from "../../constants/worklog";
-import WorklogWriteModal from "./WorklogWriteModal";
+// ☆ BOARDS(빈 목록) 대신 서버 보드를 받는다
+import { TEMPLATES, type NewWorklog } from "../../constants/worklog";
+import WorklogWriteModal, { type BoardOption } from "./WorklogWriteModal";
 
 type WorklogQuickWriteProps = {
   // 작성 창에서 올린 일지를 페이지로 넘겨주는 함수
   onSubmit: (data: NewWorklog) => void;
+  // ☆ 고를 수 있는 서버 보드들
+  boards: BoardOption[];
+  // ☆ 바로 열기 신호: 값이 새로 바뀌면 작성 창을 연다 (헤더 "업무일지 쓰기"에서 온다)
+  openRequestKey?: string | null;
+  // ☆ 작성 창이 닫힐 때 페이지에 알린다 (헤더 쪽지를 지우려고)
+  onModalClose?: () => void;
 };
 
-export default function WorklogQuickWrite({ onSubmit }: WorklogQuickWriteProps) {
+export default function WorklogQuickWrite({ onSubmit, boards, openRequestKey, onModalClose }: WorklogQuickWriteProps) {
   const [checkedTemplates, setCheckedTemplates] = useState<string[]>([]);
   const [isPublic, setIsPublic] = useState(false);
   const [selectedBoards, setSelectedBoards] = useState<string[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  // ☆ 마지막으로 처리한 바로 열기 신호
+  const [seenOpenKey, setSeenOpenKey] = useState<string | null>(null);
+
+  // ☆ 새 신호가 오면 작성 창 열기 (useEffect 대신 그리는 중에 확인: 이 프로젝트 ESLint 규칙)
+  if (openRequestKey && openRequestKey !== seenOpenKey) {
+    setSeenOpenKey(openRequestKey);
+    setIsModalOpen(true);
+  }
 
   const toggleTemplate = (template: string) => {
     if (checkedTemplates.includes(template)) {
@@ -21,12 +36,15 @@ export default function WorklogQuickWrite({ onSubmit }: WorklogQuickWriteProps) 
     }
   };
 
+  // ☆ 보드는 하나만 (서버 규칙). 같은 걸 다시 누르면 해제
   const toggleBoard = (boardName: string) => {
-    if (selectedBoards.includes(boardName)) {
-      setSelectedBoards(selectedBoards.filter((b) => b !== boardName));
-    } else {
-      setSelectedBoards([...selectedBoards, boardName]);
-    }
+    setSelectedBoards((prev) => (prev[0] === boardName ? [] : [boardName]));
+  };
+
+  // ☆ 작성 창 닫기 + 페이지에 알리기
+  const closeModal = () => {
+    setIsModalOpen(false);
+    onModalClose?.();
   };
 
   // 작성 창에서 올렸을 때: 페이지로 넘기고, 이 카드의 선택값은 다시 비운다
@@ -75,6 +93,7 @@ export default function WorklogQuickWrite({ onSubmit }: WorklogQuickWriteProps) 
             </p>
           </div>
           <button
+            type="button"
             onClick={() => setIsPublic(!isPublic)}
             className={`relative h-6 w-11 shrink-0 rounded-full transition ${
               isPublic ? "bg-black" : "bg-neutral-200"
@@ -89,17 +108,18 @@ export default function WorklogQuickWrite({ onSubmit }: WorklogQuickWriteProps) 
         </div>
 
         {/* 보드 태그 */}
-        <p className="mt-4 text-xs text-neutral-500">보드 태그</p>
-        {/* ★ 보드가 없으면 안내 문구, 있으면 태그 버튼들 */}
-        {BOARDS.length === 0 ? (
+        <p className="mt-4 text-xs text-neutral-500">보드 태그 (하나 선택)</p>
+        {/* ☆ 서버 보드가 없으면 안내 문구, 있으면 태그 버튼들 */}
+        {boards.length === 0 ? (
           <p className="mt-2 rounded border border-dashed py-4 text-center text-xs text-neutral-400">
             등록된 보드가 없습니다
           </p>
         ) : (
           <div className="mt-2 flex flex-wrap gap-2">
-            {BOARDS.map((board) => (
+            {boards.map((board) => (
               <button
-                key={board.name}
+                key={board.id}
+                type="button"
                 onClick={() => toggleBoard(board.name)}
                 className={`flex items-center gap-1.5 rounded border px-2 py-1 text-xs ${
                   selectedBoards.includes(board.name)
@@ -107,7 +127,8 @@ export default function WorklogQuickWrite({ onSubmit }: WorklogQuickWriteProps) 
                     : "border-neutral-200 text-neutral-500"
                 }`}
               >
-                <span className={`h-2 w-2 rounded-full ${board.dotColor}`} />
+                {/* ☆ 서버 보드 색 점 */}
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: board.color }} />
                 {board.name}
               </button>
             ))}
@@ -115,6 +136,7 @@ export default function WorklogQuickWrite({ onSubmit }: WorklogQuickWriteProps) 
         )}
 
         <button
+          type="button"
           onClick={() => setIsModalOpen(true)}
           className="mt-5 w-full rounded bg-black py-2.5 text-sm font-semibold text-white"
         >
@@ -124,11 +146,12 @@ export default function WorklogQuickWrite({ onSubmit }: WorklogQuickWriteProps) 
 
       {isModalOpen && (
         <WorklogWriteModal
-          onClose={() => setIsModalOpen(false)}
+          onClose={closeModal}
           onSubmit={handleSubmit}
           initialTemplates={checkedTemplates}
           initialBoards={selectedBoards}
           initialPublic={isPublic}
+          boards={boards}
         />
       )}
     </>

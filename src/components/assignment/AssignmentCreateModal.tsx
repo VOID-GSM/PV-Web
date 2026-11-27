@@ -1,15 +1,16 @@
 import { useState } from "react";
 import Dropdown from "../common/Dropdown";
-// ☆ 프로필 사진 (없으면 이름 첫 글자)
+// 프로필 사진 (없으면 이름 첫 글자)
 import Avatar from "../common/Avatar";
+// ☆ 진짜 팀원 목록 (GET /members)
+import { useTeamMembers } from "../../hooks/useTeam";
+import { MAJOR_LABEL } from "../../apis/interviews";
 import {
   MAJORS,
   MAX_DESCRIPTION,
-  MEMBERS,
   SUBMIT_TYPES,
   TARGET_ALL,
   TARGET_PERSONAL,
-  getRecipients,
   type Assignment,
   type AssignmentForm,
   type Skill,
@@ -21,7 +22,8 @@ type AssignmentCreateModalProps = {
   initialSkillId: number | null;
   editing: Assignment | null;
   remindedMajors: string[];
-  onSubmit: (form: AssignmentForm, isDraft: boolean) => void;
+  // ☆ 개인 지정이면 고른 팀원의 회원 번호들도 같이 넘긴다 (서버는 이름이 아니라 번호로 받는다)
+  onSubmit: (form: AssignmentForm, isDraft: boolean, targetMemberIds: number[]) => void;
   onClose: () => void;
 };
 
@@ -38,6 +40,7 @@ type CheckChipProps = {
 function CheckChip({ label, selected, onClick }: CheckChipProps) {
   return (
     <button
+      type="button"
       onClick={onClick}
       className={`flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs ${
         selected ? "border-black font-semibold" : "border-neutral-200 text-neutral-500"
@@ -62,17 +65,52 @@ export default function AssignmentCreateModal({
   const [skillId, setSkillId] = useState<number | null>(editing?.skillId ?? initialSkillId);
   const [deadline, setDeadline] = useState(editing?.deadline ?? "");
   const [targets, setTargets] = useState<string[]>(editing?.targets ?? []);
-  const [personalTargets, setPersonalTargets] = useState<string[]>(editing?.personalTargets ?? []);
+  // ☆ 개인 지정으로 고른 팀원의 회원 번호들
+  const [personalIds, setPersonalIds] = useState<number[]>([]);
   const [submitTypes, setSubmitTypes] = useState<string[]>(editing?.submitTypes ?? []);
   const [remind, setRemind] = useState(editing?.remind ?? false);
+
+  // ☆ 진짜 팀원 (가입 완료한 사람만, 기수 높은 순 → 이름순)
+  const membersQuery = useTeamMembers();
+  const joinedMembers = (membersQuery.data ?? [])
+    .filter((m) => m.status === "JOINED")
+    .sort((a, b) => b.generation - a.generation || a.name.localeCompare(b.name, "ko"));
+  // ☆ 가장 최근 기수 ("10기 전체"의 대상)
+  const latestGeneration = joinedMembers.length > 0 ? Math.max(...joinedMembers.map((m) => m.generation)) : null;
 
   const toggleIn = (list: string[], value: string) =>
     list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 
+  // ☆ 대상 칩 누르기: 서버는 대상을 한 종류만 받아서 "개인 지정"은 다른 칩과 같이 못 고른다
+  const toggleTarget = (t: string) => {
+    if (t === TARGET_PERSONAL) {
+      // 개인 지정을 켜면 다른 칩은 끄고, 끄면 고른 사람도 비운다
+      const turningOn = !targets.includes(TARGET_PERSONAL);
+      setTargets(turningOn ? [TARGET_PERSONAL] : []);
+      if (!turningOn) setPersonalIds([]);
+      return;
+    }
+    // 전체·전공 칩을 누르면 개인 지정은 끈다
+    setTargets(toggleIn(targets.filter((x) => x !== TARGET_PERSONAL), t));
+    setPersonalIds([]);
+  };
+
+  // ☆ 개인 지정 팀원 고르기/빼기
+  const togglePerson = (memberId: number) =>
+    setPersonalIds((prev) => (prev.includes(memberId) ? prev.filter((id) => id !== memberId) : [...prev, memberId]));
+
   const skillLabel = (s: Skill) => `${s.name} (${s.major})`;
   const selectedSkill = skills.find((s) => s.id === skillId);
 
-  const recipients = getRecipients(targets, personalTargets);
+  // ☆ 받는 사람 미리보기 (진짜 팀원 기준. 실제 대상은 서버가 정한다)
+  const isPersonal = targets.includes(TARGET_PERSONAL);
+  const recipients = isPersonal
+    ? joinedMembers.filter((m) => personalIds.includes(m.memberId))
+    : joinedMembers.filter(
+        (m) =>
+          m.generation === latestGeneration &&
+          (targets.includes(TARGET_ALL) || m.majors.some((major) => targets.includes(MAJOR_LABEL[major])))
+      );
 
   // 이 과제로 리마인더가 풀리는 전공
   const clearedMajors = remindedMajors.filter((m) => targets.includes(TARGET_ALL) || targets.includes(m));
@@ -82,7 +120,8 @@ export default function AssignmentCreateModal({
     description.trim() === "" ? "설명" : "",
     skillId === null ? "역량 항목" : "",
     deadline === "" ? "마감" : "",
-    targets.length === 0 || (targets.includes(TARGET_PERSONAL) && personalTargets.length === 0) ? "대상" : "",
+    // ☆ 개인 지정이면 한 명 이상 골라야 한다
+    targets.length === 0 || (isPersonal && personalIds.length === 0) ? "대상" : "",
     submitTypes.length === 0 ? "제출 형식" : "",
   ].filter(Boolean);
 
@@ -92,13 +131,15 @@ export default function AssignmentCreateModal({
     skillId,
     deadline,
     targets,
-    personalTargets,
+    // ☆ 화면용으로 고른 사람 이름도 남긴다
+    personalTargets: recipients.map((m) => m.name),
     submitTypes,
     remind,
   };
 
   const handleSubmit = (isDraft: boolean) => {
-    onSubmit(form, isDraft);
+    // ☆ 개인 지정일 때만 회원 번호들을 넘긴다
+    onSubmit(form, isDraft, isPersonal ? personalIds : []);
     onClose();
   };
 
@@ -115,7 +156,7 @@ export default function AssignmentCreateModal({
               9기가 10기에게 과제를 냅니다 · 역량 맵 항목과 연결하면 통과 시 자동 반영됩니다
             </p>
           </div>
-          <button onClick={onClose} className="text-xl text-neutral-400">
+          <button type="button" onClick={onClose} className="text-xl text-neutral-400">
             ×
           </button>
         </div>
@@ -190,37 +231,44 @@ export default function AssignmentCreateModal({
               <p className="text-xs font-medium">
                 대상 <span className="text-red-500">*</span>
               </p>
-              <p className="text-[11px] text-neutral-400">복수 선택</p>
+              {/* ☆ 개인 지정은 다른 대상과 같이 고를 수 없다고 안내 */}
+              <p className="text-[11px] text-neutral-400">복수 선택 · 개인 지정은 단독</p>
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
               {TARGET_OPTIONS.map((t) => (
-                <CheckChip
-                  key={t}
-                  label={t}
-                  selected={targets.includes(t)}
-                  onClick={() => setTargets(toggleIn(targets, t))}
-                />
+                <CheckChip key={t} label={t} selected={targets.includes(t)} onClick={() => toggleTarget(t)} />
               ))}
             </div>
 
-            {targets.includes(TARGET_PERSONAL) && (
-              <div className="mt-2 flex flex-wrap gap-2 rounded bg-neutral-50 p-2">
-                {MEMBERS.filter((m) => m.generation === "10기").map((m) => (
-                  <CheckChip
-                    key={m.name}
-                    label={m.name}
-                    selected={personalTargets.includes(m.name)}
-                    onClick={() => setPersonalTargets(toggleIn(personalTargets, m.name))}
-                  />
-                ))}
+            {/* ☆ 개인 지정: 진짜 팀원 목록 */}
+            {isPersonal && (
+              <div className="mt-2 rounded bg-neutral-50 p-2">
+                {membersQuery.isPending ? (
+                  <p className="px-1 py-2 text-xs text-neutral-400">팀원을 불러오는 중...</p>
+                ) : membersQuery.isError ? (
+                  <p className="px-1 py-2 text-xs text-red-500">팀원 목록을 불러오지 못했습니다</p>
+                ) : joinedMembers.length === 0 ? (
+                  <p className="px-1 py-2 text-xs text-neutral-400">고를 수 있는 팀원이 없습니다</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {joinedMembers.map((m) => (
+                      <CheckChip
+                        key={m.memberId}
+                        label={`${m.name} · ${m.generation}기`}
+                        selected={personalIds.includes(m.memberId)}
+                        onClick={() => togglePerson(m.memberId)}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
             <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-neutral-500">
               받는 사람 {recipients.length}명
               {recipients.map((m) => (
-                <span key={m.name} className="flex items-center gap-1 rounded-full bg-neutral-100 px-2 py-0.5">
-                  {/* ☆ 프로필 사진 (회원 번호가 있으면 사진, 없으면 첫 글자) */}
+                <span key={m.memberId} className="flex items-center gap-1 rounded-full bg-neutral-100 px-2 py-0.5">
+                  {/* ☆ 진짜 회원 번호라 프로필 사진도 나온다 */}
                   <Avatar memberId={m.memberId} name={m.name} className="h-4 w-4 text-[9px]" />
                   {m.name}
                 </span>
@@ -255,6 +303,7 @@ export default function AssignmentCreateModal({
               <p className="text-[11px] text-neutral-500">D-3, D-1, 당일에 미제출자에게만 알림이 갑니다</p>
             </div>
             <button
+              type="button"
               onClick={() => setRemind(!remind)}
               className={`relative h-6 w-11 shrink-0 rounded-full transition ${remind ? "bg-black" : "bg-neutral-200"}`}
             >
@@ -286,6 +335,7 @@ export default function AssignmentCreateModal({
           )}
           <div className="flex shrink-0 gap-2">
             <button
+              type="button"
               onClick={() => handleSubmit(true)}
               disabled={title.trim() === ""}
               className="rounded border px-4 py-2 text-sm disabled:opacity-40"
@@ -293,6 +343,7 @@ export default function AssignmentCreateModal({
               임시 저장
             </button>
             <button
+              type="button"
               onClick={() => handleSubmit(false)}
               disabled={missing.length > 0}
               className="rounded bg-black px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"

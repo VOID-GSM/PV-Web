@@ -48,8 +48,29 @@ export interface InviteCreated {
   maxUses: number | null;
 }
 
+// ★ 초대 링크 목록의 한 줄 (만료·소진된 것도 같이 온다)
+export interface InviteListItem {
+  inviteId: number;
+  code: string;
+  createdAt: string;
+  // 무기한이면 null
+  expiresAt: string | null;
+  // 무제한이면 null
+  maxUses: number | null;
+  // 지금까지 쓴 횟수
+  useCount: number;
+  // 만료됐는지 / 횟수를 다 썼는지
+  expired: boolean;
+  exhausted: boolean;
+}
+
+// ★ 초대 링크 목록 — GET /auth/teams/{teamId}/invites (최신순)
+export const getInvites = async () => {
+  const { data } = await api.get<InviteListItem[]>(`/auth/teams/${TEAM_ID}/invites`);
+  return data;
+};
+
 // 초대 링크 만들기 — POST /auth/teams/{teamId}/invites
-// (목록을 불러오는 API는 없다)
 export const createInvite = async (body: { expiresAt?: string; maxUses?: number }) => {
   const { data } = await api.post<InviteCreated>(`/auth/teams/${TEAM_ID}/invites`, body);
   return data;
@@ -81,6 +102,17 @@ export const getJoinRequests = async () => {
 // 입장 요청 승인 — PATCH /auth/join-requests/{requestId} (거절 API는 없다)
 export const approveJoinRequest = async (requestId: number) => {
   await api.patch(`/auth/join-requests/${requestId}`);
+};
+
+// ★ 팀 설정 (승인 모드 켜짐/꺼짐)
+export interface TeamSettings {
+  approvalRequired: boolean;
+}
+
+// ★ 팀 설정 불러오기 — GET /auth/teams/{teamId}/settings
+export const getTeamSettings = async () => {
+  const { data } = await api.get<TeamSettings>(`/auth/teams/${TEAM_ID}/settings`);
+  return data;
 };
 
 // 부장 승인 모드 켜기/끄기 — PATCH /auth/teams/{teamId}/settings

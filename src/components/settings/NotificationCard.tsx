@@ -15,7 +15,7 @@ const SERVER_ROWS: { type: NotificationType; title: string; description: string 
   { type: "TOPIC_REMINDER", title: "주제 미정 재알림", description: "회차 D-1까지 주제가 없으면 재알림" },
   { type: "UNEXCUSED_ABSENCE", title: "무단 불참 알림", description: "스터디장·부장에게 전달" },
   { type: "WEEKLY_REPORT", title: "주간 리포트", description: "매주 월요일 09:00" },
-  // ★ 댓글 알림 3종
+  // 댓글 알림 3종
   { type: "WORKLOG_COMMENT", title: "업무일지 댓글 알림", description: "내 업무일지에 댓글이 달리면 알림" },
   { type: "SUBMISSION_COMMENT", title: "제출물 댓글 알림", description: "내 과제 제출물에 댓글이 달리면 알림" },
   { type: "NOTE_COMMENT", title: "정리글 댓글 알림", description: "내 정리글에 댓글이 달리면 알림" },
@@ -25,6 +25,7 @@ const SERVER_ROWS: { type: NotificationType; title: string; description: string 
 function Toggle({ enabled, disabled, onClick }: { enabled: boolean; disabled?: boolean; onClick?: () => void }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       disabled={disabled}
       className={`relative h-6 w-11 shrink-0 rounded-full transition disabled:opacity-40 ${
@@ -65,17 +66,11 @@ export default function NotificationCard() {
   return (
     <section id="notification" className="rounded-lg bg-white p-6">
       <h2 className="font-bold">알림</h2>
-      <p className="mt-1 text-xs text-neutral-400">웹 푸시를 기본으로 하고 디스코드 웹훅을 함께 쓰는 것을 권장합니다</p>
+      {/* ☆ 웹 푸시가 없어져서 안내 문구도 바꿨다 */}
+      <p className="mt-1 text-xs text-neutral-400">앱 알림과 함께 디스코드 웹훅을 쓰는 것을 권장합니다</p>
 
       <ul className="mt-4 flex flex-col gap-2">
-        {/* 웹 푸시: 서버에 아직 없다 */}
-        <li className="flex items-center justify-between gap-3 rounded bg-neutral-50 px-4 py-3">
-          <div>
-            <p className="text-sm font-medium">웹 푸시 (PWA)</p>
-            <p className="text-xs text-neutral-400">브라우저·모바일 홈 화면에서 즉시 알림 · 준비 중</p>
-          </div>
-          <Toggle enabled={false} disabled />
-        </li>
+        {/* ☆ 웹 푸시(PWA) 줄은 지웠다 (서버에 기능이 없어서 "준비 중"으로만 보였다) */}
 
         {/* 디스코드: 토글 대신 등록 여부 표시 */}
         <li className="flex items-center justify-between gap-3 rounded bg-neutral-50 px-4 py-3">
