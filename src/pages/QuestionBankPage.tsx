@@ -21,8 +21,19 @@ import {
   type Question,
 } from "../constants/questionBank";
 // 서버 연동
-import { useAllAnswers, useCreateAnswer, useCreateQuestion, useQuestions } from "../hooks/useInterviews";
-// ★ 진짜 내 이름·기수, 팀원 목록(다른 사람 기수 찾기용)
+import {
+  useAllAnswers,
+  useCreateAnswer,
+  // ☆ 그룹 만들기·이름 바꾸기·지우기
+  useCreateGroup,
+  useCreateQuestion,
+  useDeleteGroup,
+  // ☆ 그룹 목록
+  useInterviewGroups,
+  useQuestions,
+  useUpdateGroup,
+} from "../hooks/useInterviews";
+// 진짜 내 이름·기수, 팀원 목록(다른 사람 기수 찾기용)
 import { useMyName } from "../hooks/useMyName";
 import { useTeamMembers } from "../hooks/useTeam";
 import {
@@ -67,17 +78,19 @@ function toPageQuestion(q: ServerQuestion): Question {
     category: CATEGORY_LABEL[q.category],
     // 만든 날짜로 "10월 4주차" 만들기
     week: `${created.getMonth() + 1}월 ${Math.ceil(created.getDate() / 7)}주차`,
+    // ☆ 들어 있는 그룹
+    groupId: q.groupId ?? null,
   };
 }
 
-// ★ 서버 답변 → 화면 답변
+// 서버 답변 → 화면 답변
 // 작성자는 서버가 준 진짜 이름 그대로, 기수는 페이지가 찾아서 넘겨준다
 function toPageAnswer(a: ServerAnswer, questionId: number, generation: string): Answer {
   return {
     id: a.id,
     questionId,
     author: a.memberName,
-    // ☆ 작성자 회원 번호 (프로필 사진용)
+    // 작성자 회원 번호 (프로필 사진용)
     authorId: a.memberId,
     generation,
     date: formatDate(new Date(a.createdAt)),
@@ -97,6 +110,8 @@ export default function QuestionBankPage() {
   const [activeTab, setActiveTab] = useState("질문 목록");
   const [major, setMajor] = useState("");
   const [category, setCategory] = useState("");
+  // ☆ 고른 그룹 (null이면 전체)
+  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [isAnswerModalOpen, setIsAnswerModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -110,11 +125,11 @@ export default function QuestionBankPage() {
   };
   const closeToast = useCallback(() => setToast(null), []);
 
-  // ★ 진짜 내 정보 (서버). 회원 번호를 아직 못 불러왔으면 토큰에서 꺼낸 번호를 쓴다
+  // 진짜 내 정보 (서버). 회원 번호를 아직 못 불러왔으면 토큰에서 꺼낸 번호를 쓴다
   const { myName, myGeneration, myId: profileId } = useMyName();
   const myId = profileId ?? tokenStorage.getMemberId();
 
-  // ★ 팀원 목록 → 회원 번호로 기수 찾기 ("10기"). 못 불러오면 빈 표
+  // 팀원 목록 → 회원 번호로 기수 찾기 ("10기"). 못 불러오면 빈 표
   const teamQuery = useTeamMembers();
   const generationById = new Map((teamQuery.data ?? []).map((m) => [m.memberId, `${m.generation}기`]));
 
@@ -123,17 +138,23 @@ export default function QuestionBankPage() {
   const serverQuestions = questionsQuery.data ?? [];
   const questions = serverQuestions.map(toPageQuestion);
 
+  // ☆ 그룹 목록
+  const groupsQuery = useInterviewGroups();
+  const groups = groupsQuery.data ?? [];
+  // ☆ 고른 그룹이 지워졌으면 전체로 본다
+  const activeGroupId = groups.some((g) => g.id === selectedGroupId) ? selectedGroupId : null;
+
   // 모든 질문의 답변을 한꺼번에 불러오기
   const { answersByQuestion, isPending: isAnswersPending } = useAllAnswers(serverQuestions.map((q) => q.id));
 
-  // ★ 내 답변 번호들 (이름이 아니라 회원 번호로 판단해서, 같은 이름이 있어도 안 헷갈린다)
+  // 내 답변 번호들 (이름이 아니라 회원 번호로 판단해서, 같은 이름이 있어도 안 헷갈린다)
   const myAnswerIds = new Set(
     serverQuestions.flatMap((q) =>
       (answersByQuestion.get(q.id) ?? []).filter((a) => myId !== null && a.memberId === myId).map((a) => a.id)
     )
   );
 
-  // ★ 화면용 답변: 기수는 내 것이면 내 기수, 아니면 팀원 목록에서 찾기
+  // 화면용 답변: 기수는 내 것이면 내 기수, 아니면 팀원 목록에서 찾기
   const allAnswers = serverQuestions.flatMap((q) =>
     (answersByQuestion.get(q.id) ?? []).map((a) => {
       const generation =
@@ -142,7 +163,7 @@ export default function QuestionBankPage() {
     })
   );
 
-  // ★ 이 질문에 내가 이미 답했는지
+  // 이 질문에 내가 이미 답했는지
   const hasMyAnswer = (questionId: number) =>
     allAnswers.some((a) => a.questionId === questionId && myAnswerIds.has(a.id));
 
@@ -154,9 +175,17 @@ export default function QuestionBankPage() {
   const questionsByMajor = questions.filter(
     (q) => majorFilter === "" || q.major === majorFilter || q.major === COMMON_MAJOR
   );
-  // 전공 + 카테고리 필터 (목록용)
-  const filteredQuestions = questionsByMajor.filter(
+  // 전공 + 카테고리 필터
+  const questionsByMajorCategory = questionsByMajor.filter(
     (q) => categoryFilter === "" || q.category === categoryFilter
+  );
+  // ☆ 그룹마다 질문 수 (전공·카테고리 필터를 적용한 개수)
+  const groupCounts: Record<number, number> = Object.fromEntries(
+    groups.map((g) => [g.id, questionsByMajorCategory.filter((q) => q.groupId === g.id).length])
+  );
+  // ☆ 목록용: 전공 + 카테고리 + 그룹 필터
+  const filteredQuestions = questionsByMajorCategory.filter(
+    (q) => activeGroupId === null || q.groupId === activeGroupId
   );
 
   // 선택된 질문과 그 답변
@@ -166,9 +195,13 @@ export default function QuestionBankPage() {
   // 서버로 보내는 도구들
   const createQuestionMutation = useCreateQuestion();
   const createAnswerMutation = useCreateAnswer();
+  // ☆ 그룹
+  const createGroupMutation = useCreateGroup();
+  const updateGroupMutation = useUpdateGroup();
+  const deleteGroupMutation = useDeleteGroup();
 
-  // 질문 추가 → 서버에 등록
-  const handleAddQuestion = (data: { title: string; major: string; category: string }) => {
+  // ☆ 질문 추가 → 고른 그룹에 등록 (POST /interviews/groups/{groupId}/questions)
+  const handleAddQuestion = (data: { title: string; major: string; category: string; groupId: number }) => {
     const categoryKey = findKey(CATEGORY_LABEL, data.category);
     if (!categoryKey) {
       showToast(`'${data.category}' 카테고리는 서버에서 지원하지 않습니다`, "info");
@@ -176,15 +209,58 @@ export default function QuestionBankPage() {
     }
     createQuestionMutation.mutate(
       {
-        content: data.title,
-        major: findKey(MAJOR_LABEL, data.major),
-        category: categoryKey,
+        groupId: data.groupId,
+        body: {
+          content: data.title,
+          major: findKey(MAJOR_LABEL, data.major),
+          category: categoryKey,
+        },
       },
       {
         onSuccess: () => showToast("질문을 등록했습니다"),
         onError: (error) => showToast(getErrorMessage(error), "info"),
       }
     );
+  };
+
+  // ☆ 그룹 만들기
+  const handleCreateGroup = (name: string) => {
+    createGroupMutation.mutate(name, {
+      onSuccess: () => showToast(`'${name}' 그룹을 만들었습니다`),
+      onError: (error) => showToast(getErrorMessage(error), "info"),
+    });
+  };
+
+  // ☆ 그룹 이름 바꾸기
+  const handleRenameGroup = (groupId: number, name: string) => {
+    updateGroupMutation.mutate(
+      { groupId, name },
+      {
+        onSuccess: () => showToast(`그룹 이름을 '${name}'(으)로 바꿨습니다`),
+        onError: (error) => showToast(getErrorMessage(error), "info"),
+      }
+    );
+  };
+
+  // ☆ 그룹 지우기 (지운 그룹을 보고 있었으면 전체로)
+  const handleDeleteGroup = (groupId: number) => {
+    deleteGroupMutation.mutate(groupId, {
+      onSuccess: () => {
+        if (selectedGroupId === groupId) setSelectedGroupId(null);
+        showToast("그룹을 삭제했습니다");
+      },
+      // 질문이 남아 있어서 못 지우는 경우 등은 서버가 알려준 문구 그대로
+      onError: (error) => showToast(getErrorMessage(error), "info"),
+    });
+  };
+
+  // ☆ 질문 추가 창 열기: 그룹이 하나도 없으면 먼저 만들라고 안내
+  const openAddModal = () => {
+    if (groups.length === 0) {
+      showToast('질문 목록 위 "+ 그룹"으로 그룹을 먼저 만들어 주세요', "info");
+      return;
+    }
+    setIsAddModalOpen(true);
   };
 
   // 답변 창 열기: 이미 답했으면 수정 API가 없어서 창을 열지 않는다
@@ -244,11 +320,13 @@ export default function QuestionBankPage() {
   const goToQuestion = (questionId: number) => {
     setMajor("");
     setCategory("");
+    // ☆ 그룹 필터도 풀어야 그 질문이 보인다
+    setSelectedGroupId(null);
     setSelectedId(questionId);
     setActiveTab("질문 목록");
   };
 
-  // ★ 내 답변 탭: 회원 번호로 고른 내 답변들
+  // 내 답변 탭: 회원 번호로 고른 내 답변들
   const myAnswers = allAnswers.filter((a) => myAnswerIds.has(a.id));
   const findQuestion = (id: number) => questions.find((q) => q.id === id);
 
@@ -343,6 +421,14 @@ export default function QuestionBankPage() {
             myName={myName}
             selectedId={selectedQuestion?.id ?? null}
             onSelect={setSelectedId}
+            // ☆ 그룹
+            groups={groups}
+            groupCounts={groupCounts}
+            selectedGroupId={activeGroupId}
+            onSelectGroup={setSelectedGroupId}
+            onCreateGroup={handleCreateGroup}
+            onRenameGroup={handleRenameGroup}
+            onDeleteGroup={handleDeleteGroup}
           />
         </div>
         <div className="min-w-0 flex-1">
@@ -395,7 +481,8 @@ export default function QuestionBankPage() {
               />
             </div>
             <button
-              onClick={() => setIsAddModalOpen(true)}
+              // ☆ 그룹이 없으면 안내부터
+              onClick={openAddModal}
               disabled={createQuestionMutation.isPending}
               className="rounded border bg-white px-3 py-2 text-sm font-medium disabled:opacity-40"
             >
@@ -417,7 +504,15 @@ export default function QuestionBankPage() {
       </div>
 
       {/* 모달들 */}
-      {isAddModalOpen && <QuestionAddModal onAdd={handleAddQuestion} onClose={() => setIsAddModalOpen(false)} />}
+      {isAddModalOpen && (
+        <QuestionAddModal
+          onAdd={handleAddQuestion}
+          onClose={() => setIsAddModalOpen(false)}
+          // ☆ 그룹 목록과 지금 보고 있는 그룹
+          groups={groups}
+          initialGroupId={activeGroupId}
+        />
+      )}
 
       {isAnswerModalOpen && selectedQuestion && (
         <AnswerModal

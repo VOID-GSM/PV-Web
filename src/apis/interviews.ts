@@ -25,7 +25,7 @@ export const CATEGORY_LABEL: Record<InterviewCategory, string> = {
 };
 
 // ─────────────────────────────────────────────
-// 2) 서버와 주고받는 데이터 모양 (전부 Swagger에서 확인 완료)
+// 2) 서버와 주고받는 데이터 모양
 // ─────────────────────────────────────────────
 
 // 서버가 보내주는 질문 하나 (QuestionResponse)
@@ -35,8 +35,16 @@ export interface Question {
   // null이면 공통 질문 (전공 상관없음)
   major: Major | null;
   category: InterviewCategory;
+  // ★ 이 질문이 들어 있는 그룹 번호 (예전 질문은 "기본" 그룹)
+  groupId?: number | null;
   // 만든 시각. "2026-10-27T06:54:42.562Z" 모양
   createdAt: string;
+}
+
+// ★ 질문 그룹 하나 (예: "기본", "React")
+export interface InterviewGroup {
+  id: number;
+  name: string;
 }
 
 // 서버가 보내주는 답변 하나 (AnswerResponse)
@@ -70,9 +78,10 @@ export const getQuestions = async (filter?: { major?: Major; category?: Intervie
   return data;
 };
 
-// 질문 등록 — POST /interviews/questions (같은 내용이 이미 있으면 409 에러)
-export const createQuestion = async (body: QuestionCreateRequest) => {
-  const { data } = await api.post<Question>("/interviews/questions", body);
+// ★ 질문 등록 — POST /interviews/groups/{groupId}/questions
+// (예전 POST /interviews/questions 에서 주소가 바뀌었다. 같은 내용이 이미 있으면 409 에러)
+export const createQuestion = async (groupId: number, body: QuestionCreateRequest) => {
+  const { data } = await api.post<Question>(`/interviews/groups/${groupId}/questions`, body);
   return data;
 };
 
@@ -102,5 +111,40 @@ export const createAnswer = async (questionId: number, content: string) => {
   const { data } = await api.post<Answer>(`/interviews/questions/${questionId}/answers`, {
     content,
   });
+  return data;
+};
+
+// ─────────────────────────────────────────────
+// ★ 4) 질문 그룹
+// ─────────────────────────────────────────────
+
+// 서버가 그룹 번호를 id로 줄지 groupId로 줄지 몰라서 둘 다 받아 둔다
+type RawGroup = { id?: number; groupId?: number; name: string };
+
+// 그룹 목록 — GET /interviews/groups
+export const getGroups = async () => {
+  const { data } = await api.get<RawGroup[]>("/interviews/groups");
+  // 화면에서는 항상 id로 쓰도록 맞춘다
+  return data.map((g): InterviewGroup => ({ id: g.id ?? g.groupId ?? 0, name: g.name }));
+};
+
+// 그룹 만들기 — POST /interviews/groups { name }
+export const createGroup = async (name: string) => {
+  await api.post("/interviews/groups", { name });
+};
+
+// 그룹 이름 바꾸기 — PATCH /interviews/groups/{groupId} { name }
+export const updateGroup = async (groupId: number, name: string) => {
+  await api.patch(`/interviews/groups/${groupId}`, { name });
+};
+
+// 그룹 지우기 — DELETE /interviews/groups/{groupId}
+export const deleteGroup = async (groupId: number) => {
+  await api.delete(`/interviews/groups/${groupId}`);
+};
+
+// 그룹 안의 질문 — GET /interviews/groups/{groupId}/questions
+export const getGroupQuestions = async (groupId: number) => {
+  const { data } = await api.get<Question[]>(`/interviews/groups/${groupId}/questions`);
   return data;
 };
