@@ -1,6 +1,7 @@
 // src/pages/ArchivePage.tsx
 // ★ useCallback: 토스트 닫기 함수를 한 번만 만들어 두려고
 import { useCallback, useState, useEffect } from "react";
+
 // ☆ useSearchParams: 주소의 ?activityId=3 을 읽는다 (활동 화면에서 바로 열 수 있게)
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 // ★ 다른 화면과 같은 공통 헤더 (진짜 알림 · 새로 만들기 메뉴)
@@ -76,7 +77,9 @@ export default function ArchivePage() {
   const [activities, setActivities] = useState<ActivitySummary[]>([]);
   const [selectedTag, setSelectedTag] = useState("전체 태그");
   const [serverTags, setServerTags] = useState<string[]>([]);
-  const [dateFilterMode, setDateFilterMode] = useState<"all" | "before" | "after" | "between">("all");
+  const [dateFilterMode, setDateFilterMode] = useState<
+    "all" | "before" | "after" | "between"
+  >("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [myMemberId, setMyMemberId] = useState<number | null>(null);
@@ -87,7 +90,9 @@ export default function ArchivePage() {
   );
 
   // ☆ 활동 번호 → 이름 표
-  const activityNameById = new Map<number, string>(activities.map((a) => [a.id, a.name] as const));
+  const activityNameById = new Map<number, string>(
+    activities.map((a) => [a.id, a.name] as const),
+  );
   // ☆ 정리글의 활동 칸 글자: 숫자(활동 번호)면 진짜 이름으로, 아니면 그대로 ("활동 미지정" 등)
   const activityLabel = (value: string) =>
     /^\d+$/.test(value)
@@ -111,16 +116,26 @@ export default function ArchivePage() {
     ]),
   ).sort((a, b) => a.localeCompare(b, "ko"));
   const filteredArticles = articles.filter((article) => {
-    const matchesSearch = `${article.title} ${article.content} ${activityLabel(article.activity)} ${(article.tags ?? []).join(" ")}`
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase().trim());
-    const matchesTag = selectedTag === "전체 태그" || (article.tags ?? []).includes(selectedTag);
+    const matchesSearch =
+      `${article.title} ${article.content} ${activityLabel(article.activity)} ${(article.tags ?? []).join(" ")}`
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase().trim());
+    const matchesTag =
+      selectedTag === "전체 태그" || (article.tags ?? []).includes(selectedTag);
     const articleDate = (article.date ?? "").slice(0, 10);
     const matchesDate =
       dateFilterMode === "all" ||
-      (dateFilterMode === "before" && Boolean(dateTo) && articleDate <= dateTo) ||
-      (dateFilterMode === "after" && Boolean(dateFrom) && articleDate >= dateFrom) ||
-      (dateFilterMode === "between" && Boolean(dateFrom) && Boolean(dateTo) && articleDate >= dateFrom && articleDate <= dateTo);
+      (dateFilterMode === "before" &&
+        Boolean(dateTo) &&
+        articleDate <= dateTo) ||
+      (dateFilterMode === "after" &&
+        Boolean(dateFrom) &&
+        articleDate >= dateFrom) ||
+      (dateFilterMode === "between" &&
+        Boolean(dateFrom) &&
+        Boolean(dateTo) &&
+        articleDate >= dateFrom &&
+        articleDate <= dateTo);
     return matchesSearch && matchesTag && matchesDate;
   });
 
@@ -129,29 +144,30 @@ export default function ArchivePage() {
 
   // ★ 지금 떠 있는 토스트 (null이면 안 보임)
   const [toast, setToast] = useState<ToastState | null>(null);
-  const showToast = useCallback((message: string, type: "success" | "info" = "info") => {
-    setToast((prev) => ({ id: (prev?.id ?? 0) + 1, message, type }));
-  }, []);
+  const showToast = useCallback(
+    (message: string, type: "success" | "info" = "info") => {
+      setToast((prev) => ({
+        id: (prev?.id ?? 0) + 1,
+        message,
+        type,
+      }));
+    },
+    [],
+  );
   const closeToast = useCallback(() => setToast(null), []);
 
-  useEffect(() => {
-    const navigationState = location.state as
-      | { toastMessage?: string; toastType?: "success" | "info" }
-      | null;
-    if (!navigationState?.toastMessage) return;
-
-    showToast(navigationState.toastMessage, navigationState.toastType ?? "success");
-    navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
-  }, [location.key, location.pathname, location.search, location.state, navigate, showToast]);
-
-  useEffect(() => {
+useEffect(() => {
     let cancelled = false;
     getMyProfile()
       .then((profile) => {
         if (!cancelled) setMyMemberId(profile.memberId);
       })
-      .catch((error: unknown) => console.error("내 회원 정보 조회 실패:", error));
-    return () => { cancelled = true; };
+      .catch((error: unknown) =>
+        console.error("내 회원 정보 조회 실패:", error),
+      );
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // 서버에 실제 등록된 태그를 필터 옵션으로 사용한다.
@@ -165,7 +181,9 @@ export default function ArchivePage() {
         // 서버 태그 조회에 실패하면 글 응답에 포함된 태그로 필터를 유지한다.
         console.error("태그 목록 조회 실패:", error);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // ☆ 활동 목록은 처음에 한 번만 불러온다 (못 불러와도 "전체 활동"만 보이고 화면은 그대로)
@@ -213,7 +231,7 @@ export default function ArchivePage() {
         let loaded: Article[] = [];
 
         {
-                    // ☆ 탭 조건(내가 쓴 글) + 활동 조건을 합친다
+          // ☆ 탭 조건(내가 쓴 글) + 활동 조건을 합친다
           const dateCondition: Pick<PostSearchCondition, "from" | "to"> =
             dateFilterMode === "before" && dateTo
               ? { to: dateTo }
@@ -234,7 +252,11 @@ export default function ArchivePage() {
           };
 
           const response = await getPosts(condition, 0, 50);
-          const summaries: ApiPostSummary[] = (response.content ?? []).filter((summary) => selectedTab !== "my" || (myMemberId !== null && summary.authorId === myMemberId));
+          const summaries: ApiPostSummary[] = (response.content ?? []).filter(
+            (summary) =>
+              selectedTab !== "my" ||
+              (myMemberId !== null && summary.authorId === myMemberId),
+          );
 
           const localArticles = getArticles();
           const localMap = new Map(
@@ -258,7 +280,9 @@ export default function ArchivePage() {
                   round: post.sessionId
                     ? `${post.sessionId}회차`
                     : "회차 미지정",
-                  tags: Array.isArray(post.tags) ? post.tags : (summary.tags ?? localArticle?.tags ?? []),
+                  tags: Array.isArray(post.tags)
+                    ? post.tags
+                    : (summary.tags ?? localArticle?.tags ?? []),
                   date: (post.createdAt || summary.createdAt || "").slice(
                     0,
                     10,
@@ -325,6 +349,7 @@ export default function ArchivePage() {
     dateFilterMode,
     dateFrom,
     dateTo,
+    showToast,
   ]);
 
   useEffect(() => {
@@ -473,10 +498,16 @@ export default function ArchivePage() {
               type="button"
               onClick={() => handleTabChange(tab)}
               className={`px-3.5 py-1.5 rounded-xl transition ${
-                selectedTab === tab ? "bg-black text-white" : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                selectedTab === tab
+                  ? "bg-black text-white"
+                  : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"
               }`}
             >
-              {{ all: "전체", my: "내가 쓴 정리글", feedback: "피드백 제안" }[tab]}
+              {
+                { all: "전체", my: "내가 쓴 정리글", feedback: "피드백 제안" }[
+                  tab
+                ]
+              }
             </button>
           ))}
         </div>
@@ -490,24 +521,78 @@ export default function ArchivePage() {
             aria-label="정리글 검색"
             className="w-40 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs focus:outline-none focus:border-gray-400"
           />
-          <Dropdown options={activityOptions} value={selectedActivityName} onChange={handleActivityChange} />
-          <select value={selectedTag} onChange={(e) => setSelectedTag(e.target.value)} aria-label="태그 필터" className="rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs">
+          <Dropdown
+            options={activityOptions}
+            value={selectedActivityName}
+            onChange={handleActivityChange}
+          />
+          <select
+            value={selectedTag}
+            onChange={(e) => setSelectedTag(e.target.value)}
+            aria-label="태그 필터"
+            className="rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs"
+          >
             <option value="전체 태그">전체 태그</option>
-            {tagOptions.map((tag) => <option key={tag} value={tag}>#{tag}</option>)}
+            {tagOptions.map((tag) => (
+              <option key={tag} value={tag}>
+                #{tag}
+              </option>
+            ))}
           </select>
-          <select value={dateFilterMode} onChange={(e) => setDateFilterMode(e.target.value as typeof dateFilterMode)} aria-label="기간 필터" className="rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs">
+          <select
+            value={dateFilterMode}
+            onChange={(e) =>
+              setDateFilterMode(e.target.value as typeof dateFilterMode)
+            }
+            aria-label="기간 필터"
+            className="rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs"
+          >
             <option value="all">전체 기간</option>
             <option value="before">이 날짜 이전</option>
             <option value="after">이 날짜 이후</option>
             <option value="between">기간 사이</option>
           </select>
-          {dateFilterMode === "before" && <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} aria-label="기준 날짜" className="rounded-lg border border-gray-200 px-2 py-2 text-xs" />}
-          {dateFilterMode === "after" && <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} aria-label="기준 날짜" className="rounded-lg border border-gray-200 px-2 py-2 text-xs" />}
-          {dateFilterMode === "between" && <>
-            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} aria-label="시작 날짜" className="rounded-lg border border-gray-200 px-2 py-2 text-xs" />
-            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} aria-label="종료 날짜" className="rounded-lg border border-gray-200 px-2 py-2 text-xs" />
-          </>}
-          <button type="button" onClick={() => navigate("/editor")} className="rounded-lg bg-black px-3.5 py-2 text-xs font-semibold text-white hover:bg-gray-800">
+          {dateFilterMode === "before" && (
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              aria-label="기준 날짜"
+              className="rounded-lg border border-gray-200 px-2 py-2 text-xs"
+            />
+          )}
+          {dateFilterMode === "after" && (
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              aria-label="기준 날짜"
+              className="rounded-lg border border-gray-200 px-2 py-2 text-xs"
+            />
+          )}
+          {dateFilterMode === "between" && (
+            <>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                aria-label="시작 날짜"
+                className="rounded-lg border border-gray-200 px-2 py-2 text-xs"
+              />
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                aria-label="종료 날짜"
+                className="rounded-lg border border-gray-200 px-2 py-2 text-xs"
+              />
+            </>
+          )}
+          <button
+            type="button"
+            onClick={() => navigate("/editor")}
+            className="rounded-lg bg-black px-3.5 py-2 text-xs font-semibold text-white hover:bg-gray-800"
+          >
             정리글 작성
           </button>
         </div>
@@ -755,13 +840,14 @@ export default function ArchivePage() {
         </div>
       </div>
 
-      {/* ★ 정리글 목록·댓글·삭제 결과 토스트 */}
-      {toast && (
+      {/* 정리글 목록·댓글·삭제 결과 토스트 */}
+      {toast && <Toast key={toast.id} message={toast.message} type={toast.type} onClose={closeToast} />}
+      {!toast && (location.state as { toastMessage?: string; toastType?: "success" | "info" } | null)?.toastMessage && (
         <Toast
-          key={toast.id}
-          message={toast.message}
-          type={toast.type}
-          onClose={closeToast}
+          key={`${location.key}-${(location.state as { toastMessage?: string }).toastMessage}`}
+          message={(location.state as { toastMessage: string }).toastMessage}
+          type={(location.state as { toastType?: "success" | "info" }).toastType ?? "success"}
+          onClose={() => navigate(`${location.pathname}${location.search}`, { replace: true, state: null })}
         />
       )}
     </div>
