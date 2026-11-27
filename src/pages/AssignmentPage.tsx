@@ -34,7 +34,7 @@ import {
   useCreateSkill,
   useMySkills,
   usePassSubmission,
-  // ★ 미제출자 알림
+  // 미제출자 알림
   useRemindAssignment,
   useRequestResubmission,
   useResubmitAssignment,
@@ -179,7 +179,7 @@ export default function AssignmentPage() {
   // 역량 수정·숨기기
   const updateSkill = useUpdateSkill();
   const saveScores = useSaveMyScores();
-  // ★ 미제출자 알림
+  // 미제출자 알림
   const remindAssignment = useRemindAssignment();
 
   // 진짜 내 정보 (회원 번호는 파일 업로드에 필요. 못 불러왔으면 토큰에서)
@@ -373,10 +373,16 @@ export default function AssignmentPage() {
 
   // 제출 / 재제출 → 서버 (파일 첨부면 먼저 파일을 올린다)
   // async: 파일 업로드를 기다렸다가 제출해야 해서
-  const handleSubmitWork = async (assignmentId: number, type: string, content: string, file: File | null) => {
+  // ☆ 성공하면 true, 실패하면 false를 돌려준다 (카드가 성공했을 때만 입력을 비우게)
+  const handleSubmitWork = async (
+    assignmentId: number,
+    type: string,
+    content: string,
+    file: File | null
+  ): Promise<boolean> => {
     if (type === "GitHub 링크" && !content.startsWith("https://github.com/")) {
       showToast("GitHub 링크는 https://github.com/ 으로 시작해야 합니다");
-      return;
+      return false;
     }
 
     setSubmittingId(assignmentId);
@@ -386,11 +392,11 @@ export default function AssignmentPage() {
       if (type === "파일 첨부") {
         if (!file) {
           showToast("파일을 선택해 주세요");
-          return;
+          return false;
         }
         if (myId === null) {
           showToast("내 정보를 불러오는 중입니다. 잠시 후 다시 시도해 주세요");
-          return;
+          return false;
         }
         showToast("파일을 올리는 중입니다...");
         // 파일을 올리고 받은 이름표(objectKey)로 제출한다
@@ -408,19 +414,23 @@ export default function AssignmentPage() {
         const submissionId = mySubmissionIds[assignmentId];
         if (submissionId === undefined) {
           showToast("재제출은 서버 연결을 확인 중입니다");
-          return;
+          return false;
         }
         await resubmitAssignment.mutateAsync({ assignmentId, submissionId, body });
         showToast("다시 제출했습니다", "success");
-        return;
+        return true;
       }
 
       // 처음 제출
       const submission = await submitAssignment.mutateAsync({ assignmentId, body });
       setMySubmissionIds((prev) => ({ ...prev, [assignmentId]: submission.id }));
       showToast(submission.late ? "지각 제출되었습니다" : "과제를 제출했습니다", "success");
+      return true;
     } catch (error) {
+      // ☆ 어디서 실패했는지 개발자 도구에도 남긴다 (파일 업로드 문제를 찾기 쉽게)
+      console.error("과제 제출 실패:", error);
       showToast(getErrorMessage(error));
+      return false;
     } finally {
       // finally: 성공·실패·중간에 return 어느 경우든 마지막에 꼭 실행된다
       setSubmittingId(null);
@@ -439,7 +449,7 @@ export default function AssignmentPage() {
     else requestResubmission.mutate(variables, options);
   };
 
-  // ★ 미제출자 알림 → 서버 (POST /assignments/{id}/remind)
+  // 미제출자 알림 → 서버 (POST /assignments/{id}/remind)
   const handleRemind = () => {
     if (selectedAssignmentId === null) {
       showToast("알림을 보낼 과제를 먼저 골라 주세요");
