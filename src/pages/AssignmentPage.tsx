@@ -34,7 +34,6 @@ import {
   usePassSubmission,
 
   // 미제출자 알림
-  useRemindAssignment,
 
   useRequestResubmission,
   useResubmitAssignment,
@@ -173,7 +172,6 @@ export default function AssignmentPage() {
   const saveScores = useSaveMyScores();
 
   // 미제출자 알림
-  const remindAssignment = useRemindAssignment();
 
 
   // 진짜 내 정보 (★ 회원 번호는 파일 업로드에 필요. 못 불러왔으면 토큰에서)
