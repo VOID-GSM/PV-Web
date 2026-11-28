@@ -30,5 +30,6 @@ export interface MilestoneItem {
   id: string;
   title: string;
   date: string;
+  description?: string;
   status: "확정" | "제안";
 }

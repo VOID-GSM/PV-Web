@@ -126,11 +126,12 @@ export default function CalendarPage({
     setSelectedEvent(null);
   };
 
-  const handleAddMilestone = (title: string, date: string) => {
+  const handleAddMilestone = (title: string, date: string, description?: string) => {
     const newItem: MilestoneItem = {
       id: Date.now().toString(),
       title,
       date,
+      description,
       status: "제안",
     };
     setMilestones((prev) => [...prev, newItem]);
@@ -145,6 +146,7 @@ export default function CalendarPage({
         title: m.title,
         type: "마감",
         board: "마일스톤 제안",
+        description: m.description,
         date: m.date.includes("-")
           ? m.date
           : `${currentDate.getFullYear()}-${m.date.replace("/", "-")}`,

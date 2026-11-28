@@ -8,7 +8,7 @@ interface RightPanelProps {
   canCreateBoard?: boolean;
   onCreateBoard?: (request: BoardCreateRequest) => Promise<void>;
   onToggleFilter?: (id: string) => void;
-  onAddMilestone?: (title: string, date: string) => void;
+  onAddMilestone?: (title: string, date: string, description?: string) => void;
   onApplyMilestonesToCalendar?: () => void;
 }
 
@@ -24,6 +24,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
   const [selectedDDay, setSelectedDDay] = useState<string>("D-7");
   const [newTitle, setNewTitle] = useState("");
   const [newDate, setNewDate] = useState("");
+  const [newDescription, setNewDescription] = useState("");
 
   const [milestoneError, setMilestoneError] = useState<string | null>(null);
   const [isBoardCreateOpen, setIsBoardCreateOpen] = useState(false);
@@ -57,7 +58,8 @@ export const RightPanel: React.FC<RightPanelProps> = ({
     }
 
     setMilestoneError(null);
-    onAddMilestone?.(newTitle.trim(), newDate);
+    onAddMilestone?.(newTitle.trim(), newDate, newDescription.trim());
+    setNewDescription("");
     setNewTitle("");
     setNewDate("");
   };
@@ -260,6 +262,13 @@ export const RightPanel: React.FC<RightPanelProps> = ({
               }}
               className="w-full rounded-xl border border-gray-200 px-3 py-2 text-xs outline-none focus:border-black transition"
             />
+            <textarea
+              value={newDescription}
+              onChange={(e) => setNewDescription(e.target.value)}
+              placeholder="상세 일정 또는 메모 (선택)"
+              rows={2}
+              className="w-full resize-y rounded-xl border border-gray-200 px-3 py-2 text-xs outline-none focus:border-black transition"
+            />
             <div className="flex gap-2">
               <input
                 type="date"
@@ -312,6 +321,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
                   <div>
                     <p className="font-bold text-gray-900">{m.title}</p>
                     <p className="text-[10px] text-gray-400 mt-0.5">{m.date}</p>
+                    {m.description && <p className="mt-1 max-w-[190px] whitespace-pre-wrap break-words text-[10px] text-gray-500">{m.description}</p>}
                   </div>
                   <span
                     className={`rounded-lg px-2.5 py-1 text-[10px] font-bold ${

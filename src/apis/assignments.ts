@@ -131,11 +131,6 @@ export interface SubmissionRequest {
   githubUrl?: string;
 }
 
-// ★ 미제출자 알림 결과 (몇 명에게 보냈는지)
-export interface RemindResult {
-  reminded: number;
-}
-
 // ─────────────────────────────────────────────
 // 3) 과제 요청 함수
 // ─────────────────────────────────────────────
@@ -155,13 +150,6 @@ export const getAssignment = async (assignmentId: number) => {
 // 과제 출제 — POST /assignments (부장·선배만, 아니면 403 / 응답 내용 없음)
 export const createAssignment = async (body: AssignmentCreateRequest) => {
   await api.post("/assignments", body);
-};
-
-// ★ 미제출자 알림 — POST /assignments/{id}/remind (출제자·부장만)
-// discordEnabled: 디스코드로도 보낼지 (웹훅 준비 전이라 기본은 앱 알림만)
-export const remindAssignment = async (assignmentId: number, discordEnabled = false) => {
-  const { data } = await api.post<RemindResult>(`/assignments/${assignmentId}/remind`, { discordEnabled });
-  return data;
 };
 
 // ─────────────────────────────────────────────

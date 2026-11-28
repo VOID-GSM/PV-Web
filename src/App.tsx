@@ -86,6 +86,22 @@ function AppContent() {
   // 토스트 닫기 (Toast가 2.5초 뒤 부른다)
   const closeToast = useCallback(() => setToast(null), []);
 
+  // 앱 전체에서 호출되는 alert를 공통 Toast로 대체한다.
+  useEffect(() => {
+    const originalAlert = window.alert;
+    window.alert = (message?: unknown) => {
+      const text = String(message ?? "");
+      setToast((prev) => ({
+        id: (prev?.id ?? 0) + 1,
+        message: text,
+        type: "info",
+      }));
+    };
+    return () => {
+      window.alert = originalAlert;
+    };
+  }, []);
+
   // 서버는 캘린더를 한 번에 최대 92일까지만 조회할 수 있다(넘기면 400).
   // 그래서 보는 달 기준 앞뒤 7일씩만 요청하고, 이미 불러온 달은 다시 요청하지 않는다.
   const loadedMonthsRef = useRef<Set<string>>(new Set());

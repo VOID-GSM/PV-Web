@@ -1,6 +1,4 @@
 import { useCallback, useState } from "react";
-// 헤더에서 보낸 쪽지(state)를 읽고, 다 쓰면 지우려고
-import { useLocation, useNavigate } from "react-router-dom";
 import { Header } from "../components/layout/Header";
 import Dropdown from "../components/common/Dropdown";
 import Toast from "../components/common/Toast";
@@ -34,15 +32,16 @@ import {
   useCreateSkill,
   useMySkills,
   usePassSubmission,
+
   // 미제출자 알림
-  useRemindAssignment,
+
   useRequestResubmission,
   useResubmitAssignment,
   useSaveMyScores,
   useSkills,
   useSubmissionStatus,
   useSubmitAssignment,
-  // 역량 수정·숨기기
+  // ☆ 역량 수정·숨기기
   useUpdateSkill,
 } from "../hooks/useAssignments";
 // 진짜 내 이름·기수·전공·번호
@@ -56,16 +55,12 @@ import type {
 } from "../apis/assignments";
 import { MAJOR_LABEL, type Major } from "../apis/interviews";
 import { getErrorMessage } from "../apis/client";
-// 파일 업로드
+// ★ 파일 업로드
 import { uploadFile } from "../apis/files";
 import { tokenStorage } from "../apis/tokenStorage";
 
-// 부장만 볼 수 있는 탭 (과제 목록은 모두 볼 수 있고, 제출 현황은 부장만)
-const LEADER_ONLY_TABS = ["제출 현황"];
-
-// 헤더 "새로 만들기 → 과제 출제"가 보낸 쪽지인지
-const wantsCreate = (state: unknown) =>
-  typeof state === "object" && state !== null && "openCreate" in state && state.openCreate === true;
+// ☆ 부장만 볼 수 있는 탭 (과제를 내고 관리하는 화면)
+const LEADER_ONLY_TABS = ["과제 목록", "제출 현황"];
 
 // ─────────────────────────────────────────────
 // 서버 모양 → 화면 모양 번역 함수들 (컴포넌트 바깥)
@@ -159,10 +154,6 @@ function uniqueById(list: AssignmentSummary[]): AssignmentSummary[] {
 type ToastState = { id: number; message: string; type: "success" | "info" };
 
 export default function AssignmentPage() {
-  // 지금 주소 정보(쪽지 포함)와 이동 도구
-  const location = useLocation();
-  const navigate = useNavigate();
-
   // 서버 데이터
   const receivedQuery = useAssignments("RECEIVED");
   const createdQuery = useAssignments("CREATED");
@@ -176,14 +167,15 @@ export default function AssignmentPage() {
   const passSubmission = usePassSubmission();
   const requestResubmission = useRequestResubmission();
   const createSkill = useCreateSkill();
-  // 역량 수정·숨기기
+  // ☆ 역량 수정·숨기기
   const updateSkill = useUpdateSkill();
   const saveScores = useSaveMyScores();
-  // 미제출자 알림
-  const remindAssignment = useRemindAssignment();
 
-  // 진짜 내 정보 (회원 번호는 파일 업로드에 필요. 못 불러왔으면 토큰에서)
-  // isLeader: 부장인지 (과제 관리 화면을 보여줄지 정한다)
+  // 미제출자 알림
+
+
+  // 진짜 내 정보 (★ 회원 번호는 파일 업로드에 필요. 못 불러왔으면 토큰에서)
+  // ☆ isLeader: 부장인지 (과제 관리 화면을 보여줄지 정한다)
   const { myName, myGeneration, myMajors, myId: profileId, isLeader } = useMyName();
   const myId = profileId ?? tokenStorage.getMemberId();
 
@@ -192,35 +184,22 @@ export default function AssignmentPage() {
   const [generation, setGeneration] = useState("");
   const [major, setMajor] = useState("");
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<number | null>(null);
-  // 헤더에서 "과제 출제"로 들어왔으면 출제 창이 열린 채로 시작
-  const [isCreateOpen, setIsCreateOpen] = useState(() => wantsCreate(location.state));
-  // 마지막으로 확인한 이동 번호 (이미 과제 화면에 있을 때 헤더에서 또 누른 경우를 알아채려고)
-  const [seenLocationKey, setSeenLocationKey] = useState(location.key);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [initialSkillId, setInitialSkillId] = useState<number | null>(null);
   // 이번에 화면에서 제출한 제출물 번호 (재제출할 때 필요. 과제 번호 → 제출물 번호)
   const [mySubmissionIds, setMySubmissionIds] = useState<Record<number, number>>({});
-  // 지금 제출(파일 업로드 포함) 중인 과제 번호
+  // ★ 지금 제출(파일 업로드 포함) 중인 과제 번호
   const [submittingId, setSubmittingId] = useState<number | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
-
-  // 과제 화면에 있는데 헤더에서 또 "과제 출제"를 누르면(새 이동) 출제 창을 연다
-  // (useEffect 대신 그리는 중에 확인: 이 프로젝트 ESLint 규칙에 맞추려고)
-  if (location.key !== seenLocationKey) {
-    setSeenLocationKey(location.key);
-    if (wantsCreate(location.state)) {
-      setInitialSkillId(null);
-      setIsCreateOpen(true);
-    }
-  }
 
   const showToast = (message: string, type: "success" | "info" = "info") => {
     setToast((prev) => ({ id: (prev?.id ?? 0) + 1, message, type }));
   };
   const closeToast = useCallback(() => setToast(null), []);
 
-  // 보여줄 탭: 부장이 아니면 부장 전용 탭을 뺀다
+  // ☆ 보여줄 탭: 부장이 아니면 과제 목록·제출 현황을 뺀다
   const visibleTabs = isLeader ? ASSIGNMENT_TABS : ASSIGNMENT_TABS.filter((tab) => !LEADER_ONLY_TABS.includes(tab));
-  // 지금 탭이 숨겨진 탭이면(부장이 아님) 첫 탭으로
+  // ☆ 지금 탭이 숨겨진 탭이면(부장이 아님) 첫 탭으로
   const currentTab = visibleTabs.includes(activeTab) ? activeTab : visibleTabs[0];
 
   // ===== 과제 =====
@@ -235,13 +214,13 @@ export default function AssignmentPage() {
     created.map((a) => [a.id, a.submissionCount ?? 0])
   );
 
-  // 진행 중 과제: 부장은 전체, 아니면 내가 받은 과제만
+  // ☆ 진행 중 과제: 부장은 전체, 아니면 내가 받은 과제만
   const ongoingAssignments = (isLeader ? assignments : myAssignments).filter((a) => getDaysLeft(a.deadline) >= 0);
   const summaryAssignment =
     assignments.find((a) => a.id === selectedAssignmentId) ?? ongoingAssignments[0] ?? null;
 
   // 제출 현황: 제출 현황 탭에서 고른 과제 / 역량맵 탭 오른쪽 요약 과제
-  // 부장일 때만 요청한다 (부장이 아니면 서버가 거절해서)
+  // ☆ 부장일 때만 요청한다 (부장이 아니면 서버가 거절해서)
   const statusQuery = useSubmissionStatus(selectedAssignmentId, isLeader && currentTab === "제출 현황");
   const summaryStatusQuery = useSubmissionStatus(
     summaryAssignment?.id ?? null,
@@ -280,18 +259,10 @@ export default function AssignmentPage() {
   // ===== 이벤트 처리 =====
 
   const openCreate = (skillId: number | null = null) => {
-    // 부장이 아니면 열지 않는다 (버튼도 숨기지만 한 번 더 막는다)
+    // ☆ 부장이 아니면 열지 않는다 (버튼도 숨기지만 한 번 더 막는다)
     if (!isLeader) return;
     setInitialSkillId(skillId);
     setIsCreateOpen(true);
-  };
-
-  // 출제 창 닫기: 헤더 쪽지가 남아 있으면 지운다 (새로고침했을 때 또 열리지 않게)
-  const closeCreate = () => {
-    setIsCreateOpen(false);
-    if (wantsCreate(location.state)) {
-      navigate(location.pathname, { replace: true, state: null });
-    }
   };
 
   // 역량 항목 추가 (부장만)
@@ -307,7 +278,7 @@ export default function AssignmentPage() {
     );
   };
 
-  // 역량 항목 이름 수정 (부장만)
+  // ☆ 역량 항목 이름 수정 (부장만)
   const handleUpdateSkill = (skillId: number, name: string) => {
     updateSkill.mutate(
       { skillId, body: { name } },
@@ -319,7 +290,7 @@ export default function AssignmentPage() {
     );
   };
 
-  // 역량 항목 삭제 (부장만) — 서버에 삭제 API가 없어서 숨기기(active: false)로 처리한다
+  // ☆ 역량 항목 삭제 (부장만) — 서버에 삭제 API가 없어서 숨기기(active: false)로 처리한다
   const handleDeleteSkill = (skillId: number) => {
     updateSkill.mutate(
       { skillId, body: { active: false } },
@@ -377,8 +348,7 @@ export default function AssignmentPage() {
       }
     );
   };
-  
-  // 제출 / 재제출 → 서버 (파일 첨부면 먼저 파일을 올린다)
+
   // async: 파일 업로드를 기다렸다가 제출해야 해서
   // ☆ 성공하면 true, 실패하면 false를 돌려준다 (카드가 성공했을 때만 입력을 비우게)
   const handleSubmitWork = async (
@@ -394,7 +364,7 @@ export default function AssignmentPage() {
 
     setSubmittingId(assignmentId);
     try {
-      // 형식에 맞게 보낼 내용 만들기
+      // ★ 형식에 맞게 보낼 내용 만들기
       let body: SubmissionRequest;
       if (type === "파일 첨부") {
         if (!file) {
@@ -456,30 +426,12 @@ export default function AssignmentPage() {
     else requestResubmission.mutate(variables, options);
   };
 
-  // 미제출자 알림 → 서버 (POST /assignments/{id}/remind)
-  const handleRemind = () => {
-    if (selectedAssignmentId === null) {
-      showToast("알림을 보낼 과제를 먼저 골라 주세요");
-      return;
-    }
-    // 이미 보내는 중이면 또 보내지 않는다 (연타 방지)
-    if (remindAssignment.isPending) return;
 
-    remindAssignment.mutate(
-      // 디스코드 웹훅 준비 전이라 앱 알림만 보낸다
-      { assignmentId: selectedAssignmentId, discordEnabled: false },
-      {
-        onSuccess: ({ reminded }) =>
-          showToast(
-            reminded > 0 ? `미제출자 ${reminded}명에게 알림을 보냈습니다` : "알림을 보낼 미제출자가 없습니다",
-            reminded > 0 ? "success" : "info"
-          ),
-        onError: (error) => showToast(getErrorMessage(error)),
-      }
-    );
+  const handleRemind = () => {
+    showToast("미제출자 알림은 서버 연결을 준비 중입니다");
   };
 
-  // 과제를 눌렀을 때: 부장은 제출 현황, 아니면 내 제출물로
+  // ☆ 진행 중 과제를 눌렀을 때: 부장은 제출 현황, 아니면 내 제출물로
   const goToStatus = (assignmentId: number) => {
     setSelectedAssignmentId(assignmentId);
     setActiveTab(isLeader ? "제출 현황" : "내 제출물");
@@ -519,7 +471,7 @@ export default function AssignmentPage() {
           assignments={myAssignments}
           submissions={mySubmissions}
           onSubmit={handleSubmitWork}
-          // 제출 중인 카드의 버튼을 잠근다
+          // ★ 제출 중인 카드의 버튼을 잠근다
           submittingId={submittingId}
         />
       );
@@ -533,7 +485,7 @@ export default function AssignmentPage() {
             members={visibleMembers}
             myName={myName}
             myScores={myScores}
-            // 부장만 역량 항목 관리·출제
+            // ☆ 부장만 역량 항목 관리·출제
             canManage={isLeader}
             onScoreChange={handleScoreChange}
             onAddSkill={handleAddSkill}
@@ -548,7 +500,7 @@ export default function AssignmentPage() {
             submittedCounts={submittedCounts}
             onSelect={goToStatus}
           />
-          {/* 제출 현황 요약은 부장만 */}
+          {/* ☆ 제출 현황 요약은 부장만 */}
           {isLeader && (
             <section className="rounded-lg bg-white p-5">
               <h2 className="font-bold">제출 현황{summaryAssignment ? ` · ${summaryAssignment.title}` : ""}</h2>
@@ -580,7 +532,7 @@ export default function AssignmentPage() {
       <div className="flex flex-col gap-4 p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex gap-5">
-            {/* 보여줄 탭만 */}
+            {/* ☆ 보여줄 탭만 */}
             {visibleTabs.map((tab) => (
               <button
                 key={tab}
@@ -605,7 +557,7 @@ export default function AssignmentPage() {
             <div className="w-40">
               <Dropdown options={["전체", ...MAJORS]} value={major} onChange={setMajor} placeholder="전공: 전체" />
             </div>
-            {/* 과제 출제 버튼은 부장만 (누르기 전에 막는다) */}
+            {/* ☆ 과제 출제 버튼은 부장만 (누르기 전에 막는다) */}
             {isLeader && (
               <button
                 onClick={() => openCreate()}
@@ -618,7 +570,7 @@ export default function AssignmentPage() {
           </div>
         </div>
 
-        {/* 출제 리마인더 배너도 부장만 */}
+        {/* ☆ 출제 리마인더 배너도 부장만 */}
         {isLeader && <ReminderBanner majors={remindedMajors} onCreate={() => openCreate()} />}
 
         {isLoading ? (
@@ -630,15 +582,14 @@ export default function AssignmentPage() {
         )}
       </div>
 
-      {/* 부장일 때만 출제 창 (내 정보를 불러오기 전엔 잠깐 기다렸다가 열린다) */}
-      {isCreateOpen && isLeader && (
+      {isCreateOpen && (
         <AssignmentCreateModal
           skills={pageSkills}
           initialSkillId={initialSkillId}
           editing={null}
           remindedMajors={remindedMajors}
           onSubmit={handleSubmitAssignment}
-          onClose={closeCreate}
+          onClose={() => setIsCreateOpen(false)}
         />
       )}
 

@@ -1,8 +1,9 @@
 // src/pages/ArchivePage.tsx
 // ★ useCallback: 토스트 닫기 함수를 한 번만 만들어 두려고
 import { useCallback, useState, useEffect } from "react";
+
 // ☆ useSearchParams: 주소의 ?activityId=3 을 읽는다 (활동 화면에서 바로 열 수 있게)
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 // ★ 다른 화면과 같은 공통 헤더 (진짜 알림 · 새로 만들기 메뉴)
 import { Header } from "../components/layout/Header";
 import Dropdown from "../components/common/Dropdown";
@@ -15,8 +16,7 @@ import {
   deletePost,
   getPost,
   getPosts,
-  comparePosts,
-  type ApiPost,
+  getPostTags,
   type ApiPostSummary,
   // ☆ 서버에 보낼 검색 조건 모양
   type PostSearchCondition,
@@ -24,6 +24,7 @@ import {
 import { createComment, getComments } from "../api/commentApi";
 // ☆ 진짜 활동 목록
 import { getActivities, type ActivitySummary } from "../api/activityApi";
+import { getMyProfile } from "../apis/members";
 
 interface Comment {
   id: number;
@@ -33,14 +34,13 @@ interface Comment {
   text: string;
 }
 
-type ArchiveTab = "all" | "my" | "compare" | "feedback";
+type ArchiveTab = "all" | "my" | "feedback";
 
 // ★ 토스트 하나의 모양 (id가 바뀌면 같은 문구여도 새로 뜬다)
 type ToastState = { id: number; message: string; type: "success" | "info" };
 
 // ☆ 활동 드롭다운 맨 위 "전체" 항목
 const ALL_ACTIVITIES = "전체 활동";
-const periodFilterOptions = ["기간 선택", "전체"];
 
 // ★ 에러를 토스트 문구로 바꾸기 (Error면 그 메시지, 아니면 기본 문구)
 const toErrorMessage = (error: unknown, fallback: string) =>
@@ -61,6 +61,7 @@ const toActivityId = (value: string | null) => {
 
 export default function ArchivePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
 
   // ★ 가짜 알림 창·새로 만들기 메뉴 상태는 지웠다 (공통 Header가 대신한다)
@@ -74,7 +75,14 @@ export default function ArchivePage() {
   );
   // ☆ 서버의 진짜 활동 목록 (드롭다운·활동 이름 표시용)
   const [activities, setActivities] = useState<ActivitySummary[]>([]);
-  const [selectedPeriod, setSelectedPeriod] = useState("기간 선택");
+  const [selectedTag, setSelectedTag] = useState("전체 태그");
+  const [serverTags, setServerTags] = useState<string[]>([]);
+  const [dateFilterMode, setDateFilterMode] = useState<
+    "all" | "before" | "after" | "between"
+  >("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [myMemberId, setMyMemberId] = useState<number | null>(null);
 
   const [articles, setArticles] = useState<Article[]>(() => getArticles());
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(
@@ -82,7 +90,9 @@ export default function ArchivePage() {
   );
 
   // ☆ 활동 번호 → 이름 표
-  const activityNameById = new Map(activities.map((a) => [a.id, a.name]));
+  const activityNameById = new Map<number, string>(
+    activities.map((a) => [a.id, a.name] as const),
+  );
   // ☆ 정리글의 활동 칸 글자: 숫자(활동 번호)면 진짜 이름으로, 아니면 그대로 ("활동 미지정" 등)
   const activityLabel = (value: string) =>
     /^\d+$/.test(value)
@@ -99,21 +109,82 @@ export default function ArchivePage() {
   const selectedArticle =
     articles.find((article) => article.id === selectedArticleId) ?? null;
 
-  const filteredArticles = articles.filter((article) =>
-    `${article.title} ${article.content} ${activityLabel(article.activity)} ${(article.tags ?? []).join(" ")}`
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase().trim()),
-  );
+  const tagOptions: string[] = Array.from(
+    new Set<string>([
+      ...serverTags,
+      ...articles.flatMap((article) => article.tags ?? []),
+    ]),
+  ).sort((a, b) => a.localeCompare(b, "ko"));
+  const filteredArticles = articles.filter((article) => {
+    const matchesSearch =
+      `${article.title} ${article.content} ${activityLabel(article.activity)} ${(article.tags ?? []).join(" ")}`
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase().trim());
+    const matchesTag =
+      selectedTag === "전체 태그" || (article.tags ?? []).includes(selectedTag);
+    const articleDate = (article.date ?? "").slice(0, 10);
+    const matchesDate =
+      dateFilterMode === "all" ||
+      (dateFilterMode === "before" &&
+        Boolean(dateTo) &&
+        articleDate <= dateTo) ||
+      (dateFilterMode === "after" &&
+        Boolean(dateFrom) &&
+        articleDate >= dateFrom) ||
+      (dateFilterMode === "between" &&
+        Boolean(dateFrom) &&
+        Boolean(dateTo) &&
+        articleDate >= dateFrom &&
+        articleDate <= dateTo);
+    return matchesSearch && matchesTag && matchesDate;
+  });
 
   const [commentList, setCommentList] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
 
   // ★ 지금 떠 있는 토스트 (null이면 안 보임)
   const [toast, setToast] = useState<ToastState | null>(null);
-  const showToast = (message: string, type: "success" | "info" = "info") => {
-    setToast((prev) => ({ id: (prev?.id ?? 0) + 1, message, type }));
-  };
+  const showToast = useCallback(
+    (message: string, type: "success" | "info" = "info") => {
+      setToast((prev) => ({
+        id: (prev?.id ?? 0) + 1,
+        message,
+        type,
+      }));
+    },
+    [],
+  );
   const closeToast = useCallback(() => setToast(null), []);
+
+useEffect(() => {
+    let cancelled = false;
+    getMyProfile()
+      .then((profile) => {
+        if (!cancelled) setMyMemberId(profile.memberId);
+      })
+      .catch((error: unknown) =>
+        console.error("내 회원 정보 조회 실패:", error),
+      );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // 서버에 실제 등록된 태그를 필터 옵션으로 사용한다.
+  useEffect(() => {
+    let cancelled = false;
+    getPostTags()
+      .then((tags) => {
+        if (!cancelled) setServerTags(Array.isArray(tags) ? tags : []);
+      })
+      .catch((error: unknown) => {
+        // 서버 태그 조회에 실패하면 글 응답에 포함된 태그로 필터를 유지한다.
+        console.error("태그 목록 조회 실패:", error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // ☆ 활동 목록은 처음에 한 번만 불러온다 (못 불러와도 "전체 활동"만 보이고 화면은 그대로)
   useEffect(() => {
@@ -159,46 +230,33 @@ export default function ArchivePage() {
 
         let loaded: Article[] = [];
 
-        if (selectedTab === "compare") {
-          // 비교할 회차 ID는 현재 화면의 articles 상태가 아니라 서버 목록에서 가져온다.
-          // ☆ 활동을 골랐으면 그 활동의 정리글에서 회차를 찾는다
-          const response = await getPosts(activityCondition, 0, 50);
-          const summaries: ApiPostSummary[] = response.content ?? [];
-
-          const sessionId = summaries.find(
-            (summary) =>
-              summary.sessionId !== undefined && summary.sessionId !== null,
-          )?.sessionId;
-
-          if (sessionId === undefined) {
-            loaded = [];
-          } else {
-            const posts = await comparePosts({ sessionId });
-            loaded = posts.map((post: ApiPost) => ({
-              id: String(post.id),
-              title: post.title,
-              // ☆ 활동 번호를 글자로 저장해 두고, 보여줄 때 진짜 이름으로 바꾼다
-              activity: post.activityId
-                ? String(post.activityId)
-                : "활동 미지정",
-              round: post.sessionId ? `${post.sessionId}회차` : "회차 미지정",
-              tags: [],
-              date: (post.createdAt || "").slice(0, 10),
-              author: post.authorName ?? "알 수 없음",
-              commentsCount: 0,
-              content: post.content,
-              feedbackOption: "none",
-            }));
-          }
-        } else {
+        {
           // ☆ 탭 조건(내가 쓴 글) + 활동 조건을 합친다
+          const dateCondition: Pick<PostSearchCondition, "from" | "to"> =
+            dateFilterMode === "before" && dateTo
+              ? { to: dateTo }
+              : dateFilterMode === "after" && dateFrom
+                ? { from: dateFrom }
+                : dateFilterMode === "between"
+                  ? {
+                      ...(dateFrom ? { from: dateFrom } : {}),
+                      ...(dateTo ? { to: dateTo } : {}),
+                    }
+                  : {};
+
           const condition: PostSearchCondition = {
             ...activityCondition,
+            ...dateCondition,
             ...(selectedTab === "my" ? { author: "me" as const } : {}),
+            ...(selectedTag !== "전체 태그" ? { tag: selectedTag } : {}),
           };
 
           const response = await getPosts(condition, 0, 50);
-          const summaries: ApiPostSummary[] = response.content ?? [];
+          const summaries: ApiPostSummary[] = (response.content ?? []).filter(
+            (summary) =>
+              selectedTab !== "my" ||
+              (myMemberId !== null && summary.authorId === myMemberId),
+          );
 
           const localArticles = getArticles();
           const localMap = new Map(
@@ -222,7 +280,9 @@ export default function ArchivePage() {
                   round: post.sessionId
                     ? `${post.sessionId}회차`
                     : "회차 미지정",
-                  tags: localArticle?.tags ?? [],
+                  tags: Array.isArray(post.tags)
+                    ? post.tags
+                    : (summary.tags ?? localArticle?.tags ?? []),
                   date: (post.createdAt || summary.createdAt || "").slice(
                     0,
                     10,
@@ -243,7 +303,7 @@ export default function ArchivePage() {
                   round: summary.sessionId
                     ? `${summary.sessionId}회차`
                     : "회차 미지정",
-                  tags: localArticle?.tags ?? [],
+                  tags: summary.tags ?? localArticle?.tags ?? [],
                   date: (summary.createdAt || "").slice(0, 10),
                   author: summary.authorName ?? "알 수 없음",
                   commentsCount: localArticle?.commentsCount ?? 0,
@@ -281,7 +341,16 @@ export default function ArchivePage() {
       cancelled = true;
     };
     // ☆ 탭이나 고른 활동이 바뀌면 다시 불러온다
-  }, [selectedTab, selectedActivityId]);
+  }, [
+    selectedTab,
+    selectedActivityId,
+    selectedTag,
+    myMemberId,
+    dateFilterMode,
+    dateFrom,
+    dateTo,
+    showToast,
+  ]);
 
   useEffect(() => {
     if (!selectedArticleId || !/^\d+$/.test(selectedArticleId)) {
@@ -408,8 +477,6 @@ export default function ArchivePage() {
         return "작성된 정리글이 없습니다.";
       case "my":
         return "내가 작성한 정리글이 없습니다.";
-      case "compare":
-        return "비교할 수 있는 공통 주제 정리글이 없습니다.";
       case "feedback":
         return "피드백 제안이 등록된 정리글이 없습니다.";
     }
@@ -423,110 +490,110 @@ export default function ArchivePage() {
         subtitle={`모든 정리글은 팀 전체에 공개됩니다 · 총 ${articles.length}개`}
       />
 
-      <div className="bg-white border-b border-gray-200 px-8 py-3 flex justify-between items-center gap-3 shrink-0">
+      <div className="bg-white border-b border-gray-200 px-6 py-3 flex flex-wrap justify-between items-center gap-3 shrink-0">
         <div className="flex gap-1.5 text-xs font-semibold">
-          <button
-            onClick={() => handleTabChange("all")}
-            className={`px-3.5 py-1.5 rounded-xl transition ${
-              selectedTab === "all"
-                ? "bg-black text-white"
-                : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"
-            }`}
-          >
-            전체
-          </button>
-
-          <button
-            onClick={() => handleTabChange("my")}
-            className={`px-3.5 py-1.5 rounded-xl transition ${
-              selectedTab === "my"
-                ? "bg-black text-white"
-                : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"
-            }`}
-          >
-            내가 쓴 정리글
-          </button>
-
-          <button
-            onClick={() => handleTabChange("compare")}
-            className={`px-3.5 py-1.5 rounded-xl transition ${
-              selectedTab === "compare"
-                ? "bg-black text-white"
-                : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"
-            }`}
-          >
-            공통 주제 비교
-          </button>
-
-          <button
-            onClick={() => handleTabChange("feedback")}
-            className={`px-3.5 py-1.5 rounded-xl transition ${
-              selectedTab === "feedback"
-                ? "bg-black text-white"
-                : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"
-            }`}
-          >
-            피드백 제안
-          </button>
+          {(["all", "my", "feedback"] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => handleTabChange(tab)}
+              className={`px-3.5 py-1.5 rounded-xl transition ${
+                selectedTab === tab
+                  ? "bg-black text-white"
+                  : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+              }`}
+            >
+              {
+                { all: "전체", my: "내가 쓴 정리글", feedback: "피드백 제안" }[
+                  tab
+                ]
+              }
+            </button>
+          ))}
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* ★ 검색창을 헤더에서 이 줄로 옮겼다 */}
-          <div className="relative w-56">
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="정리글 검색"
-              className="w-full pl-8 pr-3 py-2 bg-gray-100/80 rounded-lg text-xs focus:outline-none focus:bg-white border border-transparent focus:border-gray-300 transition"
-            />
-
-            <svg
-              className="w-4 h-4 text-gray-400 absolute left-2.5 top-2"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-          </div>
-
-          {/* ☆ 진짜 활동 목록 드롭다운 */}
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="정리글 검색"
+            aria-label="정리글 검색"
+            className="w-40 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs focus:outline-none focus:border-gray-400"
+          />
           <Dropdown
             options={activityOptions}
             value={selectedActivityName}
             onChange={handleActivityChange}
           />
-
-          <Dropdown
-            options={periodFilterOptions}
-            value={selectedPeriod}
-            onChange={setSelectedPeriod}
-          />
-
-          <button
-            onClick={() => navigate("/editor")}
-            className="px-3.5 py-1.5 bg-black text-white text-xs font-semibold rounded-lg hover:bg-gray-800 transition flex items-center gap-1.5"
+          <select
+            value={selectedTag}
+            onChange={(e) => setSelectedTag(e.target.value)}
+            aria-label="태그 필터"
+            className="rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs"
           >
-            <svg
-              className="w-3.5 h-3.5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+            <option value="전체 태그">전체 태그</option>
+            {tagOptions.map((tag) => (
+              <option key={tag} value={tag}>
+                #{tag}
+              </option>
+            ))}
+          </select>
+          <select
+            value={dateFilterMode}
+            onChange={(e) =>
+              setDateFilterMode(e.target.value as typeof dateFilterMode)
+            }
+            aria-label="기간 필터"
+            className="rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs"
+          >
+            <option value="all">전체 기간</option>
+            <option value="before">이 날짜 이전</option>
+            <option value="after">이 날짜 이후</option>
+            <option value="between">기간 사이</option>
+          </select>
+          {dateFilterMode === "before" && (
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              aria-label="기준 날짜"
+              className="rounded-lg border border-gray-200 px-2 py-2 text-xs"
+            />
+          )}
+          {dateFilterMode === "after" && (
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              aria-label="기준 날짜"
+              className="rounded-lg border border-gray-200 px-2 py-2 text-xs"
+            />
+          )}
+          {dateFilterMode === "between" && (
+            <>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                aria-label="시작 날짜"
+                className="rounded-lg border border-gray-200 px-2 py-2 text-xs"
               />
-            </svg>
-            <span>정리글 작성</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                aria-label="종료 날짜"
+                className="rounded-lg border border-gray-200 px-2 py-2 text-xs"
+              />
+            </>
+          )}
+          <button
+            type="button"
+            onClick={() => navigate("/editor")}
+            className="rounded-lg bg-black px-3.5 py-2 text-xs font-semibold text-white hover:bg-gray-800"
+          >
+            정리글 작성
           </button>
         </div>
       </div>
@@ -537,24 +604,12 @@ export default function ArchivePage() {
             <span className="text-xs font-bold text-gray-800">
               {selectedTab === "all" && "전체 정리글"}
               {selectedTab === "my" && "내가 작성한 정리글"}
-              {selectedTab === "compare" && "공통 주제 비교"}
               {selectedTab === "feedback" && "피드백 제안"}{" "}
               {filteredArticles.length}개
             </span>
           </div>
 
           <div className="flex-1 overflow-y-auto p-3">
-            {selectedTab === "compare" && (
-              <div className="mb-3 rounded-xl bg-blue-50 p-3">
-                <p className="text-xs font-bold text-blue-900">
-                  공통 주제 비교
-                </p>
-                <p className="mt-1 text-[11px] text-blue-700">
-                  비교 API에서 반환된 정리글을 확인할 수 있습니다.
-                </p>
-              </div>
-            )}
-
             {selectedTab === "feedback" && (
               <div className="mb-3 rounded-xl bg-purple-50 p-3">
                 <p className="text-xs font-bold text-purple-900">피드백 제안</p>
@@ -785,13 +840,14 @@ export default function ArchivePage() {
         </div>
       </div>
 
-      {/* ★ 정리글 목록·댓글·삭제 결과 토스트 */}
-      {toast && (
+      {/* 정리글 목록·댓글·삭제 결과 토스트 */}
+      {toast && <Toast key={toast.id} message={toast.message} type={toast.type} onClose={closeToast} />}
+      {!toast && (location.state as { toastMessage?: string; toastType?: "success" | "info" } | null)?.toastMessage && (
         <Toast
-          key={toast.id}
-          message={toast.message}
-          type={toast.type}
-          onClose={closeToast}
+          key={`${location.key}-${(location.state as { toastMessage?: string }).toastMessage}`}
+          message={(location.state as { toastMessage: string }).toastMessage}
+          type={(location.state as { toastType?: "success" | "info" }).toastType ?? "success"}
+          onClose={() => navigate(`${location.pathname}${location.search}`, { replace: true, state: null })}
         />
       )}
     </div>
